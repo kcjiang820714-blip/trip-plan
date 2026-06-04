@@ -70,6 +70,9 @@ const timeInput = document.querySelector("#timeInput");
 const placeInput = document.querySelector("#placeInput");
 const typeInput = document.querySelector("#typeInput");
 const noteInput = document.querySelector("#noteInput");
+const flightFields = document.querySelector("#flightFields");
+const airlineInput = document.querySelector("#airlineInput");
+const flightCodeInput = document.querySelector("#flightCodeInput");
 const tripNameInput = document.querySelector("#tripNameInput");
 const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
@@ -130,7 +133,9 @@ function normalizeItem(item) {
     time: item.time || "",
     place: item.place || "",
     type: item.type || "",
-    note: item.note || ""
+    note: item.note || "",
+    airline: item.airline || "",
+    flightCode: item.flightCode || ""
   };
 }
 
@@ -286,6 +291,7 @@ function renderTrip() {
           <div>
             <h3>${escapeHtml(item.place)}</h3>
             <span class="meta">${escapeHtml(item.type)}</span>
+            ${renderFlightInfo(item)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
               <button class="text-button" type="button" data-edit="${index}">編輯</button>
@@ -299,6 +305,13 @@ function renderTrip() {
 
 function countItems(trip) {
   return trip.days.reduce((total, day) => total + day.items.length, 0);
+}
+
+function renderFlightInfo(item) {
+  if (item.type !== "飛機") return "";
+  const details = [item.airline, item.flightCode].filter(Boolean).join(" · ");
+  if (!details) return "";
+  return `<p class="flight-info">${escapeHtml(details)}</p>`;
 }
 
 function showHome() {
@@ -344,14 +357,17 @@ function closeModal(dialog) {
 
 function openItemDialog(index = null) {
   state.editingItemIndex = index;
-  const item = index === null ? { time: "", place: "", type: "", note: "" } : currentDay().items[index];
+  const item = index === null ? { time: "", place: "", type: "景點", note: "", airline: "", flightCode: "" } : currentDay().items[index];
 
   dialogTitle.textContent = index === null ? "新增行程" : "編輯行程";
   deleteItemButton.hidden = index === null;
   timeInput.value = item.time;
   placeInput.value = item.place;
-  typeInput.value = item.type;
+  typeInput.value = [...typeInput.options].some((option) => option.value === item.type) ? item.type : "其他";
   noteInput.value = item.note;
+  airlineInput.value = item.airline || "";
+  flightCodeInput.value = item.flightCode || "";
+  syncFlightFields();
   openModal(itemDialog);
 }
 
@@ -401,6 +417,7 @@ document.querySelector("#addItemButton").addEventListener("click", () => openIte
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
+typeInput.addEventListener("change", syncFlightFields);
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -435,7 +452,9 @@ itemForm.addEventListener("submit", (event) => {
     time: timeInput.value.trim(),
     place: placeInput.value.trim(),
     type: typeInput.value.trim(),
-    note: noteInput.value.trim()
+    note: noteInput.value.trim(),
+    airline: typeInput.value === "飛機" ? airlineInput.value.trim() : "",
+    flightCode: typeInput.value === "飛機" ? flightCodeInput.value.trim().toUpperCase() : ""
   };
 
   if (state.editingItemIndex === null) {
@@ -449,6 +468,13 @@ itemForm.addEventListener("submit", (event) => {
   closeModal(itemDialog);
   render();
 });
+
+function syncFlightFields() {
+  const isFlight = typeInput.value === "飛機";
+  flightFields.hidden = !isFlight;
+  airlineInput.required = isFlight;
+  flightCodeInput.required = isFlight;
+}
 
 deleteItemButton.addEventListener("click", () => {
   if (state.editingItemIndex === null) return;

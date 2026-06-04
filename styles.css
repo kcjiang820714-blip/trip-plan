@@ -28,7 +28,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -378,7 +379,8 @@ h2 {
 }
 
 .editor input,
-.editor textarea {
+.editor textarea,
+.editor select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -389,6 +391,19 @@ h2 {
 
 .editor input[readonly] {
   background: #eef4f1;
+  color: var(--brand-dark);
+  font-weight: 900;
+}
+
+.flight-fields {
+  display: grid;
+  gap: 14px;
+  border-left: 4px solid var(--accent);
+  padding-left: 12px;
+}
+
+.flight-info {
+  margin-bottom: 8px;
   color: var(--brand-dark);
   font-weight: 900;
 }

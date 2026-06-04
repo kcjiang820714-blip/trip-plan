@@ -83,7 +83,7 @@
 
         <label>
           時間
-          <input id="timeInput" name="time" placeholder="09:30" required />
+          <input id="timeInput" name="time" type="time" required />
         </label>
 
         <label>
@@ -93,8 +93,29 @@
 
         <label>
           交通 / 分類
-          <input id="typeInput" name="type" placeholder="巴士、步行、餐廳" required />
+          <select id="typeInput" name="type" required>
+            <option value="景點">景點</option>
+            <option value="餐廳">餐廳</option>
+            <option value="交通">交通</option>
+            <option value="飛機">飛機</option>
+            <option value="住宿">住宿</option>
+            <option value="購物">購物</option>
+            <option value="散步">散步</option>
+            <option value="其他">其他</option>
+          </select>
         </label>
+
+        <section class="flight-fields" id="flightFields" hidden>
+          <label>
+            航空公司
+            <input id="airlineInput" name="airline" placeholder="長榮航空" />
+          </label>
+
+          <label>
+            航班代碼
+            <input id="flightCodeInput" name="flightCode" placeholder="BR198" autocapitalize="characters" />
+          </label>
+        </section>
 
         <label>
           備註
@@ -142,6 +163,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=6" type="module"></script>
+    <script src="./app.js?v=7" type="module"></script>
   </body>
 </html>
