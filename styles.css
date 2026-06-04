@@ -387,6 +387,12 @@ h2 {
   background: white;
 }
 
+.editor input[readonly] {
+  background: #eef4f1;
+  color: var(--brand-dark);
+  font-weight: 900;
+}
+
 [hidden] {
   display: none !important;
 }

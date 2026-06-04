@@ -4,6 +4,8 @@ const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const defaultTrip = {
   id: createId(),
   title: "京都三日散步",
+  startDate: "2026-10-12",
+  endDate: "2026-10-14",
   dates: "2026/10/12 - 2026/10/14",
   days: [
     {
@@ -69,7 +71,8 @@ const placeInput = document.querySelector("#placeInput");
 const typeInput = document.querySelector("#typeInput");
 const noteInput = document.querySelector("#noteInput");
 const tripNameInput = document.querySelector("#tripNameInput");
-const tripDatesInput = document.querySelector("#tripDatesInput");
+const tripStartInput = document.querySelector("#tripStartInput");
+const tripEndInput = document.querySelector("#tripEndInput");
 const tripDaysInput = document.querySelector("#tripDaysInput");
 
 function loadLibrary() {
@@ -98,12 +101,19 @@ function loadLibrary() {
 
 function normalizeLibrary(library) {
   return {
-    trips: library.trips.map((trip) => ({
-      id: trip.id || createId(),
-      title: trip.title || "未命名旅程",
-      dates: trip.dates || "日期未設定",
-      days: Array.isArray(trip.days) && trip.days.length > 0 ? trip.days.map(normalizeDay) : createBlankDays(3)
-    }))
+    trips: library.trips.map((trip) => {
+      const dateRange = normalizeTripDates(trip);
+      const days = Array.isArray(trip.days) && trip.days.length > 0 ? trip.days.map(normalizeDay) : createBlankDays(dateRange.dayCount, dateRange.startDate);
+
+      return {
+        id: trip.id || createId(),
+        title: trip.title || "未命名旅程",
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        dates: dateRange.label,
+        days
+      };
+    })
   };
 }
 
@@ -124,12 +134,80 @@ function normalizeItem(item) {
   };
 }
 
-function createBlankDays(count) {
+function normalizeTripDates(trip) {
+  const parsed = trip.startDate && trip.endDate ? { startDate: trip.startDate, endDate: trip.endDate } : parseDateRange(trip.dates);
+  const startDate = parsed?.startDate || todayString();
+  const endDate = parsed?.endDate || addDays(startDate, Math.max(0, (trip.days?.length || 3) - 1));
+
+  return {
+    startDate,
+    endDate,
+    dayCount: calculateDayCount(startDate, endDate),
+    label: formatDateRange(startDate, endDate)
+  };
+}
+
+function parseDateRange(value) {
+  const matches = String(value || "").match(/\d{4}\/\d{1,2}\/\d{1,2}/g);
+  if (!matches || matches.length < 2) return null;
+
+  return {
+    startDate: matches[0].replaceAll("/", "-").replace(/-(\d)(?=-|$)/g, "-0$1"),
+    endDate: matches[1].replaceAll("/", "-").replace(/-(\d)(?=-|$)/g, "-0$1")
+  };
+}
+
+function createBlankDays(count, startDate = null) {
   return Array.from({ length: count }, (_, index) => ({
     title: `第 ${index + 1} 天`,
-    date: `Day ${index + 1}`,
+    date: startDate ? formatShortDate(addDays(startDate, index)) : `Day ${index + 1}`,
     items: []
   }));
+}
+
+function syncTripDayDates(trip) {
+  trip.days = trip.days.map((day, index) => ({
+    ...day,
+    title: day.title || `第 ${index + 1} 天`,
+    date: formatShortDate(addDays(trip.startDate, index))
+  }));
+}
+
+function todayString() {
+  const today = new Date();
+  return toDateInputValue(today.getFullYear(), today.getMonth() + 1, today.getDate());
+}
+
+function addDays(dateString, days) {
+  const date = createUtcDate(dateString);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toDateInputValue(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function calculateDayCount(startDate, endDate) {
+  const start = createUtcDate(startDate);
+  const end = createUtcDate(endDate);
+  const diff = Math.round((end - start) / 86400000) + 1;
+  return Math.max(1, Math.min(30, Number.isFinite(diff) ? diff : 1));
+}
+
+function formatDateRange(startDate, endDate) {
+  return `${startDate.replaceAll("-", "/")} - ${endDate.replaceAll("-", "/")}`;
+}
+
+function formatShortDate(dateString) {
+  const date = createUtcDate(dateString);
+  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}（${weekdays[date.getUTCDay()]}）`;
+}
+
+function createUtcDate(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function toDateInputValue(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function createId() {
@@ -285,17 +363,19 @@ function openTripDialog(tripId = null) {
   deleteTripButton.hidden = !trip;
   deleteTripButton.disabled = state.library.trips.length <= 1;
   tripNameInput.value = trip?.title || "";
-  tripDatesInput.value = trip?.dates || "";
+  tripStartInput.value = trip?.startDate || todayString();
+  tripEndInput.value = trip?.endDate || addDays(tripStartInput.value, 2);
   tripDaysInput.value = trip?.days.length || 3;
+  updateTripDayPreview();
   openModal(tripDialog);
 }
 
 function resizeTripDays(trip, dayCount) {
   if (dayCount > trip.days.length) {
-    trip.days.push(...createBlankDays(dayCount - trip.days.length).map((day, index) => ({
+    trip.days.push(...createBlankDays(dayCount - trip.days.length, addDays(trip.startDate, trip.days.length)).map((day, index) => ({
       ...day,
       title: `第 ${trip.days.length + index + 1} 天`,
-      date: `Day ${trip.days.length + index + 1}`
+      date: formatShortDate(addDays(trip.startDate, trip.days.length + index))
     })));
   }
 
@@ -304,10 +384,23 @@ function resizeTripDays(trip, dayCount) {
   }
 }
 
+function updateTripDayPreview() {
+  if (!tripStartInput.value) return;
+
+  if (!tripEndInput.value || tripEndInput.value < tripStartInput.value) {
+    tripEndInput.value = tripStartInput.value;
+  }
+
+  const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
+  tripDaysInput.value = `${dayCount} 天`;
+}
+
 document.querySelector("#addTripButton").addEventListener("click", () => openTripDialog());
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
+tripStartInput.addEventListener("change", updateTripDayPreview);
+tripEndInput.addEventListener("change", updateTripDayPreview);
 
 tripList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-trip]");
@@ -363,7 +456,10 @@ tripForm.addEventListener("submit", (event) => {
   if (tripForm.returnValue === "cancel") return;
   event.preventDefault();
 
-  const dayCount = Math.max(1, Math.min(30, Number(tripDaysInput.value) || 1));
+  updateTripDayPreview();
+  const startDate = tripStartInput.value;
+  const endDate = tripEndInput.value;
+  const dayCount = calculateDayCount(startDate, endDate);
   let trip = state.editingTripId
     ? state.library.trips.find((item) => item.id === state.editingTripId)
     : null;
@@ -372,14 +468,19 @@ tripForm.addEventListener("submit", (event) => {
     trip = {
       id: createId(),
       title: tripNameInput.value.trim(),
-      dates: tripDatesInput.value.trim(),
-      days: createBlankDays(dayCount)
+      startDate,
+      endDate,
+      dates: formatDateRange(startDate, endDate),
+      days: createBlankDays(dayCount, startDate)
     };
     state.library.trips.unshift(trip);
   } else {
     trip.title = tripNameInput.value.trim();
-    trip.dates = tripDatesInput.value.trim();
+    trip.startDate = startDate;
+    trip.endDate = endDate;
+    trip.dates = formatDateRange(startDate, endDate);
     resizeTripDays(trip, dayCount);
+    syncTripDayDates(trip);
   }
 
   state.activeTripId = trip.id;

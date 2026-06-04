@@ -121,13 +121,18 @@
         </label>
 
         <label>
-          日期範圍
-          <input id="tripDatesInput" name="tripDates" required />
+          開始日期
+          <input id="tripStartInput" name="tripStart" type="date" required />
+        </label>
+
+        <label>
+          結束日期
+          <input id="tripEndInput" name="tripEnd" type="date" required />
         </label>
 
         <label>
           天數
-          <input id="tripDaysInput" name="tripDays" inputmode="numeric" min="1" max="30" type="number" required />
+          <input id="tripDaysInput" name="tripDays" readonly />
         </label>
 
         <footer>
@@ -137,6 +142,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=3" type="module"></script>
+    <script src="./app.js?v=5" type="module"></script>
   </body>
 </html>
