@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#136f63" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="旅程本" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>旅程本</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="homeView">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">旅程本</p>
+            <h1>我的旅程</h1>
+          </div>
+          <button class="primary-button" id="addTripButton" type="button">新增旅程</button>
+        </header>
+
+        <section class="trip-list" id="tripList" aria-label="旅程清單"></section>
+      </section>
+
+      <section id="tripView" hidden>
+        <header class="topbar">
+          <button class="icon-button" id="backToTripsButton" type="button" aria-label="回旅程清單" title="回旅程清單">
+            ‹
+          </button>
+          <div class="title-group">
+            <p class="eyebrow">我的旅遊行程</p>
+            <h1 id="tripTitle">京都三日散步</h1>
+          </div>
+          <button class="icon-button" id="editTripButton" type="button" aria-label="編輯旅程" title="編輯旅程">
+            ✎
+          </button>
+        </header>
+
+        <section class="trip-visual" aria-label="旅程概覽">
+          <div class="route-line" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <p id="tripDates">2026/10/12 - 2026/10/14</p>
+            <strong id="tripSummary">3 天，9 個行程</strong>
+          </div>
+        </section>
+
+        <nav class="day-tabs" id="dayTabs" aria-label="選擇日期"></nav>
+
+        <section class="day-header">
+          <div>
+            <p class="eyebrow" id="activeDate">Day 1</p>
+            <h2 id="activeDayTitle">抵達京都</h2>
+          </div>
+          <button class="primary-button" id="addItemButton" type="button">新增行程</button>
+        </section>
+
+        <section class="timeline" id="timeline" aria-live="polite"></section>
+      </section>
+
+      <section class="install-panel" id="installPanel">
+        <div>
+          <strong>加入手機主畫面</strong>
+          <p>用 Safari 或 Chrome 打開後，選「分享」再選「加入主畫面」。</p>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="editor" id="itemDialog">
+      <form method="dialog" id="itemForm">
+        <header>
+          <h2 id="dialogTitle">新增行程</h2>
+          <button class="icon-button" value="cancel" type="submit" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          時間
+          <input id="timeInput" name="time" placeholder="09:30" required />
+        </label>
+
+        <label>
+          地點
+          <input id="placeInput" name="place" placeholder="清水寺" required />
+        </label>
+
+        <label>
+          交通 / 分類
+          <input id="typeInput" name="type" placeholder="巴士、步行、餐廳" required />
+        </label>
+
+        <label>
+          備註
+          <textarea id="noteInput" name="note" rows="4" placeholder="集合地點、訂位資訊、提醒事項"></textarea>
+        </label>
+
+        <footer>
+          <button class="secondary-button" id="deleteItemButton" type="button">刪除</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="tripDialog">
+      <form method="dialog" id="tripForm">
+        <header>
+          <h2 id="tripDialogTitle">編輯旅程</h2>
+          <button class="icon-button" value="cancel" type="submit" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          旅程名稱
+          <input id="tripNameInput" name="tripName" required />
+        </label>
+
+        <label>
+          日期範圍
+          <input id="tripDatesInput" name="tripDates" required />
+        </label>
+
+        <label>
+          天數
+          <input id="tripDaysInput" name="tripDays" inputmode="numeric" min="1" max="30" type="number" required />
+        </label>
+
+        <footer>
+          <button class="secondary-button" id="deleteTripButton" type="button">刪除旅程</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script src="./app.js?v=3" type="module"></script>
+  </body>
+</html>
