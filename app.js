@@ -402,6 +402,13 @@ document.querySelector("#editTripButton").addEventListener("click", () => openTr
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
 
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const dialog = document.querySelector(`#${button.dataset.closeDialog}`);
+    if (dialog) closeModal(dialog);
+  });
+});
+
 tripList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-trip]");
   if (!button) return;
@@ -422,7 +429,6 @@ timeline.addEventListener("click", (event) => {
 });
 
 itemForm.addEventListener("submit", (event) => {
-  if (itemForm.returnValue === "cancel") return;
   event.preventDefault();
 
   const item = {
@@ -453,7 +459,6 @@ deleteItemButton.addEventListener("click", () => {
 });
 
 tripForm.addEventListener("submit", (event) => {
-  if (tripForm.returnValue === "cancel") return;
   event.preventDefault();
 
   updateTripDayPreview();

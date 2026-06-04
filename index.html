@@ -78,7 +78,7 @@
       <form method="dialog" id="itemForm">
         <header>
           <h2 id="dialogTitle">新增行程</h2>
-          <button class="icon-button" value="cancel" type="submit" aria-label="關閉" title="關閉">×</button>
+          <button class="icon-button" data-close-dialog="itemDialog" type="button" aria-label="關閉" title="關閉">×</button>
         </header>
 
         <label>
@@ -112,7 +112,7 @@
       <form method="dialog" id="tripForm">
         <header>
           <h2 id="tripDialogTitle">編輯旅程</h2>
-          <button class="icon-button" value="cancel" type="submit" aria-label="關閉" title="關閉">×</button>
+          <button class="icon-button" data-close-dialog="tripDialog" type="button" aria-label="關閉" title="關閉">×</button>
         </header>
 
         <label>
@@ -142,6 +142,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=5" type="module"></script>
+    <script src="./app.js?v=6" type="module"></script>
   </body>
 </html>
