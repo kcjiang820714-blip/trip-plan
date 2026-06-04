@@ -263,10 +263,18 @@ function renderHome() {
       const itemCount = countItems(trip);
       return `
         <button class="trip-card" type="button" data-open-trip="${trip.id}">
-          <div>
+          <span class="trip-card-art" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+          <div class="trip-card-content">
             <h2>${escapeHtml(trip.title)}</h2>
             <p>${escapeHtml(trip.dates)}</p>
-            <p>${trip.days.length} 天，${itemCount} 個行程</p>
+            <div class="trip-card-metrics">
+              <span>${trip.days.length} 天</span>
+              <span>${itemCount} 個行程</span>
+            </div>
           </div>
           <strong>›</strong>
         </button>
@@ -361,7 +369,7 @@ function renderTrip() {
   timeline.innerHTML = day.items
     .map(
       (item, index) => `
-        <article class="item-card">
+        <article class="item-card" data-type="${escapeHtml(item.type)}">
           <div class="time">${escapeHtml(item.time)}</div>
           <div>
             <h3>${escapeHtml(item.place)}</h3>
