@@ -1,5 +1,6 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
+const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
 const defaultTrip = {
   id: createId(),
@@ -77,6 +78,10 @@ const tripNameInput = document.querySelector("#tripNameInput");
 const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
 const tripDaysInput = document.querySelector("#tripDaysInput");
+const exportButton = document.querySelector("#exportButton");
+const importButton = document.querySelector("#importButton");
+const importFileInput = document.querySelector("#importFileInput");
+const readonlyBanner = document.querySelector("#readonlyBanner");
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -215,12 +220,28 @@ function toDateInputValue(year, month, day) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function safeFileName(value) {
+  return String(value || "trip-book")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "-")
+    .slice(0, 60);
+}
+
 function createId() {
   return `trip-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function saveLibrary() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+}
+
+function setLibrary(library) {
+  state.library = normalizeLibrary(library);
+  state.activeTripId = state.library.trips[0]?.id || null;
+  state.activeDayIndex = 0;
+  saveLibrary();
+  render();
+  showHome();
 }
 
 function currentTrip() {
@@ -252,6 +273,60 @@ function renderHome() {
       `;
     })
     .join("");
+}
+
+function renderReadonlyMode() {
+  document.body.classList.toggle("is-readonly", isReadonly);
+  readonlyBanner.hidden = !isReadonly;
+}
+
+function exportLibrary() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    app: "trip-notebook",
+    version: 1,
+    trips: state.library.trips
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const firstTrip = state.library.trips[0]?.title || "旅程本";
+
+  link.href = url;
+  link.download = `${safeFileName(firstTrip)}-旅程本備份.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importLibrary(file) {
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const trips = Array.isArray(parsed.trips) ? parsed.trips : Array.isArray(parsed) ? parsed : null;
+
+    if (!trips || trips.length === 0) {
+      window.alert("這個檔案不是有效的旅程本備份。");
+      return;
+    }
+
+    const confirmed = window.confirm("匯入後會覆蓋這台裝置目前的旅程資料。確定要繼續嗎？");
+    if (!confirmed) return;
+
+    setLibrary({ trips });
+    window.alert("匯入完成。");
+  } catch {
+    window.alert("匯入失敗。請確認你選的是旅程本匯出的 JSON 檔。");
+  } finally {
+    importFileInput.value = "";
+  }
+}
+
+function googleMapsUrl(place) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
 }
 
 function renderTrip() {
@@ -294,6 +369,7 @@ function renderTrip() {
             ${renderFlightInfo(item)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
+              <a class="text-button" href="${googleMapsUrl(item.place)}" target="_blank" rel="noopener">地圖</a>
               <button class="text-button" type="button" data-edit="${index}">編輯</button>
             </div>
           </div>
@@ -356,6 +432,7 @@ function closeModal(dialog) {
 }
 
 function openItemDialog(index = null) {
+  if (isReadonly) return;
   state.editingItemIndex = index;
   const item = index === null ? { time: "", place: "", type: "景點", note: "", airline: "", flightCode: "" } : currentDay().items[index];
 
@@ -371,7 +448,22 @@ function openItemDialog(index = null) {
   openModal(itemDialog);
 }
 
+function populateTimeOptions() {
+  timeInput.innerHTML = `<option value="">選擇時間</option>`;
+
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      timeInput.append(option);
+    }
+  }
+}
+
 function openTripDialog(tripId = null) {
+  if (isReadonly) return;
   state.editingTripId = tripId;
   const trip = tripId ? state.library.trips.find((item) => item.id === tripId) : null;
 
@@ -415,6 +507,15 @@ document.querySelector("#addTripButton").addEventListener("click", () => openTri
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
+exportButton.addEventListener("click", () => {
+  if (!isReadonly) exportLibrary();
+});
+importButton.addEventListener("click", () => {
+  if (!isReadonly) importFileInput.click();
+});
+importFileInput.addEventListener("change", () => {
+  if (!isReadonly) importLibrary(importFileInput.files[0]);
+});
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
 typeInput.addEventListener("change", syncFlightFields);
@@ -440,6 +541,7 @@ dayTabs.addEventListener("click", (event) => {
 });
 
 timeline.addEventListener("click", (event) => {
+  if (isReadonly) return;
   const button = event.target.closest("[data-edit]");
   if (!button) return;
   openItemDialog(Number(button.dataset.edit));
@@ -447,6 +549,7 @@ timeline.addEventListener("click", (event) => {
 
 itemForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (isReadonly) return;
 
   const item = {
     time: timeInput.value.trim(),
@@ -477,6 +580,7 @@ function syncFlightFields() {
 }
 
 deleteItemButton.addEventListener("click", () => {
+  if (isReadonly) return;
   if (state.editingItemIndex === null) return;
   currentDay().items.splice(state.editingItemIndex, 1);
   saveLibrary();
@@ -486,6 +590,7 @@ deleteItemButton.addEventListener("click", () => {
 
 tripForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (isReadonly) return;
 
   updateTripDayPreview();
   const startDate = tripStartInput.value;
@@ -522,6 +627,7 @@ tripForm.addEventListener("submit", (event) => {
 });
 
 deleteTripButton.addEventListener("click", () => {
+  if (isReadonly) return;
   if (!state.editingTripId || state.library.trips.length <= 1) return;
   const trip = state.library.trips.find((item) => item.id === state.editingTripId);
   const confirmed = window.confirm(`確定刪除「${trip.title}」？這只會刪除這台手機瀏覽器裡的資料。`);
@@ -539,6 +645,8 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js");
 }
 
+populateTimeOptions();
 saveLibrary();
 render();
+renderReadonlyMode();
 showHome();

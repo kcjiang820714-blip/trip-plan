@@ -11,10 +11,15 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=2" />
   </head>
   <body>
     <main class="app-shell">
+      <section class="readonly-banner" id="readonlyBanner" hidden>
+        <strong>唯讀分享模式</strong>
+        <p>你可以查看行程與開啟地圖，不能新增、編輯或匯入資料。</p>
+      </section>
+
       <section id="homeView">
         <header class="topbar">
           <div>
@@ -23,6 +28,12 @@
           </div>
           <button class="primary-button" id="addTripButton" type="button">新增旅程</button>
         </header>
+
+        <section class="data-actions" aria-label="資料同步">
+          <button class="secondary-action" id="exportButton" type="button">匯出資料</button>
+          <button class="secondary-action" id="importButton" type="button">匯入資料</button>
+          <input id="importFileInput" type="file" accept="application/json,.json" hidden />
+        </section>
 
         <section class="trip-list" id="tripList" aria-label="旅程清單"></section>
       </section>
@@ -83,7 +94,7 @@
 
         <label>
           時間
-          <input id="timeInput" name="time" type="time" required />
+          <select id="timeInput" name="time" required></select>
         </label>
 
         <label>
@@ -163,6 +174,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=7" type="module"></script>
+    <script src="./app.js?v=11" type="module"></script>
   </body>
 </html>

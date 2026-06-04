@@ -39,6 +39,29 @@ select {
   padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
 }
 
+.readonly-banner {
+  margin-bottom: 14px;
+  border: 1px solid #b9d0c9;
+  border-radius: 8px;
+  background: #eef7f4;
+  color: var(--brand-dark);
+  padding: 14px;
+  line-height: 1.45;
+}
+
+.readonly-banner strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.is-readonly #addTripButton,
+.is-readonly .data-actions,
+.is-readonly #editTripButton,
+.is-readonly #addItemButton,
+.is-readonly .card-actions button {
+  display: none !important;
+}
+
 .title-group {
   flex: 1;
   min-width: 0;
@@ -144,6 +167,23 @@ h2 {
 .trip-list {
   display: grid;
   gap: 10px;
+}
+
+.data-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.secondary-action {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--brand-dark);
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .trip-card {
@@ -321,6 +361,7 @@ h2 {
   font-weight: 900;
   padding: 0;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .empty-state,
