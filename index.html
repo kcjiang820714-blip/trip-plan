@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=6" />
+    <link rel="stylesheet" href="./styles.css?v=7" />
   </head>
   <body>
     <main class="app-shell">
@@ -159,6 +159,24 @@
           </label>
         </section>
 
+        <section class="transport-fields" id="transportFields" hidden>
+          <label>
+            交通方式
+            <select id="transportModeInput" name="transportMode">
+              <option value="火車">火車</option>
+              <option value="地鐵">地鐵</option>
+              <option value="JR">JR</option>
+              <option value="公車/巴士">公車/巴士</option>
+              <option value="步行">步行</option>
+              <option value="其他">其他</option>
+            </select>
+          </label>
+
+          <section class="transport-segments" id="transportSegments" aria-label="交通轉乘段落"></section>
+
+          <button class="secondary-action add-segment-button" id="addTransportSegmentButton" type="button">新增轉乘</button>
+        </section>
+
         <label>
           備註
           <textarea id="noteInput" name="note" rows="4" placeholder="集合地點、訂位資訊、提醒事項"></textarea>
@@ -205,6 +223,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=15" type="module"></script>
+    <script src="./app.js?v=17" type="module"></script>
   </body>
 </html>

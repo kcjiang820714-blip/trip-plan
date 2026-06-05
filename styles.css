@@ -674,11 +674,45 @@ h2 {
   font-weight: 900;
 }
 
-.flight-fields {
+.flight-fields,
+.transport-fields {
   display: grid;
   gap: 14px;
   border-left: 4px solid var(--accent);
   padding-left: 12px;
+}
+
+.transport-fields {
+  border-left-color: var(--indigo);
+}
+
+.transport-segments {
+  display: grid;
+  gap: 12px;
+}
+
+.transport-segment-editor {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.46);
+  padding: 12px;
+}
+
+.transport-segment-editor header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.transport-segment-editor header strong {
+  color: var(--indigo);
+}
+
+.add-segment-button {
+  width: 100%;
 }
 
 .flight-info {
@@ -705,6 +739,45 @@ h2 {
   color: var(--indigo);
   font-weight: 950;
   overflow-wrap: anywhere;
+}
+
+.transport-info {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.transport-segment-card {
+  display: grid;
+  gap: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 11px;
+}
+
+.segment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.segment-heading strong {
+  color: var(--indigo);
+}
+
+.segment-heading span,
+.transport-chipline {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.transport-route {
+  display: grid;
+  gap: 5px;
+  color: var(--ink);
+  font-weight: 900;
 }
 
 [hidden] {

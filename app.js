@@ -81,6 +81,10 @@ const departureTerminalInput = document.querySelector("#departureTerminalInput")
 const arrivalTimeInput = document.querySelector("#arrivalTimeInput");
 const arrivalAirportInput = document.querySelector("#arrivalAirportInput");
 const arrivalTerminalInput = document.querySelector("#arrivalTerminalInput");
+const transportFields = document.querySelector("#transportFields");
+const transportModeInput = document.querySelector("#transportModeInput");
+const transportSegments = document.querySelector("#transportSegments");
+const addTransportSegmentButton = document.querySelector("#addTransportSegmentButton");
 const tripNameInput = document.querySelector("#tripNameInput");
 const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
@@ -154,7 +158,23 @@ function normalizeItem(item) {
     departureTerminal: item.departureTerminal || "",
     arrivalTime: item.arrivalTime || "",
     arrivalAirport: item.arrivalAirport || "",
-    arrivalTerminal: item.arrivalTerminal || ""
+    arrivalTerminal: item.arrivalTerminal || "",
+    transportMode: item.transportMode || "",
+    transportSegments: Array.isArray(item.transportSegments) ? item.transportSegments.map(normalizeTransportSegment) : []
+  };
+}
+
+function normalizeTransportSegment(segment) {
+  return {
+    mode: segment.mode || "",
+    company: segment.company || "",
+    departureStation: segment.departureStation || "",
+    routeName: segment.routeName || "",
+    routeNumber: segment.routeNumber || "",
+    departureTime: segment.departureTime || "",
+    trainNumber: segment.trainNumber || "",
+    arrivalStation: segment.arrivalStation || "",
+    arrivalTime: segment.arrivalTime || ""
   };
 }
 
@@ -397,16 +417,17 @@ function renderTrip() {
           >
             <span class="time">${escapeHtml(item.time)}</span>
             <span class="item-summary-content">
-              <span class="item-title">${escapeHtml(item.place)}</span>
+              <span class="item-title">${escapeHtml(getItemTitle(item))}</span>
               <span class="meta">${escapeHtml(item.type)}</span>
             </span>
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
             ${renderFlightInfo(item)}
+            ${renderTransportInfo(item)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
-              <a class="text-button" href="${googleMapsUrl(item.place)}" target="_blank" rel="noopener">地圖</a>
+              <a class="text-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">地圖</a>
               <button class="text-button" type="button" data-edit="${index}">編輯</button>
             </div>
           </div>
@@ -419,6 +440,26 @@ function renderTrip() {
 
 function countItems(trip) {
   return trip.days.reduce((total, day) => total + day.items.length, 0);
+}
+
+function getItemTitle(item) {
+  if (item.type === "交通") {
+    const first = item.transportSegments[0];
+    const last = item.transportSegments[item.transportSegments.length - 1];
+    const start = first?.departureStation;
+    const end = last?.arrivalStation;
+    if (start && end) return `${start} → ${end}`;
+  }
+
+  return item.place;
+}
+
+function getMapQuery(item) {
+  if (item.type === "交通") {
+    return item.transportSegments[0]?.departureStation || getItemTitle(item);
+  }
+
+  return item.place;
 }
 
 function renderFlightInfo(item) {
@@ -438,6 +479,39 @@ function renderFlightInfo(item) {
     <dl class="flight-info">
       ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
     </dl>
+  `;
+}
+
+function renderTransportInfo(item) {
+  if (item.type !== "交通" || item.transportSegments.length === 0) return "";
+
+  return `
+    <div class="transport-info">
+      ${item.transportSegments
+        .map((segment, index) => {
+          const chips = [
+            segment.company,
+            segment.routeName,
+            segment.routeNumber,
+            segment.trainNumber ? `車次 ${segment.trainNumber}` : ""
+          ].filter(Boolean);
+
+          return `
+            <section class="transport-segment-card">
+              <div class="segment-heading">
+                <strong>${index === 0 ? "交通" : `轉乘 ${index}`}</strong>
+                <span>${escapeHtml(segment.mode || item.transportMode || "交通")}</span>
+              </div>
+              ${chips.length ? `<p class="transport-chipline">${escapeHtml(chips.join(" · "))}</p>` : ""}
+              <div class="transport-route">
+                <span>${escapeHtml([segment.departureTime, segment.departureStation].filter(Boolean).join(" · "))}</span>
+                <span>${escapeHtml([segment.arrivalTime, segment.arrivalStation].filter(Boolean).join(" · "))}</span>
+              </div>
+            </section>
+          `;
+        })
+        .join("")}
+    </div>
   `;
 }
 
@@ -498,7 +572,9 @@ function openItemDialog(index = null) {
         departureTerminal: "",
         arrivalTime: "",
         arrivalAirport: "",
-        arrivalTerminal: ""
+        arrivalTerminal: "",
+        transportMode: "火車",
+        transportSegments: [createBlankTransportSegment("火車")]
       }
     : currentDay().items[index];
 
@@ -516,8 +592,133 @@ function openItemDialog(index = null) {
   arrivalTimeInput.value = item.arrivalTime || "";
   arrivalAirportInput.value = item.arrivalAirport || "";
   arrivalTerminalInput.value = item.arrivalTerminal || "";
+  transportModeInput.value = item.transportMode || item.transportSegments[0]?.mode || "火車";
+  const transportSegmentList = item.transportSegments.length
+    ? item.transportSegments
+    : [{ ...createBlankTransportSegment(transportModeInput.value), departureStation: item.type === "交通" ? item.place : "" }];
+  renderTransportSegments(transportSegmentList);
   syncFlightFields();
+  syncTransportFields();
   openModal(itemDialog);
+}
+
+function createBlankTransportSegment(mode = transportModeInput.value || "火車") {
+  return {
+    mode,
+    company: "",
+    departureStation: "",
+    routeName: "",
+    routeNumber: "",
+    departureTime: "",
+    trainNumber: "",
+    arrivalStation: "",
+    arrivalTime: ""
+  };
+}
+
+function renderTransportSegments(segments) {
+  transportSegments.innerHTML = segments.map((segment, index) => renderTransportSegment(segment, index)).join("");
+  syncTransportSegmentModeFields();
+}
+
+function renderTransportSegment(segment, index) {
+  const mode = segment.mode || transportModeInput.value || "火車";
+  const isBus = mode === "公車/巴士";
+  const isWalk = mode === "步行";
+  const routeLabel = isBus ? "路線名稱" : "路線名稱";
+  const departureLabel = isBus ? "出發站名" : isWalk ? "出發地點" : "出發車站";
+  const arrivalLabel = isBus ? "抵達站名" : isWalk ? "抵達地點" : "抵達車站";
+
+  return `
+    <section class="transport-segment-editor" data-transport-segment="${index}">
+      <header>
+        <strong>${index === 0 ? "第一段" : `轉乘 ${index}`}</strong>
+        ${index > 0 ? `<button class="text-button" type="button" data-remove-transport-segment="${index}">移除</button>` : ""}
+      </header>
+
+      <label>
+        交通方式
+        <select data-transport-field="mode">
+          <option value="火車" ${mode === "火車" ? "selected" : ""}>火車</option>
+          <option value="地鐵" ${mode === "地鐵" ? "selected" : ""}>地鐵</option>
+          <option value="JR" ${mode === "JR" ? "selected" : ""}>JR</option>
+          <option value="公車/巴士" ${mode === "公車/巴士" ? "selected" : ""}>公車/巴士</option>
+          <option value="步行" ${mode === "步行" ? "selected" : ""}>步行</option>
+          <option value="其他" ${mode === "其他" ? "selected" : ""}>其他</option>
+        </select>
+      </label>
+
+      <label data-mode-field="company">
+        營運公司
+        <input data-transport-field="company" value="${escapeHtml(segment.company)}" placeholder="${isBus ? "京都市巴士" : "京阪電車"}" />
+      </label>
+
+      <label>
+        ${departureLabel}
+        <input data-transport-field="departureStation" value="${escapeHtml(segment.departureStation)}" placeholder="${isBus ? "京都駅前" : "京都車站"}" required />
+      </label>
+
+      <label data-mode-field="routeName">
+        ${routeLabel}
+        <input data-transport-field="routeName" value="${escapeHtml(segment.routeName)}" placeholder="${isBus ? "洛巴士" : "烏丸線"}" />
+      </label>
+
+      <label data-mode-field="routeNumber">
+        路線編號
+        <input data-transport-field="routeNumber" value="${escapeHtml(segment.routeNumber)}" placeholder="206" />
+      </label>
+
+      <label>
+        出發時間
+        <input data-transport-field="departureTime" type="time" value="${escapeHtml(segment.departureTime)}" />
+      </label>
+
+      <label data-mode-field="trainNumber">
+        車次
+        <input data-transport-field="trainNumber" value="${escapeHtml(segment.trainNumber)}" placeholder="123A" />
+      </label>
+
+      <label>
+        ${arrivalLabel}
+        <input data-transport-field="arrivalStation" value="${escapeHtml(segment.arrivalStation)}" placeholder="${isBus ? "清水道" : "四條站"}" required />
+      </label>
+
+      <label>
+        抵達時間
+        <input data-transport-field="arrivalTime" type="time" value="${escapeHtml(segment.arrivalTime)}" />
+      </label>
+    </section>
+  `;
+}
+
+function collectTransportSegments() {
+  return Array.from(transportSegments.querySelectorAll("[data-transport-segment]")).map((segmentElement) => {
+    const valueFor = (field) => segmentElement.querySelector(`[data-transport-field="${field}"]`)?.value.trim() || "";
+    return normalizeTransportSegment({
+      mode: valueFor("mode"),
+      company: valueFor("company"),
+      departureStation: valueFor("departureStation"),
+      routeName: valueFor("routeName"),
+      routeNumber: valueFor("routeNumber"),
+      departureTime: valueFor("departureTime"),
+      trainNumber: valueFor("trainNumber"),
+      arrivalStation: valueFor("arrivalStation"),
+      arrivalTime: valueFor("arrivalTime")
+    });
+  });
+}
+
+function syncTransportSegmentModeFields() {
+  transportSegments.querySelectorAll("[data-transport-segment]").forEach((segmentElement) => {
+    const mode = segmentElement.querySelector('[data-transport-field="mode"]')?.value || transportModeInput.value;
+    const isBus = mode === "公車/巴士";
+    const isWalk = mode === "步行";
+    segmentElement.querySelectorAll('[data-mode-field="company"], [data-mode-field="routeName"]').forEach((field) => {
+      field.hidden = isWalk;
+    });
+    segmentElement.querySelector('[data-mode-field="routeNumber"]').hidden = !isBus;
+    segmentElement.querySelector('[data-mode-field="trainNumber"]').hidden = isBus || isWalk;
+  });
 }
 
 function populateTimeOptions() {
@@ -590,7 +791,35 @@ importFileInput.addEventListener("change", () => {
 });
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
-typeInput.addEventListener("change", syncFlightFields);
+typeInput.addEventListener("change", () => {
+  syncFlightFields();
+  syncTransportFields();
+});
+transportModeInput.addEventListener("change", () => {
+  const segments = collectTransportSegments();
+  renderTransportSegments(segments.map((segment) => ({ ...segment, mode: transportModeInput.value })));
+});
+addTransportSegmentButton.addEventListener("click", () => {
+  const segments = collectTransportSegments();
+  segments.push(createBlankTransportSegment(transportModeInput.value));
+  renderTransportSegments(segments);
+});
+transportSegments.addEventListener("change", (event) => {
+  if (event.target.matches('[data-transport-field="mode"]')) {
+    renderTransportSegments(collectTransportSegments());
+  }
+  if (typeInput.value === "交通") placeInput.value = getTransportTitle(collectTransportSegments());
+});
+transportSegments.addEventListener("input", () => {
+  if (typeInput.value === "交通") placeInput.value = getTransportTitle(collectTransportSegments());
+});
+transportSegments.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-remove-transport-segment]");
+  if (!removeButton) return;
+  const removeIndex = Number(removeButton.dataset.removeTransportSegment);
+  const segments = collectTransportSegments().filter((_, index) => index !== removeIndex);
+  renderTransportSegments(segments.length ? segments : [createBlankTransportSegment(transportModeInput.value)]);
+});
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -645,8 +874,14 @@ itemForm.addEventListener("submit", (event) => {
     departureTerminal: typeInput.value === "飛機" ? departureTerminalInput.value.trim() : "",
     arrivalTime: typeInput.value === "飛機" ? arrivalTimeInput.value.trim() : "",
     arrivalAirport: typeInput.value === "飛機" ? arrivalAirportInput.value.trim() : "",
-    arrivalTerminal: typeInput.value === "飛機" ? arrivalTerminalInput.value.trim() : ""
+    arrivalTerminal: typeInput.value === "飛機" ? arrivalTerminalInput.value.trim() : "",
+    transportMode: typeInput.value === "交通" ? transportModeInput.value : "",
+    transportSegments: typeInput.value === "交通" ? collectTransportSegments() : []
   };
+
+  if (item.type === "交通") {
+    item.place = getTransportTitle(item.transportSegments) || item.place;
+  }
 
   if (state.editingItemIndex === null) {
     item.id = createId();
@@ -674,6 +909,32 @@ function syncFlightFields() {
   arrivalTimeInput.required = isFlight;
   arrivalAirportInput.required = isFlight;
   arrivalTerminalInput.required = isFlight;
+}
+
+function syncTransportFields() {
+  const isTransport = typeInput.value === "交通";
+  transportFields.hidden = !isTransport;
+  placeInput.readOnly = isTransport;
+  placeInput.required = !isTransport;
+
+  if (isTransport) {
+    if (transportSegments.children.length === 0) {
+      renderTransportSegments([createBlankTransportSegment(transportModeInput.value)]);
+    }
+    placeInput.value = getTransportTitle(collectTransportSegments()) || placeInput.value;
+  }
+
+  transportFields.querySelectorAll("input, select, button").forEach((control) => {
+    control.disabled = !isTransport;
+  });
+}
+
+function getTransportTitle(segments) {
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+  const start = first?.departureStation;
+  const end = last?.arrivalStation;
+  return start && end ? `${start} → ${end}` : "";
 }
 
 deleteItemButton.addEventListener("click", () => {
