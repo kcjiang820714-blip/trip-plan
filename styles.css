@@ -404,17 +404,13 @@ h2 {
 .item-card {
   --card-accent: var(--brand);
   position: relative;
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 15px;
-  min-height: 112px;
+  min-height: 92px;
   border: 1px solid rgba(24, 37, 33, 0.09);
   border-radius: 8px;
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent 42%),
     linear-gradient(135deg, rgba(255, 253, 248, 0.99), rgba(250, 246, 237, 0.97));
-  padding: 16px;
   box-shadow:
     0 18px 34px rgba(24, 37, 33, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.86);
@@ -473,6 +469,23 @@ h2 {
   --card-accent: var(--gold);
 }
 
+.item-summary {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  min-height: 92px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
 .time {
   display: grid;
   place-items: center;
@@ -489,10 +502,16 @@ h2 {
     0 8px 16px rgba(24, 37, 33, 0.06);
 }
 
-.item-card h3 {
-  margin: 0 0 8px;
-  padding-right: 64px;
+.item-summary-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.item-title {
+  padding-right: 12px;
   font-size: 1.1rem;
+  font-weight: 950;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -519,6 +538,36 @@ h2 {
   border-radius: 50%;
   background: var(--card-accent);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.58);
+}
+
+.expand-indicator {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.52);
+  color: color-mix(in srgb, var(--card-accent), black 24%);
+  font-size: 1.2rem;
+  font-weight: 950;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.item-summary[aria-expanded="true"] .expand-indicator {
+  background: color-mix(in srgb, var(--card-accent), white 88%);
+  transform: rotate(180deg);
+}
+
+.item-details {
+  position: relative;
+  z-index: 1;
+  margin: 0 16px 16px 113px;
+  border-top: 1px solid rgba(24, 37, 33, 0.08);
+  padding-top: 13px;
 }
 
 .note {
@@ -633,9 +682,29 @@ h2 {
 }
 
 .flight-info {
-  margin-bottom: 8px;
-  color: var(--indigo);
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.flight-info div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.flight-info dt {
+  color: var(--muted);
+  font-size: 0.78rem;
   font-weight: 900;
+}
+
+.flight-info dd {
+  margin: 0;
+  color: var(--indigo);
+  font-weight: 950;
+  overflow-wrap: anywhere;
 }
 
 [hidden] {
@@ -654,8 +723,23 @@ h2 {
   }
 
   .item-card {
-    grid-template-columns: 70px 1fr;
+    min-height: 86px;
+  }
+
+  .item-summary {
+    grid-template-columns: 70px minmax(0, 1fr) 30px;
+    gap: 12px;
+    min-height: 86px;
     padding: 13px;
+  }
+
+  .item-details {
+    margin: 0 13px 13px 95px;
+  }
+
+  .expand-indicator {
+    width: 30px;
+    height: 30px;
   }
 }
 
@@ -665,6 +749,14 @@ h2 {
   }
 
   .item-card {
-    grid-template-columns: 94px 1fr;
+    min-height: 94px;
+  }
+
+  .item-summary {
+    grid-template-columns: 94px minmax(0, 1fr) 34px;
+  }
+
+  .item-details {
+    margin-left: 125px;
   }
 }

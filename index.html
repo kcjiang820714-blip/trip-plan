@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
   </head>
   <body>
     <main class="app-shell">
@@ -126,6 +126,26 @@
             航班代碼
             <input id="flightCodeInput" name="flightCode" placeholder="BR198" autocapitalize="characters" />
           </label>
+
+          <label>
+            出發時間
+            <input id="departureTimeInput" name="departureTime" type="time" />
+          </label>
+
+          <label>
+            出發機場
+            <input id="departureAirportInput" name="departureAirport" placeholder="桃園國際機場 TPE" />
+          </label>
+
+          <label>
+            抵達時間
+            <input id="arrivalTimeInput" name="arrivalTime" type="time" />
+          </label>
+
+          <label>
+            抵達機場
+            <input id="arrivalAirportInput" name="arrivalAirport" placeholder="關西國際機場 KIX" />
+          </label>
         </section>
 
         <label>
@@ -174,6 +194,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=13" type="module"></script>
+    <script src="./app.js?v=14" type="module"></script>
   </body>
 </html>

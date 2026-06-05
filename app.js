@@ -74,6 +74,10 @@ const noteInput = document.querySelector("#noteInput");
 const flightFields = document.querySelector("#flightFields");
 const airlineInput = document.querySelector("#airlineInput");
 const flightCodeInput = document.querySelector("#flightCodeInput");
+const departureTimeInput = document.querySelector("#departureTimeInput");
+const departureAirportInput = document.querySelector("#departureAirportInput");
+const arrivalTimeInput = document.querySelector("#arrivalTimeInput");
+const arrivalAirportInput = document.querySelector("#arrivalAirportInput");
 const tripNameInput = document.querySelector("#tripNameInput");
 const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
@@ -140,7 +144,11 @@ function normalizeItem(item) {
     type: item.type || "",
     note: item.note || "",
     airline: item.airline || "",
-    flightCode: item.flightCode || ""
+    flightCode: item.flightCode || "",
+    departureTime: item.departureTime || "",
+    departureAirport: item.departureAirport || "",
+    arrivalTime: item.arrivalTime || "",
+    arrivalAirport: item.arrivalAirport || ""
   };
 }
 
@@ -370,10 +378,21 @@ function renderTrip() {
     .map(
       (item, index) => `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
-          <div class="time">${escapeHtml(item.time)}</div>
-          <div>
-            <h3>${escapeHtml(item.place)}</h3>
-            <span class="meta">${escapeHtml(item.type)}</span>
+          <button
+            class="item-summary"
+            type="button"
+            data-toggle-details="${index}"
+            aria-expanded="false"
+            aria-controls="itemDetails${index}"
+          >
+            <span class="time">${escapeHtml(item.time)}</span>
+            <span class="item-summary-content">
+              <span class="item-title">${escapeHtml(item.place)}</span>
+              <span class="meta">${escapeHtml(item.type)}</span>
+            </span>
+            <span class="expand-indicator" aria-hidden="true">⌄</span>
+          </button>
+          <div class="item-details" id="itemDetails${index}" hidden>
             ${renderFlightInfo(item)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
@@ -393,9 +412,20 @@ function countItems(trip) {
 
 function renderFlightInfo(item) {
   if (item.type !== "飛機") return "";
-  const details = [item.airline, item.flightCode].filter(Boolean).join(" · ");
-  if (!details) return "";
-  return `<p class="flight-info">${escapeHtml(details)}</p>`;
+  const details = [
+    { label: "航空公司", value: item.airline },
+    { label: "航班代碼", value: item.flightCode },
+    { label: "出發", value: [item.departureTime, item.departureAirport].filter(Boolean).join(" · ") },
+    { label: "抵達", value: [item.arrivalTime, item.arrivalAirport].filter(Boolean).join(" · ") }
+  ].filter((detail) => detail.value);
+
+  if (details.length === 0) return "";
+
+  return `
+    <dl class="flight-info">
+      ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
+    </dl>
+  `;
 }
 
 function showHome() {
@@ -442,7 +472,20 @@ function closeModal(dialog) {
 function openItemDialog(index = null) {
   if (isReadonly) return;
   state.editingItemIndex = index;
-  const item = index === null ? { time: "", place: "", type: "景點", note: "", airline: "", flightCode: "" } : currentDay().items[index];
+  const item = index === null
+    ? {
+        time: "",
+        place: "",
+        type: "景點",
+        note: "",
+        airline: "",
+        flightCode: "",
+        departureTime: "",
+        departureAirport: "",
+        arrivalTime: "",
+        arrivalAirport: ""
+      }
+    : currentDay().items[index];
 
   dialogTitle.textContent = index === null ? "新增行程" : "編輯行程";
   deleteItemButton.hidden = index === null;
@@ -452,6 +495,10 @@ function openItemDialog(index = null) {
   noteInput.value = item.note;
   airlineInput.value = item.airline || "";
   flightCodeInput.value = item.flightCode || "";
+  departureTimeInput.value = item.departureTime || "";
+  departureAirportInput.value = item.departureAirport || "";
+  arrivalTimeInput.value = item.arrivalTime || "";
+  arrivalAirportInput.value = item.arrivalAirport || "";
   syncFlightFields();
   openModal(itemDialog);
 }
@@ -549,6 +596,15 @@ dayTabs.addEventListener("click", (event) => {
 });
 
 timeline.addEventListener("click", (event) => {
+  const toggleButton = event.target.closest("[data-toggle-details]");
+  if (toggleButton) {
+    const details = document.querySelector(`#${toggleButton.getAttribute("aria-controls")}`);
+    const isExpanded = toggleButton.getAttribute("aria-expanded") === "true";
+    toggleButton.setAttribute("aria-expanded", String(!isExpanded));
+    if (details) details.hidden = isExpanded;
+    return;
+  }
+
   if (isReadonly) return;
   const button = event.target.closest("[data-edit]");
   if (!button) return;
@@ -565,7 +621,11 @@ itemForm.addEventListener("submit", (event) => {
     type: typeInput.value.trim(),
     note: noteInput.value.trim(),
     airline: typeInput.value === "飛機" ? airlineInput.value.trim() : "",
-    flightCode: typeInput.value === "飛機" ? flightCodeInput.value.trim().toUpperCase() : ""
+    flightCode: typeInput.value === "飛機" ? flightCodeInput.value.trim().toUpperCase() : "",
+    departureTime: typeInput.value === "飛機" ? departureTimeInput.value.trim() : "",
+    departureAirport: typeInput.value === "飛機" ? departureAirportInput.value.trim() : "",
+    arrivalTime: typeInput.value === "飛機" ? arrivalTimeInput.value.trim() : "",
+    arrivalAirport: typeInput.value === "飛機" ? arrivalAirportInput.value.trim() : ""
   };
 
   if (state.editingItemIndex === null) {
@@ -585,6 +645,10 @@ function syncFlightFields() {
   flightFields.hidden = !isFlight;
   airlineInput.required = isFlight;
   flightCodeInput.required = isFlight;
+  departureTimeInput.required = isFlight;
+  departureAirportInput.required = isFlight;
+  arrivalTimeInput.required = isFlight;
+  arrivalAirportInput.required = isFlight;
 }
 
 deleteItemButton.addEventListener("click", () => {
