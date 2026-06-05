@@ -666,6 +666,216 @@ h2 {
   gap: 12px;
 }
 
+.expense-members,
+.expense-dashboard {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.expense-members {
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.86);
+  padding: 14px;
+}
+
+.member-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.member-chip {
+  justify-self: start;
+  border: 1px solid rgba(15, 107, 95, 0.16);
+  border-radius: 999px;
+  background: #edf7f3;
+  color: var(--brand-dark);
+  font-size: 0.8rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 7px 10px;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.inline-form input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 11px 12px;
+}
+
+.expense-share-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.expense-share-fields p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.check-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ledger-card {
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.94);
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(24, 37, 33, 0.06);
+}
+
+.ledger-card h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.ledger-visual {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ledger-pie {
+  width: 112px;
+  aspect-ratio: 1;
+  border: 8px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(24, 37, 33, 0.08), 0 8px 18px rgba(24, 37, 33, 0.08);
+}
+
+.ledger-pie-empty {
+  border: 1px dashed rgba(24, 37, 33, 0.18);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 12px;
+}
+
+.ledger-legend {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.ledger-legend span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.ledger-legend i {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.member-ledger-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.member-ledger-card {
+  border: 1px solid rgba(24, 37, 33, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.56);
+  padding: 10px;
+}
+
+.member-ledger-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.member-ledger-card p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.ledger-table {
+  display: grid;
+  gap: 0;
+  border: 1px solid rgba(24, 37, 33, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: minmax(64px, 1.2fr) repeat(3, minmax(58px, 1fr));
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid rgba(24, 37, 33, 0.07);
+  background: rgba(255, 255, 255, 0.5);
+  padding: 10px;
+  font-size: 0.82rem;
+}
+
+.ledger-row:last-child {
+  border-bottom: 0;
+}
+
+.ledger-head {
+  background: #eef4f1;
+  color: var(--brand-dark);
+  font-weight: 950;
+}
+
+.ledger-row strong {
+  font-weight: 950;
+}
+
+.is-positive {
+  color: var(--brand);
+}
+
+.is-negative {
+  color: var(--danger);
+}
+
+.settlement-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.settlement-list strong {
+  color: var(--ink);
+}
+
+.settlement-list p {
+  margin: 0;
+}
+
 .utility-card,
 .todo-group {
   border: 1px solid rgba(24, 37, 33, 0.09);
@@ -1244,6 +1454,11 @@ h2 {
   padding: 0;
 }
 
+.checkbox-row.compact {
+  min-height: 40px;
+  padding: 9px 10px;
+}
+
 .transport-segments {
   display: grid;
   gap: 12px;
@@ -1399,6 +1614,19 @@ h2 {
 
   .item-details {
     margin: 0 13px 13px 95px;
+  }
+
+  .ledger-visual {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .ledger-pie {
+    width: 96px;
+  }
+
+  .member-ledger-list {
+    grid-template-columns: 1fr;
   }
 
   .booking-stay-fields {

@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=23" />
+    <link rel="stylesheet" href="./styles.css?v=25" />
   </head>
   <body>
     <main class="app-shell">
@@ -173,6 +173,17 @@
             </div>
             <button class="primary-button" id="addExpenseButton" type="button">新增支出</button>
           </section>
+          <section class="expense-members">
+            <div>
+              <p class="eyebrow">成員</p>
+              <div class="member-chips" id="memberChips"></div>
+            </div>
+            <form class="inline-form" id="memberForm">
+              <input id="memberNameInput" placeholder="新增成員，例如 小美" />
+              <button class="secondary-action" type="submit">新增</button>
+            </form>
+          </section>
+          <section class="expense-dashboard" id="expenseDashboard"></section>
           <section class="utility-list" id="expenseList"></section>
         </section>
       </section>
@@ -472,6 +483,7 @@
             <option value="USD">USD</option>
             <option value="KRW">KRW</option>
             <option value="EUR">EUR</option>
+            <option value="CHF">CHF</option>
           </select>
         </label>
 
@@ -486,6 +498,16 @@
             <option value="其他">其他</option>
           </select>
         </label>
+
+        <label>
+          付款人
+          <select id="expensePayerInput" required></select>
+        </label>
+
+        <section class="expense-share-fields">
+          <p>一起分攤的人</p>
+          <div class="check-list" id="expenseShareInputs"></div>
+        </section>
 
         <label>
           備註
@@ -506,6 +528,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=31" type="module"></script>
+    <script src="./app.js?v=33" type="module"></script>
   </body>
 </html>

@@ -80,6 +80,10 @@ const todoSectionTitle = document.querySelector("#todoSectionTitle");
 const todoGroups = document.querySelector("#todoGroups");
 const expenseList = document.querySelector("#expenseList");
 const expenseSummary = document.querySelector("#expenseSummary");
+const memberChips = document.querySelector("#memberChips");
+const memberForm = document.querySelector("#memberForm");
+const memberNameInput = document.querySelector("#memberNameInput");
+const expenseDashboard = document.querySelector("#expenseDashboard");
 const itemDialog = document.querySelector("#itemDialog");
 const itemForm = document.querySelector("#itemForm");
 const dialogTitle = document.querySelector("#dialogTitle");
@@ -146,6 +150,8 @@ const expenseNameInput = document.querySelector("#expenseNameInput");
 const expenseAmountInput = document.querySelector("#expenseAmountInput");
 const expenseCurrencyInput = document.querySelector("#expenseCurrencyInput");
 const expenseCategoryInput = document.querySelector("#expenseCategoryInput");
+const expensePayerInput = document.querySelector("#expensePayerInput");
+const expenseShareInputs = document.querySelector("#expenseShareInputs");
 const expenseNoteInput = document.querySelector("#expenseNoteInput");
 const attachmentViewer = document.querySelector("#attachmentViewer");
 const attachmentViewerTitle = document.querySelector("#attachmentViewerTitle");
@@ -190,12 +196,19 @@ function normalizeLibrary(library) {
         endDate: dateRange.endDate,
         dates: dateRange.label,
         days,
+        members: normalizeMembers(trip.members),
         bookings: Array.isArray(trip.bookings) ? trip.bookings.map(normalizeBooking) : [],
         todos: Array.isArray(trip.todos) ? trip.todos.map(normalizeTodo) : [],
         expenses: Array.isArray(trip.expenses) ? trip.expenses.map(normalizeExpense) : []
       };
     })
   };
+}
+
+function normalizeMembers(members) {
+  const source = Array.isArray(members) ? members : ["我"];
+  const names = source.map((member) => String(member || "").trim()).filter(Boolean);
+  return [...new Set(names.length ? names : ["我"])];
 }
 
 function normalizeBooking(booking) {
@@ -244,6 +257,8 @@ function normalizeExpense(expense) {
     amount: Number(expense.amount) || 0,
     currency: expense.currency || "JPY",
     category: expense.category || "其他",
+    payer: expense.payer || "我",
+    shareWith: normalizeMembers(expense.shareWith),
     note: expense.note || ""
   };
 }
@@ -751,8 +766,11 @@ function renderTodos() {
 
 function renderExpenses() {
   const trip = currentTrip();
+  renderMembers();
+
   if (trip.expenses.length === 0) {
     expenseSummary.textContent = "尚無支出";
+    expenseDashboard.innerHTML = `<div class="empty-state">新增支出後，這裡會自動顯示每個人的分攤與結算狀態。</div>`;
     expenseList.innerHTML = `<div class="empty-state">還沒有支出。可以依日期記錄品項、金額、貨幣和分類。</div>`;
     return;
   }
@@ -766,6 +784,7 @@ function renderExpenses() {
     .map(([currency, total]) => `${currency} ${formatAmount(total)}`)
     .join(" · ");
 
+  expenseDashboard.innerHTML = renderExpenseDashboard(trip);
   expenseList.innerHTML = trip.expenses
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -776,12 +795,206 @@ function renderExpenses() {
             <span class="meta">${escapeHtml(expense.category)}</span>
             <h3>${escapeHtml(expense.name)}</h3>
             <p>${escapeHtml(expense.date)} · ${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</p>
+            <p>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</p>
             ${expense.note ? `<p>${escapeHtml(expense.note)}</p>` : ""}
           </div>
         </article>
       `
     )
     .join("");
+}
+
+function renderMembers() {
+  const trip = currentTrip();
+  trip.members = normalizeMembers(trip.members);
+  memberChips.innerHTML = trip.members.map((member) => `<span class="member-chip">${escapeHtml(member)}</span>`).join("");
+}
+
+function calculateExpenseLedger(trip) {
+  const members = normalizeMembers(trip.members);
+  const ledgers = {};
+
+  trip.expenses.forEach((expense) => {
+    if (!ledgers[expense.currency]) {
+      ledgers[expense.currency] = Object.fromEntries(members.map((member) => [member, { paid: 0, share: 0, balance: 0 }]));
+    }
+
+    if (!ledgers[expense.currency][expense.payer]) {
+      ledgers[expense.currency][expense.payer] = { paid: 0, share: 0, balance: 0 };
+    }
+
+    const shareWith = normalizeMembers(expense.shareWith).filter((member) => members.includes(member));
+    const participants = shareWith.length ? shareWith : members;
+    const amount = Number(expense.amount) || 0;
+    const shareAmount = participants.length ? amount / participants.length : 0;
+
+    ledgers[expense.currency][expense.payer].paid += amount;
+    participants.forEach((member) => {
+      if (!ledgers[expense.currency][member]) ledgers[expense.currency][member] = { paid: 0, share: 0, balance: 0 };
+      ledgers[expense.currency][member].share += shareAmount;
+    });
+  });
+
+  Object.values(ledgers).forEach((ledger) => {
+    Object.values(ledger).forEach((entry) => {
+      entry.balance = entry.paid - entry.share;
+    });
+  });
+
+  return ledgers;
+}
+
+function calculateSettlements(ledger) {
+  const debtors = [];
+  const creditors = [];
+
+  Object.entries(ledger).forEach(([member, entry]) => {
+    const balance = Math.round(entry.balance * 100) / 100;
+    if (balance < -0.01) debtors.push({ member, amount: -balance });
+    if (balance > 0.01) creditors.push({ member, amount: balance });
+  });
+
+  const settlements = [];
+  let debtorIndex = 0;
+  let creditorIndex = 0;
+
+  while (debtors[debtorIndex] && creditors[creditorIndex]) {
+    const amount = Math.min(debtors[debtorIndex].amount, creditors[creditorIndex].amount);
+    settlements.push({ from: debtors[debtorIndex].member, to: creditors[creditorIndex].member, amount });
+    debtors[debtorIndex].amount -= amount;
+    creditors[creditorIndex].amount -= amount;
+    if (debtors[debtorIndex].amount <= 0.01) debtorIndex += 1;
+    if (creditors[creditorIndex].amount <= 0.01) creditorIndex += 1;
+  }
+
+  return settlements;
+}
+
+function pieColor(index) {
+  return ["#0f6b5f", "#d98145", "#334a75", "#d6a83d", "#86b6cf", "#b42318"][index % 6];
+}
+
+function renderExpensePie(ledger) {
+  const entries = Object.entries(ledger).filter(([, entry]) => entry.share > 0);
+  const total = entries.reduce((sum, [, entry]) => sum + entry.share, 0);
+
+  if (total <= 0) {
+    return `<div class="ledger-pie-empty">尚無可分攤資料</div>`;
+  }
+
+  let cursor = 0;
+  const segments = entries.map(([member, entry], index) => {
+    const start = cursor;
+    const end = cursor + (entry.share / total) * 100;
+    cursor = end;
+    return `${pieColor(index)} ${start}% ${end}%`;
+  });
+
+  return `
+    <section class="ledger-visual">
+      <div class="ledger-pie" style="background: conic-gradient(${segments.join(", ")});"></div>
+      <div class="ledger-legend">
+        ${entries
+          .map(
+            ([member, entry], index) => `
+              <span>
+                <i style="background: ${pieColor(index)};"></i>
+                ${escapeHtml(member)} ${formatAmount(entry.share)}
+              </span>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderMemberLedgerList(ledger) {
+  return `
+    <section class="member-ledger-list" aria-label="每人成員帳務">
+      ${Object.entries(ledger)
+        .map(
+          ([member, entry]) => `
+            <article class="member-ledger-card">
+              <header>
+                <strong>${escapeHtml(member)}</strong>
+                <span class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${formatAmount(entry.balance)}</span>
+              </header>
+              <p>已付 ${formatAmount(entry.paid)}</p>
+              <p>應分攤 ${formatAmount(entry.share)}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function renderExpenseDashboard(trip) {
+  const ledgers = calculateExpenseLedger(trip);
+
+  return Object.entries(ledgers)
+    .map(([currency, ledger]) => {
+      const settlements = calculateSettlements(ledger);
+
+      return `
+        <section class="ledger-card">
+          <header>
+            <h3>${escapeHtml(currency)} 帳務總表</h3>
+          </header>
+          ${renderExpensePie(ledger)}
+          ${renderMemberLedgerList(ledger)}
+          <div class="ledger-table">
+            <div class="ledger-row ledger-head">
+              <span>成員</span>
+              <span>已付</span>
+              <span>應分攤</span>
+              <span>差額</span>
+            </div>
+            ${Object.entries(ledger)
+              .map(
+                ([member, entry]) => `
+                  <div class="ledger-row">
+                    <span>${escapeHtml(member)}</span>
+                    <span>${formatAmount(entry.paid)}</span>
+                    <span>${formatAmount(entry.share)}</span>
+                    <strong class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${formatAmount(entry.balance)}</strong>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="settlement-list">
+            <strong>結算建議</strong>
+            ${
+              settlements.length
+                ? settlements.map((item) => `<p>${escapeHtml(item.from)} 給 ${escapeHtml(item.to)} ${escapeHtml(currency)} ${formatAmount(item.amount)}</p>`).join("")
+                : "<p>目前帳務已打平。</p>"
+            }
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+}
+
+function renderExpenseFormMembers() {
+  const members = normalizeMembers(currentTrip().members);
+  expensePayerInput.innerHTML = members.map((member) => `<option value="${escapeHtml(member)}">${escapeHtml(member)}</option>`).join("");
+  expenseShareInputs.innerHTML = members
+    .map(
+      (member) => `
+        <label class="checkbox-row compact">
+          <input type="checkbox" value="${escapeHtml(member)}" checked />
+          <span>${escapeHtml(member)}</span>
+        </label>
+      `
+    )
+    .join("");
+}
+
+function selectedExpenseShareMembers() {
+  return Array.from(expenseShareInputs.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
 }
 
 function formatAmount(value) {
@@ -1314,6 +1527,7 @@ document.querySelector("#addExpenseButton").addEventListener("click", () => {
   if (isReadonly) return;
   expenseForm.reset();
   expenseDateInput.value = currentTrip().startDate;
+  renderExpenseFormMembers();
   openModal(expenseDialog);
 });
 exportButton.addEventListener("click", () => {
@@ -1585,9 +1799,27 @@ todoGroups.addEventListener("change", (event) => {
   renderTodos();
 });
 
+memberForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (isReadonly) return;
+  const memberName = memberNameInput.value.trim();
+  if (!memberName) return;
+
+  const trip = currentTrip();
+  trip.members = normalizeMembers([...(trip.members || []), memberName]);
+  memberNameInput.value = "";
+  saveLibrary();
+  renderExpenses();
+});
+
 expenseForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (isReadonly) return;
+  const shareWith = selectedExpenseShareMembers();
+  if (shareWith.length === 0) {
+    alert("請至少選擇一位分攤成員。");
+    return;
+  }
 
   currentTrip().expenses.push(normalizeExpense({
     id: createId(),
@@ -1596,6 +1828,8 @@ expenseForm.addEventListener("submit", (event) => {
     amount: expenseAmountInput.value,
     currency: expenseCurrencyInput.value,
     category: expenseCategoryInput.value,
+    payer: expensePayerInput.value,
+    shareWith,
     note: expenseNoteInput.value.trim()
   }));
 
@@ -1688,6 +1922,7 @@ tripForm.addEventListener("submit", (event) => {
       endDate,
       dates: formatDateRange(startDate, endDate),
       days: createBlankDays(dayCount, startDate),
+      members: ["我"],
       bookings: [],
       todos: [],
       expenses: []
