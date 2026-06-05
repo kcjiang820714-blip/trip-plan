@@ -44,7 +44,8 @@ const state = {
   activeTripId: null,
   activeDayIndex: 0,
   editingItemIndex: null,
-  editingTripId: null
+  editingTripId: null,
+  expandedItemId: null
 };
 
 state.activeTripId = state.library.trips[0]?.id || null;
@@ -76,8 +77,10 @@ const airlineInput = document.querySelector("#airlineInput");
 const flightCodeInput = document.querySelector("#flightCodeInput");
 const departureTimeInput = document.querySelector("#departureTimeInput");
 const departureAirportInput = document.querySelector("#departureAirportInput");
+const departureTerminalInput = document.querySelector("#departureTerminalInput");
 const arrivalTimeInput = document.querySelector("#arrivalTimeInput");
 const arrivalAirportInput = document.querySelector("#arrivalAirportInput");
+const arrivalTerminalInput = document.querySelector("#arrivalTerminalInput");
 const tripNameInput = document.querySelector("#tripNameInput");
 const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
@@ -139,6 +142,7 @@ function normalizeDay(day, index) {
 
 function normalizeItem(item) {
   return {
+    id: item.id || createId(),
     time: item.time || "",
     place: item.place || "",
     type: item.type || "",
@@ -147,8 +151,10 @@ function normalizeItem(item) {
     flightCode: item.flightCode || "",
     departureTime: item.departureTime || "",
     departureAirport: item.departureAirport || "",
+    departureTerminal: item.departureTerminal || "",
     arrivalTime: item.arrivalTime || "",
-    arrivalAirport: item.arrivalAirport || ""
+    arrivalAirport: item.arrivalAirport || "",
+    arrivalTerminal: item.arrivalTerminal || ""
   };
 }
 
@@ -376,14 +382,18 @@ function renderTrip() {
 
   timeline.innerHTML = day.items
     .map(
-      (item, index) => `
+      (item, index) => {
+        const isExpanded = state.expandedItemId === item.id;
+        const detailsId = `itemDetails${item.id}`;
+
+        return `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
           <button
             class="item-summary"
             type="button"
-            data-toggle-details="${index}"
-            aria-expanded="false"
-            aria-controls="itemDetails${index}"
+            data-toggle-details="${escapeHtml(item.id)}"
+            aria-expanded="${isExpanded}"
+            aria-controls="${escapeHtml(detailsId)}"
           >
             <span class="time">${escapeHtml(item.time)}</span>
             <span class="item-summary-content">
@@ -392,7 +402,7 @@ function renderTrip() {
             </span>
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
-          <div class="item-details" id="itemDetails${index}" hidden>
+          <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
             ${renderFlightInfo(item)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
@@ -401,7 +411,8 @@ function renderTrip() {
             </div>
           </div>
         </article>
-      `
+      `;
+      }
     )
     .join("");
 }
@@ -416,7 +427,9 @@ function renderFlightInfo(item) {
     { label: "航空公司", value: item.airline },
     { label: "航班代碼", value: item.flightCode },
     { label: "出發", value: [item.departureTime, item.departureAirport].filter(Boolean).join(" · ") },
-    { label: "抵達", value: [item.arrivalTime, item.arrivalAirport].filter(Boolean).join(" · ") }
+    { label: "出發航廈", value: item.departureTerminal },
+    { label: "抵達", value: [item.arrivalTime, item.arrivalAirport].filter(Boolean).join(" · ") },
+    { label: "抵達航廈", value: item.arrivalTerminal }
   ].filter((detail) => detail.value);
 
   if (details.length === 0) return "";
@@ -482,8 +495,10 @@ function openItemDialog(index = null) {
         flightCode: "",
         departureTime: "",
         departureAirport: "",
+        departureTerminal: "",
         arrivalTime: "",
-        arrivalAirport: ""
+        arrivalAirport: "",
+        arrivalTerminal: ""
       }
     : currentDay().items[index];
 
@@ -497,8 +512,10 @@ function openItemDialog(index = null) {
   flightCodeInput.value = item.flightCode || "";
   departureTimeInput.value = item.departureTime || "";
   departureAirportInput.value = item.departureAirport || "";
+  departureTerminalInput.value = item.departureTerminal || "";
   arrivalTimeInput.value = item.arrivalTime || "";
   arrivalAirportInput.value = item.arrivalAirport || "";
+  arrivalTerminalInput.value = item.arrivalTerminal || "";
   syncFlightFields();
   openModal(itemDialog);
 }
@@ -507,7 +524,7 @@ function populateTimeOptions() {
   timeInput.innerHTML = `<option value="">選擇時間</option>`;
 
   for (let hour = 0; hour < 24; hour += 1) {
-    for (let minute = 0; minute < 60; minute += 15) {
+    for (let minute = 0; minute < 60; minute += 1) {
       const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
       const option = document.createElement("option");
       option.value = value;
@@ -600,6 +617,7 @@ timeline.addEventListener("click", (event) => {
   if (toggleButton) {
     const details = document.querySelector(`#${toggleButton.getAttribute("aria-controls")}`);
     const isExpanded = toggleButton.getAttribute("aria-expanded") === "true";
+    state.expandedItemId = isExpanded ? null : toggleButton.dataset.toggleDetails;
     toggleButton.setAttribute("aria-expanded", String(!isExpanded));
     if (details) details.hidden = isExpanded;
     return;
@@ -624,17 +642,22 @@ itemForm.addEventListener("submit", (event) => {
     flightCode: typeInput.value === "飛機" ? flightCodeInput.value.trim().toUpperCase() : "",
     departureTime: typeInput.value === "飛機" ? departureTimeInput.value.trim() : "",
     departureAirport: typeInput.value === "飛機" ? departureAirportInput.value.trim() : "",
+    departureTerminal: typeInput.value === "飛機" ? departureTerminalInput.value.trim() : "",
     arrivalTime: typeInput.value === "飛機" ? arrivalTimeInput.value.trim() : "",
-    arrivalAirport: typeInput.value === "飛機" ? arrivalAirportInput.value.trim() : ""
+    arrivalAirport: typeInput.value === "飛機" ? arrivalAirportInput.value.trim() : "",
+    arrivalTerminal: typeInput.value === "飛機" ? arrivalTerminalInput.value.trim() : ""
   };
 
   if (state.editingItemIndex === null) {
+    item.id = createId();
     currentDay().items.push(item);
   } else {
+    item.id = currentDay().items[state.editingItemIndex].id || createId();
     currentDay().items[state.editingItemIndex] = item;
   }
 
   currentDay().items.sort((a, b) => a.time.localeCompare(b.time));
+  state.expandedItemId = item.id;
   saveLibrary();
   closeModal(itemDialog);
   render();
@@ -647,13 +670,17 @@ function syncFlightFields() {
   flightCodeInput.required = isFlight;
   departureTimeInput.required = isFlight;
   departureAirportInput.required = isFlight;
+  departureTerminalInput.required = isFlight;
   arrivalTimeInput.required = isFlight;
   arrivalAirportInput.required = isFlight;
+  arrivalTerminalInput.required = isFlight;
 }
 
 deleteItemButton.addEventListener("click", () => {
   if (isReadonly) return;
   if (state.editingItemIndex === null) return;
+  const item = currentDay().items[state.editingItemIndex];
+  if (item?.id === state.expandedItemId) state.expandedItemId = null;
   currentDay().items.splice(state.editingItemIndex, 1);
   saveLibrary();
   closeModal(itemDialog);
