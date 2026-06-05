@@ -54,6 +54,7 @@ const state = {
   activeTripId: null,
   activeDayIndex: 0,
   activeExpenseDate: null,
+  activeExpenseStatsTab: "category",
   activeTripSection: "itinerary",
   activeBookingGroup: "票券",
   activeTodoGroup: "行前準備",
@@ -1038,11 +1039,11 @@ function renderExpenseCategoryStats(trip) {
   const totalTwd = categories.reduce((total, [, category]) => total + category.totalTwd, 0);
 
   if (totalTwd <= 0) {
-    return `<section class="category-stats-card"><div class="empty-state">新增支出後，這裡會顯示整趟旅程的分類花費。</div></section>`;
+    return `<div class="empty-state">新增支出後，這裡會顯示整趟旅程的分類花費。</div>`;
   }
 
   return `
-    <section class="category-stats-card">
+    <div class="category-stats-pane">
       <header>
         <div>
           <p class="eyebrow">整趟旅程</p>
@@ -1079,7 +1080,7 @@ function renderExpenseCategoryStats(trip) {
           })
           .join("")}
       </div>
-    </section>
+    </div>
   `;
 }
 
@@ -1110,7 +1111,7 @@ function renderMemberCategoryStats(trip) {
   const memberStats = calculateMemberCategoryTotals(trip);
 
   return `
-    <section class="member-category-card">
+    <div class="member-category-pane">
       <header>
         <p class="eyebrow">整趟旅程</p>
         <h3>每人分類花費</h3>
@@ -1156,6 +1157,32 @@ function renderMemberCategoryStats(trip) {
           })
           .join("")}
       </div>
+    </div>
+  `;
+}
+
+function renderExpenseStatsTabs(trip) {
+  const tabs = [
+    { id: "category", label: "分類總覽" },
+    { id: "member", label: "每人分類" }
+  ];
+  const activeTab = tabs.some((tab) => tab.id === state.activeExpenseStatsTab) ? state.activeExpenseStatsTab : "category";
+  state.activeExpenseStatsTab = activeTab;
+
+  return `
+    <section class="expense-stats-card">
+      <nav class="expense-stats-tabs" aria-label="花費統計分頁">
+        ${tabs
+          .map(
+            (tab) => `
+              <button class="expense-stats-tab ${tab.id === activeTab ? "is-active" : ""}" type="button" data-expense-stats-tab="${tab.id}">
+                ${escapeHtml(tab.label)}
+              </button>
+            `
+          )
+          .join("")}
+      </nav>
+      ${activeTab === "member" ? renderMemberCategoryStats(trip) : renderExpenseCategoryStats(trip)}
     </section>
   `;
 }
@@ -1166,8 +1193,7 @@ function renderExpenseDashboard(trip) {
   const total = Object.values(ledger).reduce((sum, entry) => sum + entry.share, 0);
 
   return `
-    ${renderExpenseCategoryStats(trip)}
-    ${renderMemberCategoryStats(trip)}
+    ${renderExpenseStatsTabs(trip)}
     <section class="ledger-card">
       <header>
         <h3>TWD 帳務總表</h3>
@@ -1937,6 +1963,13 @@ expenseList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-expense-date]");
   if (!button) return;
   state.activeExpenseDate = button.dataset.expenseDate;
+  renderExpenses();
+});
+
+expenseDashboard.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-expense-stats-tab]");
+  if (!button) return;
+  state.activeExpenseStatsTab = button.dataset.expenseStatsTab;
   renderExpenses();
 });
 
