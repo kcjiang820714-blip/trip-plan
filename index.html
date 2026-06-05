@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=11" />
+    <link rel="stylesheet" href="./styles.css?v=12" />
   </head>
   <body>
     <main class="app-shell">
@@ -112,15 +112,57 @@
 
         <nav class="day-tabs" id="dayTabs" aria-label="選擇日期"></nav>
 
-        <section class="day-header">
-          <div>
-            <p class="eyebrow" id="activeDate">Day 1</p>
-            <h2 id="activeDayTitle">抵達京都</h2>
-          </div>
-          <button class="primary-button" id="addItemButton" type="button">新增行程</button>
+        <nav class="trip-section-tabs" id="tripSectionTabs" aria-label="旅程功能">
+          <button class="trip-section-tab is-active" type="button" data-trip-section="itinerary">行程</button>
+          <button class="trip-section-tab" type="button" data-trip-section="bookings">預訂</button>
+          <button class="trip-section-tab" type="button" data-trip-section="todos">待辦</button>
+          <button class="trip-section-tab" type="button" data-trip-section="expenses">記帳</button>
+        </nav>
+
+        <section class="trip-section-panel" id="itineraryPanel" data-section-panel="itinerary">
+          <section class="day-header">
+            <div>
+              <p class="eyebrow" id="activeDate">Day 1</p>
+              <h2 id="activeDayTitle">抵達京都</h2>
+            </div>
+            <button class="primary-button" id="addItemButton" type="button">新增行程</button>
+          </section>
+
+          <section class="timeline" id="timeline" aria-live="polite"></section>
         </section>
 
-        <section class="timeline" id="timeline" aria-live="polite"></section>
+        <section class="trip-section-panel" id="bookingsPanel" data-section-panel="bookings" hidden>
+          <section class="day-header">
+            <div>
+              <p class="eyebrow">預訂</p>
+              <h2>票券、餐廳、住宿</h2>
+            </div>
+            <button class="primary-button" id="addBookingButton" type="button">新增預訂</button>
+          </section>
+          <section class="utility-list" id="bookingList"></section>
+        </section>
+
+        <section class="trip-section-panel" id="todosPanel" data-section-panel="todos" hidden>
+          <section class="day-header">
+            <div>
+              <p class="eyebrow">待辦事項</p>
+              <h2>準備、打包、購物</h2>
+            </div>
+            <button class="primary-button" id="addTodoButton" type="button">新增待辦</button>
+          </section>
+          <section class="todo-groups" id="todoGroups"></section>
+        </section>
+
+        <section class="trip-section-panel" id="expensesPanel" data-section-panel="expenses" hidden>
+          <section class="day-header">
+            <div>
+              <p class="eyebrow">記帳</p>
+              <h2 id="expenseSummary">尚無支出</h2>
+            </div>
+            <button class="primary-button" id="addExpenseButton" type="button">新增支出</button>
+          </section>
+          <section class="utility-list" id="expenseList"></section>
+        </section>
       </section>
 
       <section class="install-panel" id="installPanel">
@@ -273,6 +315,149 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=19" type="module"></script>
+    <dialog class="editor" id="bookingDialog">
+      <form method="dialog" id="bookingForm">
+        <header>
+          <h2>新增預訂</h2>
+          <button class="icon-button" data-close-dialog="bookingDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          類型
+          <select id="bookingTypeInput" required>
+            <option value="機票">機票</option>
+            <option value="景點票券">景點票券</option>
+            <option value="餐廳">餐廳</option>
+            <option value="住宿">住宿</option>
+            <option value="活動">活動</option>
+            <option value="其他">其他</option>
+          </select>
+        </label>
+
+        <label>
+          名稱
+          <input id="bookingNameInput" placeholder="餐廳名稱、飯店、票券名稱" required />
+        </label>
+
+        <label>
+          日期
+          <input id="bookingDateInput" type="date" required />
+        </label>
+
+        <label>
+          時間
+          <input id="bookingTimeInput" type="time" />
+        </label>
+
+        <label>
+          地點 / 地址
+          <input id="bookingPlaceInput" placeholder="地點、地址或集合處" />
+        </label>
+
+        <label>
+          訂位 / 訂單代碼
+          <input id="bookingCodeInput" placeholder="Booking ID、訂位代碼" />
+        </label>
+
+        <label>
+          備註
+          <textarea id="bookingNoteInput" rows="3" placeholder="付款狀態、注意事項"></textarea>
+        </label>
+
+        <footer>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="todoDialog">
+      <form method="dialog" id="todoForm">
+        <header>
+          <h2>新增待辦</h2>
+          <button class="icon-button" data-close-dialog="todoDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          清單
+          <select id="todoGroupInput" required>
+            <option value="行前準備">行前準備</option>
+            <option value="行李打包">行李打包</option>
+            <option value="購物清單">購物清單</option>
+          </select>
+        </label>
+
+        <label>
+          項目
+          <input id="todoTextInput" placeholder="護照、轉接頭、藥品" required />
+        </label>
+
+        <label>
+          備註
+          <textarea id="todoNoteInput" rows="3" placeholder="數量、提醒事項"></textarea>
+        </label>
+
+        <footer>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="expenseDialog">
+      <form method="dialog" id="expenseForm">
+        <header>
+          <h2>新增支出</h2>
+          <button class="icon-button" data-close-dialog="expenseDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          日期
+          <input id="expenseDateInput" type="date" required />
+        </label>
+
+        <label>
+          品項
+          <input id="expenseNameInput" placeholder="拉麵、電車票、門票" required />
+        </label>
+
+        <label>
+          金額
+          <input id="expenseAmountInput" type="number" min="0" step="0.01" placeholder="1200" required />
+        </label>
+
+        <label>
+          貨幣
+          <select id="expenseCurrencyInput" required>
+            <option value="JPY">JPY</option>
+            <option value="TWD">TWD</option>
+            <option value="USD">USD</option>
+            <option value="KRW">KRW</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </label>
+
+        <label>
+          分類
+          <select id="expenseCategoryInput" required>
+            <option value="餐飲">餐飲</option>
+            <option value="交通">交通</option>
+            <option value="住宿">住宿</option>
+            <option value="票券">票券</option>
+            <option value="購物">購物</option>
+            <option value="其他">其他</option>
+          </select>
+        </label>
+
+        <label>
+          備註
+          <textarea id="expenseNoteInput" rows="3" placeholder="付款方式、分攤對象"></textarea>
+        </label>
+
+        <footer>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script src="./app.js?v=20" type="module"></script>
   </body>
 </html>

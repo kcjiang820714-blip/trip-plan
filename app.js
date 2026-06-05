@@ -43,6 +43,7 @@ const state = {
   library: loadLibrary(),
   activeTripId: null,
   activeDayIndex: 0,
+  activeTripSection: "itinerary",
   editingItemIndex: null,
   editingTripId: null,
   expandedItemId: null
@@ -65,7 +66,12 @@ const tripSummary = document.querySelector("#tripSummary");
 const activeDate = document.querySelector("#activeDate");
 const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
+const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const timeline = document.querySelector("#timeline");
+const bookingList = document.querySelector("#bookingList");
+const todoGroups = document.querySelector("#todoGroups");
+const expenseList = document.querySelector("#expenseList");
+const expenseSummary = document.querySelector("#expenseSummary");
 const itemDialog = document.querySelector("#itemDialog");
 const itemForm = document.querySelector("#itemForm");
 const dialogTitle = document.querySelector("#dialogTitle");
@@ -101,6 +107,28 @@ const exportButton = document.querySelector("#exportButton");
 const importButton = document.querySelector("#importButton");
 const importFileInput = document.querySelector("#importFileInput");
 const readonlyBanner = document.querySelector("#readonlyBanner");
+const bookingDialog = document.querySelector("#bookingDialog");
+const bookingForm = document.querySelector("#bookingForm");
+const bookingTypeInput = document.querySelector("#bookingTypeInput");
+const bookingNameInput = document.querySelector("#bookingNameInput");
+const bookingDateInput = document.querySelector("#bookingDateInput");
+const bookingTimeInput = document.querySelector("#bookingTimeInput");
+const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
+const bookingCodeInput = document.querySelector("#bookingCodeInput");
+const bookingNoteInput = document.querySelector("#bookingNoteInput");
+const todoDialog = document.querySelector("#todoDialog");
+const todoForm = document.querySelector("#todoForm");
+const todoGroupInput = document.querySelector("#todoGroupInput");
+const todoTextInput = document.querySelector("#todoTextInput");
+const todoNoteInput = document.querySelector("#todoNoteInput");
+const expenseDialog = document.querySelector("#expenseDialog");
+const expenseForm = document.querySelector("#expenseForm");
+const expenseDateInput = document.querySelector("#expenseDateInput");
+const expenseNameInput = document.querySelector("#expenseNameInput");
+const expenseAmountInput = document.querySelector("#expenseAmountInput");
+const expenseCurrencyInput = document.querySelector("#expenseCurrencyInput");
+const expenseCategoryInput = document.querySelector("#expenseCategoryInput");
+const expenseNoteInput = document.querySelector("#expenseNoteInput");
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -138,9 +166,47 @@ function normalizeLibrary(library) {
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         dates: dateRange.label,
-        days
+        days,
+        bookings: Array.isArray(trip.bookings) ? trip.bookings.map(normalizeBooking) : [],
+        todos: Array.isArray(trip.todos) ? trip.todos.map(normalizeTodo) : [],
+        expenses: Array.isArray(trip.expenses) ? trip.expenses.map(normalizeExpense) : []
       };
     })
+  };
+}
+
+function normalizeBooking(booking) {
+  return {
+    id: booking.id || createId(),
+    type: booking.type || "其他",
+    name: booking.name || "",
+    date: booking.date || "",
+    time: booking.time || "",
+    place: booking.place || "",
+    code: booking.code || "",
+    note: booking.note || ""
+  };
+}
+
+function normalizeTodo(todo) {
+  return {
+    id: todo.id || createId(),
+    group: todo.group || "行前準備",
+    text: todo.text || "",
+    note: todo.note || "",
+    done: Boolean(todo.done)
+  };
+}
+
+function normalizeExpense(expense) {
+  return {
+    id: expense.id || createId(),
+    date: expense.date || "",
+    name: expense.name || "",
+    amount: Number(expense.amount) || 0,
+    currency: expense.currency || "JPY",
+    category: expense.category || "其他",
+    note: expense.note || ""
   };
 }
 
@@ -401,6 +467,7 @@ function renderTrip() {
   tripTitle.textContent = trip.title;
   tripDates.textContent = trip.dates;
   tripSummary.textContent = `${trip.days.length} 天，${countItems(trip)} 個行程`;
+  renderTripSectionTabs();
 
   dayTabs.innerHTML = trip.days
     .map(
@@ -416,6 +483,9 @@ function renderTrip() {
   const day = currentDay();
   activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}`;
   activeDayTitle.textContent = day.title;
+  renderBookings();
+  renderTodos();
+  renderExpenses();
 
   if (day.items.length === 0) {
     timeline.innerHTML = `<div class="empty-state">這一天還沒有行程。點「新增行程」開始安排。</div>`;
@@ -458,6 +528,123 @@ function renderTrip() {
       }
     )
     .join("");
+}
+
+function renderTripSectionTabs() {
+  document.querySelectorAll("[data-trip-section]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.tripSection === state.activeTripSection);
+  });
+
+  document.querySelectorAll("[data-section-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.sectionPanel !== state.activeTripSection;
+  });
+}
+
+function renderBookings() {
+  const trip = currentTrip();
+  if (trip.bookings.length === 0) {
+    bookingList.innerHTML = `<div class="empty-state">還沒有預訂。可以先把機票、餐廳、票券或住宿收進來。</div>`;
+    return;
+  }
+
+  bookingList.innerHTML = trip.bookings
+    .slice()
+    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+    .map(
+      (booking) => `
+        <article class="utility-card">
+          <div>
+            <span class="meta">${escapeHtml(booking.type)}</span>
+            <h3>${escapeHtml(booking.name)}</h3>
+            <p>${escapeHtml([booking.date, booking.time, booking.place].filter(Boolean).join(" · "))}</p>
+            ${booking.code ? `<p>代碼：${escapeHtml(booking.code)}</p>` : ""}
+            ${booking.note ? `<p>${escapeHtml(booking.note)}</p>` : ""}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function renderTodos() {
+  const trip = currentTrip();
+  const groups = ["行前準備", "行李打包", "購物清單"];
+
+  todoGroups.innerHTML = groups
+    .map((group) => {
+      const todos = trip.todos.filter((todo) => todo.group === group);
+      const doneCount = todos.filter((todo) => todo.done).length;
+
+      return `
+        <section class="todo-group">
+          <header>
+            <div>
+              <p class="eyebrow">${escapeHtml(group)}</p>
+              <h3>${doneCount}/${todos.length} 完成</h3>
+            </div>
+          </header>
+          <div class="todo-list">
+            ${
+              todos.length
+                ? todos
+                    .map(
+                      (todo) => `
+                        <label class="todo-row">
+                          <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
+                          <span>
+                            <strong>${escapeHtml(todo.text)}</strong>
+                            ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
+                          </span>
+                        </label>
+                      `
+                    )
+                    .join("")
+                : `<p class="muted-text">還沒有項目。</p>`
+            }
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+}
+
+function renderExpenses() {
+  const trip = currentTrip();
+  if (trip.expenses.length === 0) {
+    expenseSummary.textContent = "尚無支出";
+    expenseList.innerHTML = `<div class="empty-state">還沒有支出。可以依日期記錄品項、金額、貨幣和分類。</div>`;
+    return;
+  }
+
+  const totals = trip.expenses.reduce((result, expense) => {
+    result[expense.currency] = (result[expense.currency] || 0) + expense.amount;
+    return result;
+  }, {});
+
+  expenseSummary.textContent = Object.entries(totals)
+    .map(([currency, total]) => `${currency} ${formatAmount(total)}`)
+    .join(" · ");
+
+  expenseList.innerHTML = trip.expenses
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(
+      (expense) => `
+        <article class="utility-card">
+          <div>
+            <span class="meta">${escapeHtml(expense.category)}</span>
+            <h3>${escapeHtml(expense.name)}</h3>
+            <p>${escapeHtml(expense.date)} · ${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</p>
+            ${expense.note ? `<p>${escapeHtml(expense.note)}</p>` : ""}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function formatAmount(value) {
+  return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 function countItems(trip) {
@@ -554,6 +741,7 @@ function showLanding() {
 function showTrip(tripId) {
   state.activeTripId = tripId;
   state.activeDayIndex = 0;
+  state.activeTripSection = "itinerary";
   landingView.hidden = true;
   homeView.hidden = true;
   tripView.hidden = false;
@@ -837,6 +1025,23 @@ document.querySelector("#addTripButton").addEventListener("click", () => openTri
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
+document.querySelector("#addBookingButton").addEventListener("click", () => {
+  if (isReadonly) return;
+  bookingForm.reset();
+  bookingDateInput.value = currentTrip().startDate;
+  openModal(bookingDialog);
+});
+document.querySelector("#addTodoButton").addEventListener("click", () => {
+  if (isReadonly) return;
+  todoForm.reset();
+  openModal(todoDialog);
+});
+document.querySelector("#addExpenseButton").addEventListener("click", () => {
+  if (isReadonly) return;
+  expenseForm.reset();
+  expenseDateInput.value = currentTrip().startDate;
+  openModal(expenseDialog);
+});
 exportButton.addEventListener("click", () => {
   if (!isReadonly) exportLibrary();
 });
@@ -900,6 +1105,13 @@ dayTabs.addEventListener("click", (event) => {
   renderTrip();
 });
 
+tripSectionTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-trip-section]");
+  if (!button) return;
+  state.activeTripSection = button.dataset.tripSection;
+  renderTripSectionTabs();
+});
+
 timeline.addEventListener("click", (event) => {
   const toggleButton = event.target.closest("[data-toggle-details]");
   if (toggleButton) {
@@ -955,6 +1167,72 @@ itemForm.addEventListener("submit", (event) => {
   saveLibrary();
   closeModal(itemDialog);
   render();
+});
+
+bookingForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (isReadonly) return;
+
+  currentTrip().bookings.push(normalizeBooking({
+    id: createId(),
+    type: bookingTypeInput.value,
+    name: bookingNameInput.value.trim(),
+    date: bookingDateInput.value,
+    time: bookingTimeInput.value,
+    place: bookingPlaceInput.value.trim(),
+    code: bookingCodeInput.value.trim(),
+    note: bookingNoteInput.value.trim()
+  }));
+
+  saveLibrary();
+  closeModal(bookingDialog);
+  renderBookings();
+});
+
+todoForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (isReadonly) return;
+
+  currentTrip().todos.push(normalizeTodo({
+    id: createId(),
+    group: todoGroupInput.value,
+    text: todoTextInput.value.trim(),
+    note: todoNoteInput.value.trim(),
+    done: false
+  }));
+
+  saveLibrary();
+  closeModal(todoDialog);
+  renderTodos();
+});
+
+todoGroups.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("[data-toggle-todo]");
+  if (!checkbox || isReadonly) return;
+  const todo = currentTrip().todos.find((item) => item.id === checkbox.dataset.toggleTodo);
+  if (!todo) return;
+  todo.done = checkbox.checked;
+  saveLibrary();
+  renderTodos();
+});
+
+expenseForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (isReadonly) return;
+
+  currentTrip().expenses.push(normalizeExpense({
+    id: createId(),
+    date: expenseDateInput.value,
+    name: expenseNameInput.value.trim(),
+    amount: expenseAmountInput.value,
+    currency: expenseCurrencyInput.value,
+    category: expenseCategoryInput.value,
+    note: expenseNoteInput.value.trim()
+  }));
+
+  saveLibrary();
+  closeModal(expenseDialog);
+  renderExpenses();
 });
 
 function syncFlightFields() {
@@ -1026,7 +1304,10 @@ tripForm.addEventListener("submit", (event) => {
       startDate,
       endDate,
       dates: formatDateRange(startDate, endDate),
-      days: createBlankDays(dayCount, startDate)
+      days: createBlankDays(dayCount, startDate),
+      bookings: [],
+      todos: [],
+      expenses: []
     };
     state.library.trips.unshift(trip);
   } else {

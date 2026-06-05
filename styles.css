@@ -243,6 +243,9 @@ select {
 .is-readonly .data-actions,
 .is-readonly #editTripButton,
 .is-readonly #addItemButton,
+.is-readonly #addBookingButton,
+.is-readonly #addTodoButton,
+.is-readonly #addExpenseButton,
 .is-readonly .card-actions button {
   display: none !important;
 }
@@ -546,6 +549,36 @@ h2 {
   display: none;
 }
 
+.trip-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 2px 0 12px;
+}
+
+.trip-section-tab {
+  min-height: 44px;
+  border: 1px solid rgba(24, 37, 33, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.86);
+  color: var(--brand-dark);
+  font-size: 0.9rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.trip-section-tab.is-active {
+  border-color: transparent;
+  background: var(--brand);
+  color: white;
+  box-shadow: 0 10px 24px rgba(15, 107, 95, 0.16);
+}
+
+.trip-section-panel {
+  display: grid;
+  gap: 12px;
+}
+
 .day-tab {
   min-height: 58px;
   border: 1px solid rgba(24, 37, 33, 0.1);
@@ -582,6 +615,72 @@ h2 {
 .timeline {
   display: grid;
   gap: 14px;
+}
+
+.utility-list,
+.todo-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.utility-card,
+.todo-group {
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), transparent 44%),
+    rgba(255, 253, 248, 0.94);
+  padding: 15px;
+  box-shadow: 0 12px 28px rgba(24, 37, 33, 0.08);
+}
+
+.utility-card h3,
+.todo-group h3 {
+  margin: 7px 0;
+}
+
+.utility-card p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.todo-group header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.todo-list {
+  display: grid;
+  gap: 8px;
+}
+
+.todo-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+  padding: 10px;
+  color: var(--ink);
+}
+
+.todo-row input {
+  margin-top: 3px;
+  accent-color: var(--brand);
+}
+
+.todo-row strong,
+.todo-row small {
+  display: block;
+}
+
+.todo-row small,
+.muted-text {
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .item-card {
@@ -1014,6 +1113,10 @@ h2 {
   .topbar-actions .primary-button,
   .topbar-actions .secondary-action {
     min-height: 40px;
+  }
+
+  .trip-section-tabs {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .trip-card {
