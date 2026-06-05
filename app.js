@@ -1,6 +1,14 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
+const DEFAULT_EXCHANGE_RATES = {
+  TWD: 1,
+  JPY: 0.22,
+  KRW: 0.024,
+  USD: 32,
+  EUR: 35,
+  CHF: 36
+};
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
 const defaultTrip = {
@@ -83,6 +91,7 @@ const expenseSummary = document.querySelector("#expenseSummary");
 const memberChips = document.querySelector("#memberChips");
 const memberForm = document.querySelector("#memberForm");
 const memberNameInput = document.querySelector("#memberNameInput");
+const exchangeRateList = document.querySelector("#exchangeRateList");
 const expenseDashboard = document.querySelector("#expenseDashboard");
 const itemDialog = document.querySelector("#itemDialog");
 const itemForm = document.querySelector("#itemForm");
@@ -197,6 +206,7 @@ function normalizeLibrary(library) {
         dates: dateRange.label,
         days,
         members: normalizeMembers(trip.members),
+        exchangeRates: normalizeExchangeRates(trip.exchangeRates),
         bookings: Array.isArray(trip.bookings) ? trip.bookings.map(normalizeBooking) : [],
         todos: Array.isArray(trip.todos) ? trip.todos.map(normalizeTodo) : [],
         expenses: Array.isArray(trip.expenses) ? trip.expenses.map(normalizeExpense) : []
@@ -209,6 +219,15 @@ function normalizeMembers(members) {
   const source = Array.isArray(members) ? members : ["我"];
   const names = source.map((member) => String(member || "").trim()).filter(Boolean);
   return [...new Set(names.length ? names : ["我"])];
+}
+
+function normalizeExchangeRates(rates) {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_EXCHANGE_RATES).map(([currency, defaultRate]) => {
+      const rate = Number(rates?.[currency]);
+      return [currency, Number.isFinite(rate) && rate > 0 ? rate : defaultRate];
+    })
+  );
 }
 
 function normalizeBooking(booking) {
@@ -767,6 +786,7 @@ function renderTodos() {
 function renderExpenses() {
   const trip = currentTrip();
   renderMembers();
+  renderExchangeRates();
 
   if (trip.expenses.length === 0) {
     expenseSummary.textContent = "尚無支出";
@@ -780,9 +800,10 @@ function renderExpenses() {
     return result;
   }, {});
 
-  expenseSummary.textContent = Object.entries(totals)
-    .map(([currency, total]) => `${currency} ${formatAmount(total)}`)
-    .join(" · ");
+  const totalTwd = trip.expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+  expenseSummary.textContent = `${Object.entries(totals)
+    .map(([currency, total]) => `${currency} ${formatAmount(total)}（約 ${formatTwd(convertToTwd(total, currency, trip))}）`)
+    .join(" · ")} · 合計約 ${formatTwd(totalTwd)}`;
 
   expenseDashboard.innerHTML = renderExpenseDashboard(trip);
   expenseList.innerHTML = trip.expenses
@@ -795,6 +816,7 @@ function renderExpenses() {
             <span class="meta">${escapeHtml(expense.category)}</span>
             <h3>${escapeHtml(expense.name)}</h3>
             <p>${escapeHtml(expense.date)} · ${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</p>
+            <p>約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</p>
             <p>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</p>
             ${expense.note ? `<p>${escapeHtml(expense.note)}</p>` : ""}
           </div>
@@ -936,11 +958,13 @@ function renderExpenseDashboard(trip) {
   return Object.entries(ledgers)
     .map(([currency, ledger]) => {
       const settlements = calculateSettlements(ledger);
+      const currencyTotal = Object.values(ledger).reduce((total, entry) => total + entry.share, 0);
 
       return `
         <section class="ledger-card">
           <header>
             <h3>${escapeHtml(currency)} 帳務總表</h3>
+            <p>總額約 ${escapeHtml(formatTwd(convertToTwd(currencyTotal, currency, trip)))}</p>
           </header>
           ${renderExpensePie(ledger)}
           ${renderMemberLedgerList(ledger)}
@@ -999,6 +1023,30 @@ function selectedExpenseShareMembers() {
 
 function formatAmount(value) {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function formatTwd(value) {
+  return `TWD ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function convertToTwd(amount, currency, trip = currentTrip()) {
+  const rates = normalizeExchangeRates(trip.exchangeRates);
+  return (Number(amount) || 0) * (rates[currency] || 1);
+}
+
+function renderExchangeRates() {
+  const trip = currentTrip();
+  trip.exchangeRates = normalizeExchangeRates(trip.exchangeRates);
+  exchangeRateList.innerHTML = Object.entries(trip.exchangeRates)
+    .map(
+      ([currency, rate]) => `
+        <label class="exchange-rate-row">
+          <span>${escapeHtml(currency)}</span>
+          <input type="number" min="0" step="0.001" value="${escapeHtml(rate)}" data-exchange-currency="${escapeHtml(currency)}" ${currency === "TWD" ? "readonly" : ""} />
+        </label>
+      `
+    )
+    .join("");
 }
 
 function countItems(trip) {
@@ -1812,6 +1860,22 @@ memberForm.addEventListener("submit", (event) => {
   renderExpenses();
 });
 
+exchangeRateList.addEventListener("input", (event) => {
+  const input = event.target.closest("[data-exchange-currency]");
+  if (!input || isReadonly) return;
+  const currency = input.dataset.exchangeCurrency;
+  if (currency === "TWD") return;
+  const rate = Number(input.value);
+  if (!Number.isFinite(rate) || rate <= 0) return;
+
+  currentTrip().exchangeRates = normalizeExchangeRates({
+    ...currentTrip().exchangeRates,
+    [currency]: rate
+  });
+  saveLibrary();
+  renderExpenses();
+});
+
 expenseForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (isReadonly) return;
@@ -1923,6 +1987,7 @@ tripForm.addEventListener("submit", (event) => {
       dates: formatDateRange(startDate, endDate),
       days: createBlankDays(dayCount, startDate),
       members: ["我"],
+      exchangeRates: { ...DEFAULT_EXCHANGE_RATES },
       bookings: [],
       todos: [],
       expenses: []

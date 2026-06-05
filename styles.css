@@ -667,17 +667,56 @@ h2 {
 }
 
 .expense-members,
+.exchange-panel,
 .expense-dashboard {
   display: grid;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.expense-members {
+.expense-members,
+.exchange-panel {
   border: 1px solid rgba(24, 37, 33, 0.09);
   border-radius: 8px;
   background: rgba(255, 253, 248, 0.86);
   padding: 14px;
+}
+
+.exchange-panel h3 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+}
+
+.exchange-rate-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.exchange-rate-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(24, 37, 33, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  padding: 8px;
+}
+
+.exchange-rate-row span {
+  color: var(--brand-dark);
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.exchange-rate-row input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+  padding: 8px;
+  font-weight: 850;
 }
 
 .member-chips {
@@ -740,8 +779,21 @@ h2 {
 }
 
 .ledger-card h3 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 1rem;
+}
+
+.ledger-card > header {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.ledger-card > header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
 }
 
 .ledger-visual {
