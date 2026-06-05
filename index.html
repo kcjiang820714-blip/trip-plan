@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=40" />
+    <link rel="stylesheet" href="./styles.css?v=41" />
   </head>
   <body>
     <main class="app-shell">
@@ -173,26 +173,46 @@
             </div>
             <button class="primary-button" id="addExpenseButton" type="button">新增支出</button>
           </section>
-          <section class="expense-members">
-            <div>
-              <p class="eyebrow">成員</p>
-              <div class="member-chips" id="memberChips"></div>
+          <section class="expense-section">
+            <header class="expense-section-heading">
+              <p class="eyebrow">設定</p>
+              <h3>成員與匯率</h3>
+            </header>
+            <div class="expense-settings-grid">
+              <section class="expense-members">
+                <div>
+                  <p class="eyebrow">成員</p>
+                  <div class="member-chips" id="memberChips"></div>
+                </div>
+                <form class="inline-form" id="memberForm">
+                  <input id="memberNameInput" placeholder="新增成員，例如 小美" />
+                  <button class="secondary-action" type="submit">新增</button>
+                </form>
+              </section>
+              <section class="exchange-panel">
+                <div>
+                  <p class="eyebrow">匯率</p>
+                  <h3>換算台幣</h3>
+                  <p>請填「1 單位外幣可以換成多少 TWD」。例如 JPY 填 0.22，代表 1 JPY 約等於 0.22 TWD。輸入完成後點其他地方才會套用。</p>
+                </div>
+                <div class="exchange-rate-list" id="exchangeRateList"></div>
+              </section>
             </div>
-            <form class="inline-form" id="memberForm">
-              <input id="memberNameInput" placeholder="新增成員，例如 小美" />
-              <button class="secondary-action" type="submit">新增</button>
-            </form>
           </section>
-          <section class="exchange-panel">
-            <div>
-              <p class="eyebrow">匯率</p>
-              <h3>換算台幣</h3>
-              <p>請填「1 單位外幣可以換成多少 TWD」。例如 JPY 填 0.22，代表 1 JPY 約等於 0.22 TWD。輸入完成後點其他地方才會套用。</p>
-            </div>
-            <div class="exchange-rate-list" id="exchangeRateList"></div>
+          <section class="expense-section">
+            <header class="expense-section-heading">
+              <p class="eyebrow">分析</p>
+              <h3>統計與帳務總表</h3>
+            </header>
+            <section class="expense-dashboard" id="expenseDashboard"></section>
           </section>
-          <section class="expense-dashboard" id="expenseDashboard"></section>
-          <section class="expense-day-list" id="expenseList"></section>
+          <section class="expense-section">
+            <header class="expense-section-heading">
+              <p class="eyebrow">明細</p>
+              <h3>每日帳目</h3>
+            </header>
+            <section class="expense-day-list" id="expenseList"></section>
+          </section>
         </section>
       </section>
 
@@ -544,6 +564,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=48" type="module"></script>
+    <script src="./app.js?v=50" type="module"></script>
   </body>
 </html>

@@ -427,10 +427,11 @@ function saveLibrary() {
 }
 
 function setLibrary(library) {
-  state.library = normalizeLibrary(library);
-  state.activeTripId = state.library.trips[0]?.id || null;
+  const nextLibrary = normalizeLibrary(library);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextLibrary));
+  state.library = nextLibrary;
+  state.activeTripId = nextLibrary.trips[0]?.id || null;
   state.activeDayIndex = 0;
-  saveLibrary();
   render();
   showHome();
 }
@@ -518,7 +519,20 @@ async function importLibrary(file) {
 
   try {
     const text = await file.text();
-    const parsed = JSON.parse(text);
+
+    if (!text.trim()) {
+      window.alert("匯入失敗：這個檔案是空的。請確認手機下載到的是完整的 JSON 備份檔。");
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      window.alert("匯入失敗：這不是有效的 JSON 檔。請確認不是 zip、圖片、PDF，或手機雲端尚未下載完成的檔案。");
+      return;
+    }
+
     const trips = Array.isArray(parsed.trips) ? parsed.trips : Array.isArray(parsed) ? parsed : null;
 
     if (!trips || trips.length === 0) {
@@ -531,8 +545,14 @@ async function importLibrary(file) {
 
     setLibrary({ trips });
     window.alert("匯入完成。");
-  } catch {
-    window.alert("匯入失敗。請確認你選的是旅．拾光匯出的 JSON 檔。");
+  } catch (error) {
+    const isQuotaError = error?.name === "QuotaExceededError" || error?.code === 22 || error?.code === 1014;
+    if (isQuotaError) {
+      window.alert("匯入失敗：手機瀏覽器可用儲存空間不足。通常是備份裡的照片或 PDF 附件太多、太大。請先在電腦端減少附件或改用較小檔案後再匯出。");
+      return;
+    }
+
+    window.alert("匯入失敗：這份備份資料無法讀取。請確認它是由旅．拾光匯出的 JSON 檔，並且手機已完整下載。");
   } finally {
     importFileInput.value = "";
   }
@@ -1211,7 +1231,7 @@ function renderExpenseDashboard(trip) {
     <section class="ledger-card">
       <header>
         <h3>TWD 帳務總表</h3>
-        <p>所有幣別先依匯率換算成台幣後一起計算，總額 ${escapeHtml(formatTwd(total))}</p>
+        <p>已換算成台幣，總額 ${escapeHtml(formatTwd(total))}</p>
       </header>
       ${renderExpensePie(ledger)}
       ${renderMemberLedgerList(ledger)}
