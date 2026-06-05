@@ -53,6 +53,7 @@ const state = {
   library: loadLibrary(),
   activeTripId: null,
   activeDayIndex: 0,
+  activeExpenseDate: null,
   activeTripSection: "itinerary",
   activeBookingGroup: "票券",
   activeTodoGroup: "行前準備",
@@ -796,22 +797,15 @@ function renderExpenses() {
     return;
   }
 
-  const totals = trip.expenses.reduce((result, expense) => {
-    result[expense.currency] = (result[expense.currency] || 0) + expense.amount;
-    return result;
-  }, {});
-
   const totalTwd = trip.expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
-  expenseSummary.textContent = `${Object.entries(totals)
-    .map(([currency, total]) => `${currency} ${formatAmount(total)}（約 ${formatTwd(convertToTwd(total, currency, trip))}）`)
-    .join(" · ")} · 合計約 ${formatTwd(totalTwd)}`;
+  expenseSummary.textContent = `${trip.expenses.length} 筆支出 · 合計 ${formatTwd(totalTwd)}`;
 
   expenseDashboard.innerHTML = renderExpenseDashboard(trip);
-  expenseList.innerHTML = renderExpenseDayGroups(trip);
+  expenseList.innerHTML = renderExpenseDayTabs(trip);
 }
 
-function renderExpenseDayGroups(trip) {
-  const groups = trip.expenses
+function groupExpensesByDate(trip) {
+  return trip.expenses
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
     .reduce((result, expense) => {
@@ -820,50 +814,76 @@ function renderExpenseDayGroups(trip) {
       result[date].push(expense);
       return result;
     }, {});
+}
 
-  return Object.entries(groups)
-    .map(([date, expenses]) => {
-      const dayTotals = expenses.reduce((result, expense) => {
-        result[expense.currency] = (result[expense.currency] || 0) + expense.amount;
-        return result;
-      }, {});
-      const dayTwd = expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+function renderExpenseDayTabs(trip) {
+  const groups = groupExpensesByDate(trip);
+  const dates = Object.keys(groups);
+  const activeDate = dates.includes(state.activeExpenseDate) ? state.activeExpenseDate : dates[0];
+  state.activeExpenseDate = activeDate;
+  const expenses = groups[activeDate] || [];
 
-      return `
-        <section class="expense-day-card">
-          <header>
-            <div>
-              <p class="eyebrow">${escapeHtml(date)}</p>
-              <h3>${Object.entries(dayTotals)
-                .map(([currency, total]) => `${escapeHtml(currency)} ${formatAmount(total)}`)
-                .join(" · ")}</h3>
-            </div>
-            <span>約 ${escapeHtml(formatTwd(dayTwd))}</span>
-          </header>
-          <div class="expense-entry-list">
-            ${expenses
-              .map(
-                (expense) => `
-                  <article class="expense-entry">
-                    <div class="expense-entry-main">
-                      <span class="expense-category">${escapeHtml(expense.category)}</span>
-                      <strong>${escapeHtml(expense.name)}</strong>
-                      <small>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</small>
-                      ${expense.note ? `<small>${escapeHtml(expense.note)}</small>` : ""}
-                    </div>
-                    <div class="expense-entry-amount">
-                      <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
-                      <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
-                    </div>
-                  </article>
-                `
-              )
-              .join("")}
-          </div>
-        </section>
-      `;
-    })
-    .join("");
+  return `
+    <section class="expense-day-tabs-card">
+      <nav class="expense-date-tabs" aria-label="每日帳目">
+        ${dates
+          .map((date) => {
+            const dayTotal = groups[date].reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+            return `
+              <button class="expense-date-tab ${date === activeDate ? "is-active" : ""}" type="button" data-expense-date="${escapeHtml(date)}">
+                <strong>${escapeHtml(date)}</strong>
+                <span>${escapeHtml(formatTwd(dayTotal))}</span>
+              </button>
+            `;
+          })
+          .join("")}
+      </nav>
+      ${renderExpenseDayCard(activeDate, expenses, trip)}
+    </section>
+  `;
+}
+
+function renderExpenseDayCard(date, expenses, trip) {
+  const dayTotals = expenses.reduce((result, expense) => {
+    result[expense.currency] = (result[expense.currency] || 0) + expense.amount;
+    return result;
+  }, {});
+  const dayTwd = expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+
+  return `
+    <section class="expense-day-card">
+      <header>
+        <div>
+          <p class="eyebrow">${escapeHtml(date)}</p>
+          <h3>${escapeHtml(formatTwd(dayTwd))}</h3>
+          <small>${Object.entries(dayTotals)
+            .map(([currency, total]) => `${escapeHtml(currency)} ${formatAmount(total)}`)
+            .join(" · ")}</small>
+        </div>
+        <span>${expenses.length} 筆</span>
+      </header>
+      <div class="expense-entry-list">
+        ${expenses
+          .map(
+            (expense) => `
+              <article class="expense-entry">
+                <div class="expense-entry-main">
+                  <span class="expense-category">${escapeHtml(expense.category)}</span>
+                  <strong>${escapeHtml(expense.name)}</strong>
+                  <small>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</small>
+                  ${expense.note ? `<small>${escapeHtml(expense.note)}</small>` : ""}
+                </div>
+                <div class="expense-entry-amount">
+                  <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
+                  <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderMembers() {
@@ -874,36 +894,30 @@ function renderMembers() {
 
 function calculateExpenseLedger(trip) {
   const members = normalizeMembers(trip.members);
-  const ledgers = {};
+  const ledger = Object.fromEntries(members.map((member) => [member, { paid: 0, share: 0, balance: 0 }]));
 
   trip.expenses.forEach((expense) => {
-    if (!ledgers[expense.currency]) {
-      ledgers[expense.currency] = Object.fromEntries(members.map((member) => [member, { paid: 0, share: 0, balance: 0 }]));
-    }
-
-    if (!ledgers[expense.currency][expense.payer]) {
-      ledgers[expense.currency][expense.payer] = { paid: 0, share: 0, balance: 0 };
+    if (!ledger[expense.payer]) {
+      ledger[expense.payer] = { paid: 0, share: 0, balance: 0 };
     }
 
     const shareWith = normalizeMembers(expense.shareWith).filter((member) => members.includes(member));
     const participants = shareWith.length ? shareWith : members;
-    const amount = Number(expense.amount) || 0;
+    const amount = convertToTwd(expense.amount, expense.currency, trip);
     const shareAmount = participants.length ? amount / participants.length : 0;
 
-    ledgers[expense.currency][expense.payer].paid += amount;
+    ledger[expense.payer].paid += amount;
     participants.forEach((member) => {
-      if (!ledgers[expense.currency][member]) ledgers[expense.currency][member] = { paid: 0, share: 0, balance: 0 };
-      ledgers[expense.currency][member].share += shareAmount;
+      if (!ledger[member]) ledger[member] = { paid: 0, share: 0, balance: 0 };
+      ledger[member].share += shareAmount;
     });
   });
 
-  Object.values(ledgers).forEach((ledger) => {
-    Object.values(ledger).forEach((entry) => {
-      entry.balance = entry.paid - entry.share;
-    });
+  Object.values(ledger).forEach((entry) => {
+    entry.balance = entry.paid - entry.share;
   });
 
-  return ledgers;
+  return ledger;
 }
 
 function calculateSettlements(ledger) {
@@ -961,7 +975,7 @@ function renderExpensePie(ledger) {
             ([member, entry], index) => `
               <span>
                 <i style="background: ${pieColor(index)};"></i>
-                ${escapeHtml(member)} ${formatAmount(entry.share)}
+                ${escapeHtml(member)} ${escapeHtml(formatTwd(entry.share))}
               </span>
             `
           )
@@ -980,10 +994,10 @@ function renderMemberLedgerList(ledger) {
             <article class="member-ledger-card">
               <header>
                 <strong>${escapeHtml(member)}</strong>
-                <span class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${formatAmount(entry.balance)}</span>
+                <span class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${escapeHtml(formatTwd(entry.balance))}</span>
               </header>
-              <p>已付 ${formatAmount(entry.paid)}</p>
-              <p>應分攤 ${formatAmount(entry.share)}</p>
+              <p>已付 ${escapeHtml(formatTwd(entry.paid))}</p>
+              <p>應分攤 ${escapeHtml(formatTwd(entry.share))}</p>
             </article>
           `
         )
@@ -993,53 +1007,48 @@ function renderMemberLedgerList(ledger) {
 }
 
 function renderExpenseDashboard(trip) {
-  const ledgers = calculateExpenseLedger(trip);
+  const ledger = calculateExpenseLedger(trip);
+  const settlements = calculateSettlements(ledger);
+  const total = Object.values(ledger).reduce((sum, entry) => sum + entry.share, 0);
 
-  return Object.entries(ledgers)
-    .map(([currency, ledger]) => {
-      const settlements = calculateSettlements(ledger);
-      const currencyTotal = Object.values(ledger).reduce((total, entry) => total + entry.share, 0);
-
-      return `
-        <section class="ledger-card">
-          <header>
-            <h3>${escapeHtml(currency)} 帳務總表</h3>
-            <p>總額約 ${escapeHtml(formatTwd(convertToTwd(currencyTotal, currency, trip)))}</p>
-          </header>
-          ${renderExpensePie(ledger)}
-          ${renderMemberLedgerList(ledger)}
-          <div class="ledger-table">
-            <div class="ledger-row ledger-head">
-              <span>成員</span>
-              <span>已付</span>
-              <span>應分攤</span>
-              <span>差額</span>
-            </div>
-            ${Object.entries(ledger)
-              .map(
-                ([member, entry]) => `
-                  <div class="ledger-row">
-                    <span>${escapeHtml(member)}</span>
-                    <span>${formatAmount(entry.paid)}</span>
-                    <span>${formatAmount(entry.share)}</span>
-                    <strong class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${formatAmount(entry.balance)}</strong>
-                  </div>
-                `
-              )
-              .join("")}
-          </div>
-          <div class="settlement-list">
-            <strong>結算建議</strong>
-            ${
-              settlements.length
-                ? settlements.map((item) => `<p>${escapeHtml(item.from)} 給 ${escapeHtml(item.to)} ${escapeHtml(currency)} ${formatAmount(item.amount)}</p>`).join("")
-                : "<p>目前帳務已打平。</p>"
-            }
-          </div>
-        </section>
-      `;
-    })
-    .join("");
+  return `
+    <section class="ledger-card">
+      <header>
+        <h3>TWD 帳務總表</h3>
+        <p>所有幣別先依匯率換算成台幣後一起計算，總額 ${escapeHtml(formatTwd(total))}</p>
+      </header>
+      ${renderExpensePie(ledger)}
+      ${renderMemberLedgerList(ledger)}
+      <div class="ledger-table">
+        <div class="ledger-row ledger-head">
+          <span>成員</span>
+          <span>已付</span>
+          <span>應分攤</span>
+          <span>差額</span>
+        </div>
+        ${Object.entries(ledger)
+          .map(
+            ([member, entry]) => `
+              <div class="ledger-row">
+                <span>${escapeHtml(member)}</span>
+                <span>${escapeHtml(formatTwd(entry.paid))}</span>
+                <span>${escapeHtml(formatTwd(entry.share))}</span>
+                <strong class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${escapeHtml(formatTwd(entry.balance))}</strong>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="settlement-list">
+        <strong>結算建議</strong>
+        ${
+          settlements.length
+            ? settlements.map((item) => `<p>${escapeHtml(item.from)} 給 ${escapeHtml(item.to)} ${escapeHtml(formatTwd(item.amount))}</p>`).join("")
+            : "<p>目前帳務已打平。</p>"
+        }
+      </div>
+    </section>
+  `;
 }
 
 function renderExpenseFormMembers() {
@@ -1202,6 +1211,7 @@ function showLanding() {
 function showTrip(tripId) {
   state.activeTripId = tripId;
   state.activeDayIndex = 0;
+  state.activeExpenseDate = null;
   state.activeTripSection = "itinerary";
   landingView.hidden = true;
   homeView.hidden = true;
@@ -1740,6 +1750,13 @@ todoSubTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeTodoGroup = button.dataset.todoGroup;
   renderTodos();
+});
+
+expenseList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-expense-date]");
+  if (!button) return;
+  state.activeExpenseDate = button.dataset.expenseDate;
+  renderExpenses();
 });
 
 timeline.addEventListener("click", (event) => {
