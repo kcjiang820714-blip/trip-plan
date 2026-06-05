@@ -398,88 +398,158 @@ h2 {
 
 .timeline {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .item-card {
+  --card-accent: var(--brand);
   position: relative;
   display: grid;
-  grid-template-columns: 78px 1fr;
-  gap: 14px;
-  min-height: 102px;
-  border: 1px solid rgba(24, 37, 33, 0.08);
-  border-left: 5px solid var(--brand);
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 15px;
+  min-height: 112px;
+  border: 1px solid rgba(24, 37, 33, 0.09);
   border-radius: 8px;
-  background: rgba(255, 253, 248, 0.98);
-  padding: 15px;
-  box-shadow: 0 12px 28px rgba(24, 37, 33, 0.09);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent 42%),
+    linear-gradient(135deg, rgba(255, 253, 248, 0.99), rgba(250, 246, 237, 0.97));
+  padding: 16px;
+  box-shadow:
+    0 18px 34px rgba(24, 37, 33, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
-.item-card[data-type="餐廳"] {
-  border-left-color: var(--accent);
+.item-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 32%),
+    var(--card-accent);
+}
+
+.item-card::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 74px;
+  height: 28px;
+  border-top: 1px solid rgba(24, 37, 33, 0.06);
+  border-bottom: 1px solid rgba(24, 37, 33, 0.05);
+  opacity: 0.65;
+  transform: rotate(-10deg);
+}
+
+.item-card:hover {
+  border-color: color-mix(in srgb, var(--card-accent), white 68%);
+  box-shadow:
+    0 22px 40px rgba(24, 37, 33, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateY(-1px);
+}
+
+.item-card[data-type="餐廳"],
+.item-card[data-type="午餐"] {
+  --card-accent: var(--accent);
 }
 
 .item-card[data-type="飛機"],
 .item-card[data-type="交通"] {
-  border-left-color: var(--indigo);
+  --card-accent: var(--indigo);
 }
 
 .item-card[data-type="住宿"] {
-  border-left-color: #8d6c9f;
+  --card-accent: #8d6c9f;
 }
 
 .item-card[data-type="購物"] {
-  border-left-color: var(--gold);
+  --card-accent: var(--gold);
 }
 
 .time {
   display: grid;
   place-items: center;
   align-self: start;
-  min-height: 44px;
+  min-height: 48px;
   border-radius: 8px;
-  background: #eef5f1;
-  color: var(--brand-dark);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent),
+    color-mix(in srgb, var(--card-accent), white 86%);
+  color: color-mix(in srgb, var(--card-accent), black 34%);
   font-weight: 950;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--card-accent), white 72%),
+    0 8px 16px rgba(24, 37, 33, 0.06);
 }
 
 .item-card h3 {
   margin: 0 0 8px;
-  font-size: 1.08rem;
+  padding-right: 64px;
+  font-size: 1.1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .meta {
   display: inline-flex;
+  align-items: center;
+  gap: 6px;
   width: fit-content;
   max-width: 100%;
   margin-bottom: 8px;
   border-radius: 999px;
-  background: #e9f1ee;
-  color: var(--brand-dark);
-  padding: 4px 9px;
+  background: color-mix(in srgb, var(--card-accent), white 88%);
+  color: color-mix(in srgb, var(--card-accent), black 36%);
+  padding: 5px 10px;
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.meta::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--card-accent);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.58);
 }
 
 .note {
   color: var(--muted);
   line-height: 1.5;
+  max-width: 54ch;
 }
 
 .card-actions {
   display: flex;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 13px;
 }
 
 .text-button {
-  border: 0;
-  background: transparent;
-  color: var(--brand);
+  display: inline-grid;
+  place-items: center;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.46);
+  color: color-mix(in srgb, var(--card-accent), black 24%);
   font-weight: 950;
-  padding: 0;
+  padding: 0 11px;
   cursor: pointer;
   text-decoration: none;
+}
+
+.text-button:hover {
+  border-color: color-mix(in srgb, var(--card-accent), white 70%);
+  background: color-mix(in srgb, var(--card-accent), white 92%);
 }
 
 .empty-state,
