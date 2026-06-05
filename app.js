@@ -9,6 +9,7 @@ const DEFAULT_EXCHANGE_RATES = {
   EUR: 35,
   CHF: 36
 };
+const exchangeRateDrafts = new Map();
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
 const defaultTrip = {
@@ -806,23 +807,62 @@ function renderExpenses() {
     .join(" · ")} · 合計約 ${formatTwd(totalTwd)}`;
 
   expenseDashboard.innerHTML = renderExpenseDashboard(trip);
-  expenseList.innerHTML = trip.expenses
+  expenseList.innerHTML = renderExpenseDayGroups(trip);
+}
+
+function renderExpenseDayGroups(trip) {
+  const groups = trip.expenses
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(
-      (expense) => `
-        <article class="utility-card">
-          <div>
-            <span class="meta">${escapeHtml(expense.category)}</span>
-            <h3>${escapeHtml(expense.name)}</h3>
-            <p>${escapeHtml(expense.date)} · ${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</p>
-            <p>約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</p>
-            <p>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</p>
-            ${expense.note ? `<p>${escapeHtml(expense.note)}</p>` : ""}
+    .reduce((result, expense) => {
+      const date = expense.date || "未填日期";
+      if (!result[date]) result[date] = [];
+      result[date].push(expense);
+      return result;
+    }, {});
+
+  return Object.entries(groups)
+    .map(([date, expenses]) => {
+      const dayTotals = expenses.reduce((result, expense) => {
+        result[expense.currency] = (result[expense.currency] || 0) + expense.amount;
+        return result;
+      }, {});
+      const dayTwd = expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+
+      return `
+        <section class="expense-day-card">
+          <header>
+            <div>
+              <p class="eyebrow">${escapeHtml(date)}</p>
+              <h3>${Object.entries(dayTotals)
+                .map(([currency, total]) => `${escapeHtml(currency)} ${formatAmount(total)}`)
+                .join(" · ")}</h3>
+            </div>
+            <span>約 ${escapeHtml(formatTwd(dayTwd))}</span>
+          </header>
+          <div class="expense-entry-list">
+            ${expenses
+              .map(
+                (expense) => `
+                  <article class="expense-entry">
+                    <div class="expense-entry-main">
+                      <span class="expense-category">${escapeHtml(expense.category)}</span>
+                      <strong>${escapeHtml(expense.name)}</strong>
+                      <small>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</small>
+                      ${expense.note ? `<small>${escapeHtml(expense.note)}</small>` : ""}
+                    </div>
+                    <div class="expense-entry-amount">
+                      <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
+                      <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
+                    </div>
+                  </article>
+                `
+              )
+              .join("")}
           </div>
-        </article>
-      `
-    )
+        </section>
+      `;
+    })
     .join("");
 }
 
@@ -1029,22 +1069,41 @@ function formatTwd(value) {
   return `TWD ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
+function formatExchangeRate(rate, currency = "") {
+  const maxDigits = ["USD", "EUR", "CHF"].includes(currency) ? 2 : 3;
+  return Number(rate).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDigits,
+    useGrouping: false
+  });
+}
+
+function parseExchangeRate(value) {
+  const normalized = String(value || "").replace(",", ".").trim();
+  const rate = Number(normalized);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
+
 function convertToTwd(amount, currency, trip = currentTrip()) {
   const rates = normalizeExchangeRates(trip.exchangeRates);
   return (Number(amount) || 0) * (rates[currency] || 1);
 }
 
 function renderExchangeRates() {
+  if (exchangeRateList.contains(document.activeElement)) return;
   const trip = currentTrip();
   trip.exchangeRates = normalizeExchangeRates(trip.exchangeRates);
   exchangeRateList.innerHTML = Object.entries(trip.exchangeRates)
     .map(
-      ([currency, rate]) => `
+      ([currency, rate]) => {
+        const value = exchangeRateDrafts.get(currency) ?? formatExchangeRate(rate, currency);
+        return `
         <label class="exchange-rate-row">
           <span>${escapeHtml(currency)}</span>
-          <input type="number" min="0" step="0.001" value="${escapeHtml(rate)}" data-exchange-currency="${escapeHtml(currency)}" ${currency === "TWD" ? "readonly" : ""} />
+          <input type="text" inputmode="decimal" value="${escapeHtml(value)}" data-exchange-currency="${escapeHtml(currency)}" ${currency === "TWD" ? "readonly" : ""} aria-label="1 ${escapeHtml(currency)} 可以換成多少 TWD" />
         </label>
-      `
+      `;
+      }
     )
     .join("");
 }
@@ -1860,20 +1919,41 @@ memberForm.addEventListener("submit", (event) => {
   renderExpenses();
 });
 
+function applyExchangeRateInput(input) {
+  if (!input || isReadonly) return;
+  const currency = input.dataset.exchangeCurrency;
+  if (currency === "TWD") return;
+
+  const currentRates = normalizeExchangeRates(currentTrip().exchangeRates);
+  const rate = parseExchangeRate(input.value) || currentRates[currency];
+  exchangeRateDrafts.delete(currency);
+  input.value = formatExchangeRate(rate, currency);
+  currentTrip().exchangeRates = normalizeExchangeRates({
+    ...currentRates,
+    [currency]: rate
+  });
+  saveLibrary();
+  renderExpenses();
+}
+
 exchangeRateList.addEventListener("input", (event) => {
   const input = event.target.closest("[data-exchange-currency]");
   if (!input || isReadonly) return;
   const currency = input.dataset.exchangeCurrency;
   if (currency === "TWD") return;
-  const rate = Number(input.value);
-  if (!Number.isFinite(rate) || rate <= 0) return;
+  exchangeRateDrafts.set(currency, input.value);
+});
 
-  currentTrip().exchangeRates = normalizeExchangeRates({
-    ...currentTrip().exchangeRates,
-    [currency]: rate
-  });
-  saveLibrary();
-  renderExpenses();
+exchangeRateList.addEventListener("change", (event) => {
+  applyExchangeRateInput(event.target.closest("[data-exchange-currency]"));
+});
+
+exchangeRateList.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  const input = event.target.closest("[data-exchange-currency]");
+  if (!input || isReadonly) return;
+  event.preventDefault();
+  input.blur();
 });
 
 expenseForm.addEventListener("submit", (event) => {

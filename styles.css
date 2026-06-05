@@ -655,13 +655,28 @@ h2 {
   padding: 13px 0 10px;
 }
 
+#expensesPanel .day-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+#expensesPanel .day-header h2 {
+  max-width: 100%;
+  font-size: 1.25rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .timeline {
   display: grid;
   gap: 14px;
 }
 
 .utility-list,
-.todo-groups {
+.todo-groups,
+.expense-day-list {
   display: grid;
   gap: 12px;
 }
@@ -678,8 +693,9 @@ h2 {
 .exchange-panel {
   border: 1px solid rgba(24, 37, 33, 0.09);
   border-radius: 8px;
-  background: rgba(255, 253, 248, 0.86);
+  background: rgba(255, 253, 248, 0.92);
   padding: 14px;
+  box-shadow: 0 8px 20px rgba(24, 37, 33, 0.05);
 }
 
 .exchange-panel h3 {
@@ -934,6 +950,98 @@ h2 {
 
 .settlement-list p {
   margin: 0;
+}
+
+.expense-day-card {
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.95);
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(24, 37, 33, 0.06);
+}
+
+.expense-day-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(24, 37, 33, 0.08);
+  padding-bottom: 11px;
+}
+
+.expense-day-card h3 {
+  margin: 4px 0 0;
+  font-size: 1.04rem;
+}
+
+.expense-day-card > header > span {
+  flex: 0 0 auto;
+  color: var(--brand-dark);
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.expense-entry-list {
+  display: grid;
+  gap: 0;
+}
+
+.expense-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 1px solid rgba(24, 37, 33, 0.06);
+  padding: 12px 0;
+}
+
+.expense-entry:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.expense-entry-main,
+.expense-entry-amount {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.expense-entry-main strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.expense-entry-main small,
+.expense-entry-amount span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.expense-entry-amount {
+  justify-items: end;
+  text-align: right;
+}
+
+.expense-entry-amount strong {
+  color: var(--ink);
+  font-size: 0.96rem;
+  white-space: nowrap;
+}
+
+.expense-category {
+  justify-self: start;
+  border-radius: 999px;
+  background: #eef4f1;
+  color: var(--brand-dark);
+  font-size: 0.74rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 6px 9px;
 }
 
 .utility-card,
