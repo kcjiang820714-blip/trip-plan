@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=37" />
+    <link rel="stylesheet" href="./styles.css?v=40" />
   </head>
   <body>
     <main class="app-shell">
@@ -300,6 +300,13 @@
           <button class="secondary-action add-segment-button" id="addTransportSegmentButton" type="button">新增轉乘</button>
         </section>
 
+        <section class="attraction-fields" id="attractionFields">
+          <label>
+            景點介紹
+            <textarea id="attractionIntroInput" name="attractionIntro" rows="4" placeholder="可以記錄景點特色、歷史背景、推薦看點或拍照位置"></textarea>
+          </label>
+        </section>
+
         <label>
           備註
           <textarea id="noteInput" name="note" rows="4" placeholder="集合地點、訂位資訊、提醒事項"></textarea>
@@ -537,6 +544,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=45" type="module"></script>
+    <script src="./app.js?v=48" type="module"></script>
   </body>
 </html>

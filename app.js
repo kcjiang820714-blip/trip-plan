@@ -111,6 +111,8 @@ const timeHourInput = document.querySelector("#timeHourInput");
 const timeMinuteInput = document.querySelector("#timeMinuteInput");
 const placeInput = document.querySelector("#placeInput");
 const typeInput = document.querySelector("#typeInput");
+const attractionFields = document.querySelector("#attractionFields");
+const attractionIntroInput = document.querySelector("#attractionIntroInput");
 const noteInput = document.querySelector("#noteInput");
 const itemPhotoInput = document.querySelector("#itemPhotoInput");
 const flightFields = document.querySelector("#flightFields");
@@ -303,6 +305,7 @@ function normalizeItem(item) {
     time: item.time || "",
     place: item.place || "",
     type: item.type || "",
+    attractionIntro: item.attractionIntro || "",
     note: item.note || "",
     airline: item.airline || "",
     flightCode: item.flightCode || "",
@@ -597,6 +600,7 @@ function renderTrip() {
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
             ${renderFlightInfo(item)}
             ${renderTransportInfo(item)}
+            ${renderAttractionIntro(item)}
             ${renderAttachmentGallery(item.attachments, "item", item.id)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
@@ -1378,6 +1382,30 @@ function renderFlightInfo(item) {
   `;
 }
 
+function renderAttractionIntro(item) {
+  if (item.type !== "景點" || !item.attractionIntro) return "";
+
+  return `
+    <button class="attraction-intro-button" type="button" data-open-attraction-intro="${escapeHtml(item.id)}">
+      景點介紹
+    </button>
+  `;
+}
+
+function openAttractionIntro(itemId) {
+  const item = currentDay().items.find((entry) => entry.id === itemId);
+  if (!item?.attractionIntro) return;
+
+  attachmentViewerTitle.textContent = `${item.place || "景點"}介紹`;
+  attachmentViewer.classList.add("is-text-viewer");
+  attachmentViewerBody.innerHTML = `
+    <article class="attraction-intro-view">
+      <p>${escapeHtml(item.attractionIntro)}</p>
+    </article>
+  `;
+  openModal(attachmentViewer);
+}
+
 function renderTransportInfo(item) {
   if (item.type !== "交通" || item.transportSegments.length === 0) return "";
 
@@ -1465,6 +1493,7 @@ function closeModal(dialog) {
 
 function closeAttachmentViewer() {
   closeModal(attachmentViewer);
+  attachmentViewer.classList.remove("is-text-viewer");
   attachmentViewerBody.innerHTML = "";
 
   if (activeAttachmentUrl) {
@@ -1607,6 +1636,7 @@ function openItemDialog(index = null) {
         time: "",
         place: "",
         type: "景點",
+        attractionIntro: "",
         note: "",
         airline: "",
         flightCode: "",
@@ -1627,6 +1657,7 @@ function openItemDialog(index = null) {
   setTimeSelects(item.time);
   placeInput.value = item.place;
   typeInput.value = [...typeInput.options].some((option) => option.value === item.type) ? item.type : "其他";
+  attractionIntroInput.value = item.attractionIntro || "";
   noteInput.value = item.note;
   itemPhotoInput.value = "";
   airlineInput.value = item.airline || "";
@@ -1644,6 +1675,7 @@ function openItemDialog(index = null) {
   renderTransportSegments(transportSegmentList);
   syncFlightFields();
   syncTransportFields();
+  syncAttractionFields();
   openModal(itemDialog);
 }
 
@@ -1874,6 +1906,7 @@ bookingDateInput.addEventListener("change", syncBookingStayFields);
 typeInput.addEventListener("change", () => {
   syncFlightFields();
   syncTransportFields();
+  syncAttractionFields();
 });
 timeHourInput.addEventListener("change", syncTimeInput);
 timeMinuteInput.addEventListener("change", syncTimeInput);
@@ -1997,6 +2030,12 @@ timeline.addEventListener("click", (event) => {
     return;
   }
 
+  const attractionIntroButton = event.target.closest("[data-open-attraction-intro]");
+  if (attractionIntroButton) {
+    openAttractionIntro(attractionIntroButton.dataset.openAttractionIntro);
+    return;
+  }
+
   const toggleButton = event.target.closest("[data-toggle-details]");
   if (toggleButton) {
     const details = document.querySelector(`#${toggleButton.getAttribute("aria-controls")}`);
@@ -2029,6 +2068,7 @@ itemForm.addEventListener("submit", async (event) => {
     time: `${timeHourInput.value}:${timeMinuteInput.value}`,
     place: placeInput.value.trim(),
     type: typeInput.value.trim(),
+    attractionIntro: typeInput.value === "景點" ? attractionIntroInput.value.trim() : "",
     note: noteInput.value.trim(),
     airline: typeInput.value === "飛機" ? airlineInput.value.trim() : "",
     flightCode: typeInput.value === "飛機" ? flightCodeInput.value.trim().toUpperCase() : "",
@@ -2273,6 +2313,12 @@ function syncTransportFields() {
   transportFields.querySelectorAll("input, select, button").forEach((control) => {
     control.disabled = !isTransport;
   });
+}
+
+function syncAttractionFields() {
+  const isAttraction = typeInput.value === "景點";
+  attractionFields.hidden = !isAttraction;
+  attractionIntroInput.disabled = !isAttraction;
 }
 
 function getTransportTitle(segments) {
