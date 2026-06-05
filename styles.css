@@ -835,6 +835,7 @@ h2 {
 .editor label {
   display: grid;
   gap: 7px;
+  min-width: 0;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 900;
@@ -844,11 +845,19 @@ h2 {
 .editor textarea,
 .editor select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   color: var(--ink);
   background: white;
+}
+
+.editor input[type="date"] {
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .time-selects {
