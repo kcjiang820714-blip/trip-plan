@@ -147,6 +147,11 @@ const expenseAmountInput = document.querySelector("#expenseAmountInput");
 const expenseCurrencyInput = document.querySelector("#expenseCurrencyInput");
 const expenseCategoryInput = document.querySelector("#expenseCategoryInput");
 const expenseNoteInput = document.querySelector("#expenseNoteInput");
+const attachmentViewer = document.querySelector("#attachmentViewer");
+const attachmentViewerTitle = document.querySelector("#attachmentViewerTitle");
+const attachmentViewerBody = document.querySelector("#attachmentViewerBody");
+const closeAttachmentViewerButton = document.querySelector("#closeAttachmentViewerButton");
+let activeAttachmentUrl = null;
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -911,6 +916,16 @@ function closeModal(dialog) {
   dialog.removeAttribute("open");
 }
 
+function closeAttachmentViewer() {
+  closeModal(attachmentViewer);
+  attachmentViewerBody.innerHTML = "";
+
+  if (activeAttachmentUrl) {
+    URL.revokeObjectURL(activeAttachmentUrl);
+    activeAttachmentUrl = null;
+  }
+}
+
 function readBookingAttachment(file) {
   if (file.size > MAX_BOOKING_ATTACHMENT_SIZE) {
     throw new Error(`「${file.name}」超過 4 MB，請改用較小的檔案。`);
@@ -980,20 +995,22 @@ function openAttachment(ownerType, ownerId, attachmentId) {
   }
 
   try {
-    const blob = dataUrlToBlob(attachment.dataUrl);
-    const url = URL.createObjectURL(blob);
-    const opened = window.open(url, "_blank", "noopener");
-
-    if (!opened) {
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = attachment.name || "訂單附件";
-      document.body.append(link);
-      link.click();
-      link.remove();
+    if (activeAttachmentUrl) {
+      URL.revokeObjectURL(activeAttachmentUrl);
+      activeAttachmentUrl = null;
     }
 
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const blob = dataUrlToBlob(attachment.dataUrl);
+    activeAttachmentUrl = URL.createObjectURL(blob);
+    attachmentViewerTitle.textContent = attachment.name || "附件預覽";
+
+    if (attachment.type.startsWith("image/")) {
+      attachmentViewerBody.innerHTML = `<img class="attachment-viewer-image" src="${escapeHtml(activeAttachmentUrl)}" alt="${escapeHtml(attachment.name)}" />`;
+    } else {
+      attachmentViewerBody.innerHTML = `<iframe class="attachment-viewer-frame" src="${escapeHtml(activeAttachmentUrl)}" title="${escapeHtml(attachment.name || "附件預覽")}"></iframe>`;
+    }
+
+    openModal(attachmentViewer);
   } catch {
     window.alert("附件開啟失敗。請重新上傳一次附件，或改用較小的 PDF。");
   }
@@ -1349,6 +1366,12 @@ document.querySelectorAll("[data-close-dialog]").forEach((button) => {
     const dialog = document.querySelector(`#${button.dataset.closeDialog}`);
     if (dialog) closeModal(dialog);
   });
+});
+
+closeAttachmentViewerButton.addEventListener("click", closeAttachmentViewer);
+attachmentViewer.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeAttachmentViewer();
 });
 
 tripList.addEventListener("click", (event) => {
