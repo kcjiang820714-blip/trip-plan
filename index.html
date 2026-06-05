@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=30" />
+    <link rel="stylesheet" href="./styles.css?v=31" />
   </head>
   <body>
     <main class="app-shell">
@@ -464,7 +464,7 @@
     <dialog class="editor" id="expenseDialog">
       <form method="dialog" id="expenseForm">
         <header>
-          <h2>新增支出</h2>
+          <h2 id="expenseDialogTitle">新增支出</h2>
           <button class="icon-button" data-close-dialog="expenseDialog" type="button" aria-label="關閉" title="關閉">×</button>
         </header>
 
@@ -523,6 +523,7 @@
         </label>
 
         <footer>
+          <button class="secondary-button" id="deleteExpenseButton" type="button">刪除支出</button>
           <button class="primary-button" value="default" type="submit">儲存</button>
         </footer>
       </form>
@@ -536,6 +537,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=38" type="module"></script>
+    <script src="./app.js?v=39" type="module"></script>
   </body>
 </html>

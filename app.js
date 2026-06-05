@@ -60,6 +60,7 @@ const state = {
   editingItemIndex: null,
   editingTripId: null,
   editingBookingId: null,
+  editingExpenseId: null,
   expandedItemId: null
 };
 
@@ -156,6 +157,7 @@ const todoTextInput = document.querySelector("#todoTextInput");
 const todoNoteInput = document.querySelector("#todoNoteInput");
 const expenseDialog = document.querySelector("#expenseDialog");
 const expenseForm = document.querySelector("#expenseForm");
+const expenseDialogTitle = document.querySelector("#expenseDialogTitle");
 const expenseDateInput = document.querySelector("#expenseDateInput");
 const expenseNameInput = document.querySelector("#expenseNameInput");
 const expenseAmountInput = document.querySelector("#expenseAmountInput");
@@ -164,6 +166,7 @@ const expenseCategoryInput = document.querySelector("#expenseCategoryInput");
 const expensePayerInput = document.querySelector("#expensePayerInput");
 const expenseShareInputs = document.querySelector("#expenseShareInputs");
 const expenseNoteInput = document.querySelector("#expenseNoteInput");
+const deleteExpenseButton = document.querySelector("#deleteExpenseButton");
 const attachmentViewer = document.querySelector("#attachmentViewer");
 const attachmentViewerTitle = document.querySelector("#attachmentViewerTitle");
 const attachmentViewerBody = document.querySelector("#attachmentViewerBody");
@@ -876,6 +879,11 @@ function renderExpenseDayCard(date, expenses, trip) {
                 <div class="expense-entry-amount">
                   <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
                   <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
+                  ${
+                    isReadonly
+                      ? ""
+                      : `<button class="text-button expense-edit-button" type="button" data-edit-expense="${escapeHtml(expense.id)}">編輯</button>`
+                  }
                 </div>
               </article>
             `
@@ -1064,6 +1072,31 @@ function renderExpenseFormMembers() {
       `
     )
     .join("");
+}
+
+function openExpenseDialog(expenseId = null) {
+  if (isReadonly) return;
+  const expense = expenseId ? currentTrip().expenses.find((item) => item.id === expenseId) : null;
+  state.editingExpenseId = expense?.id || null;
+  expenseDialogTitle.textContent = expense ? "編輯支出" : "新增支出";
+  deleteExpenseButton.hidden = !expense;
+  expenseForm.reset();
+  renderExpenseFormMembers();
+
+  expenseDateInput.value = expense?.date || state.activeExpenseDate || currentTrip().startDate;
+  expenseNameInput.value = expense?.name || "";
+  expenseAmountInput.value = expense?.amount || "";
+  expenseCurrencyInput.value = expense?.currency || "JPY";
+  expenseCategoryInput.value = expense?.category || "餐飲";
+  expensePayerInput.value = expense?.payer || normalizeMembers(currentTrip().members)[0];
+  expenseNoteInput.value = expense?.note || "";
+
+  const shareWith = expense ? normalizeMembers(expense.shareWith) : normalizeMembers(currentTrip().members);
+  expenseShareInputs.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.checked = shareWith.includes(input.value);
+  });
+
+  openModal(expenseDialog);
 }
 
 function selectedExpenseShareMembers() {
@@ -1640,13 +1673,7 @@ document.querySelector("#addTodoButton").addEventListener("click", () => {
   todoGroupInput.value = state.activeTodoGroup;
   openModal(todoDialog);
 });
-document.querySelector("#addExpenseButton").addEventListener("click", () => {
-  if (isReadonly) return;
-  expenseForm.reset();
-  expenseDateInput.value = currentTrip().startDate;
-  renderExpenseFormMembers();
-  openModal(expenseDialog);
-});
+document.querySelector("#addExpenseButton").addEventListener("click", () => openExpenseDialog());
 exportButton.addEventListener("click", () => {
   if (!isReadonly) exportLibrary();
 });
@@ -1753,6 +1780,12 @@ todoSubTabs.addEventListener("click", (event) => {
 });
 
 expenseList.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-edit-expense]");
+  if (editButton) {
+    openExpenseDialog(editButton.dataset.editExpense);
+    return;
+  }
+
   const button = event.target.closest("[data-expense-date]");
   if (!button) return;
   state.activeExpenseDate = button.dataset.expenseDate;
@@ -1982,8 +2015,9 @@ expenseForm.addEventListener("submit", (event) => {
     return;
   }
 
-  currentTrip().expenses.push(normalizeExpense({
-    id: createId(),
+  const trip = currentTrip();
+  const payload = normalizeExpense({
+    id: state.editingExpenseId || createId(),
     date: expenseDateInput.value,
     name: expenseNameInput.value.trim(),
     amount: expenseAmountInput.value,
@@ -1992,8 +2026,21 @@ expenseForm.addEventListener("submit", (event) => {
     payer: expensePayerInput.value,
     shareWith,
     note: expenseNoteInput.value.trim()
-  }));
+  });
 
+  if (state.editingExpenseId) {
+    const index = trip.expenses.findIndex((expense) => expense.id === state.editingExpenseId);
+    if (index >= 0) {
+      trip.expenses[index] = payload;
+    } else {
+      trip.expenses.push(payload);
+    }
+  } else {
+    trip.expenses.push(payload);
+  }
+
+  state.editingExpenseId = null;
+  state.activeExpenseDate = payload.date || state.activeExpenseDate;
   saveLibrary();
   closeModal(expenseDialog);
   renderExpenses();
@@ -2061,6 +2108,21 @@ deleteBookingButton.addEventListener("click", () => {
   saveLibrary();
   closeModal(bookingDialog);
   renderBookings();
+});
+
+deleteExpenseButton.addEventListener("click", () => {
+  if (isReadonly) return;
+  if (!state.editingExpenseId) return;
+  const trip = currentTrip();
+  const expense = trip.expenses.find((item) => item.id === state.editingExpenseId);
+  const confirmed = window.confirm(`確定刪除「${expense?.name || "這筆支出"}」？這只會刪除這台裝置瀏覽器裡的資料。`);
+  if (!confirmed) return;
+
+  trip.expenses = trip.expenses.filter((item) => item.id !== state.editingExpenseId);
+  state.editingExpenseId = null;
+  saveLibrary();
+  closeModal(expenseDialog);
+  renderExpenses();
 });
 
 tripForm.addEventListener("submit", (event) => {

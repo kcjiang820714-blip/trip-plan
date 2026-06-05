@@ -1101,6 +1101,13 @@ h2 {
   white-space: nowrap;
 }
 
+.expense-edit-button {
+  justify-self: end;
+  min-height: 28px;
+  padding: 4px 0;
+  font-size: 0.78rem;
+}
+
 .expense-category {
   justify-self: start;
   border-radius: 999px;
