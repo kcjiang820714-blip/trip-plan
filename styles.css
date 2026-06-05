@@ -56,7 +56,7 @@ select {
 
 .landing-hero {
   position: relative;
-  min-height: 360px;
+  min-height: 230px;
   border: 1px solid rgba(24, 37, 33, 0.1);
   border-radius: 8px;
   overflow: hidden;
@@ -98,26 +98,27 @@ select {
   z-index: 1;
 }
 
-.landing-hero h1 {
-  max-width: 9em;
-  margin-top: 10px;
-  font-size: clamp(2.5rem, 11vw, 4.65rem);
-  line-height: 0.98;
+.landing-brand {
+  display: grid;
+  gap: 10px;
 }
 
-.landing-copy {
-  max-width: 34rem;
-  margin-top: 18px;
+.landing-brand .eyebrow {
+  font-size: clamp(2.7rem, 12vw, 5.1rem);
+  line-height: 0.95;
+}
+
+.landing-brand strong {
   color: var(--muted);
-  font-size: 1rem;
-  line-height: 1.7;
+  font-size: 0.88rem;
+  font-weight: 950;
 }
 
 .landing-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 28px;
+  margin-top: 30px;
 }
 
 .landing-actions .primary-button,
@@ -850,6 +851,12 @@ h2 {
   background: white;
 }
 
+.time-selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .editor input[readonly] {
   background: #eef4f1;
   color: var(--brand-dark);
@@ -972,12 +979,12 @@ h2 {
   }
 
   .landing-hero {
-    min-height: 330px;
+    min-height: 230px;
     padding: 24px;
   }
 
-  .landing-hero h1 {
-    font-size: clamp(2.3rem, 14vw, 3.5rem);
+  .landing-brand .eyebrow {
+    font-size: clamp(2.6rem, 16vw, 4.2rem);
   }
 
   .landing-ticket {

@@ -75,6 +75,8 @@ const tripForm = document.querySelector("#tripForm");
 const tripDialogTitle = document.querySelector("#tripDialogTitle");
 const deleteTripButton = document.querySelector("#deleteTripButton");
 const timeInput = document.querySelector("#timeInput");
+const timeHourInput = document.querySelector("#timeHourInput");
+const timeMinuteInput = document.querySelector("#timeMinuteInput");
 const placeInput = document.querySelector("#placeInput");
 const typeInput = document.querySelector("#typeInput");
 const noteInput = document.querySelector("#noteInput");
@@ -610,6 +612,7 @@ function openItemDialog(index = null) {
   dialogTitle.textContent = index === null ? "新增行程" : "編輯行程";
   deleteItemButton.hidden = index === null;
   timeInput.value = item.time;
+  setTimeSelects(item.time);
   placeInput.value = item.place;
   typeInput.value = [...typeInput.options].some((option) => option.value === item.type) ? item.type : "其他";
   noteInput.value = item.note;
@@ -751,17 +754,35 @@ function syncTransportSegmentModeFields() {
 }
 
 function populateTimeOptions() {
-  timeInput.innerHTML = `<option value="">選擇時間</option>`;
+  timeHourInput.innerHTML = `<option value="">時</option>`;
+  timeMinuteInput.innerHTML = `<option value="">分</option>`;
 
   for (let hour = 0; hour < 24; hour += 1) {
-    for (let minute = 0; minute < 60; minute += 1) {
-      const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = value;
-      timeInput.append(option);
-    }
+    const value = String(hour).padStart(2, "0");
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    timeHourInput.append(option);
   }
+
+  for (let minute = 0; minute < 60; minute += 1) {
+    const value = String(minute).padStart(2, "0");
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    timeMinuteInput.append(option);
+  }
+}
+
+function setTimeSelects(time) {
+  const [hour = "", minute = ""] = String(time || "").split(":");
+  timeHourInput.value = hour;
+  timeMinuteInput.value = minute;
+  syncTimeInput();
+}
+
+function syncTimeInput() {
+  timeInput.value = timeHourInput.value && timeMinuteInput.value ? `${timeHourInput.value}:${timeMinuteInput.value}` : "";
 }
 
 function openTripDialog(tripId = null) {
@@ -831,6 +852,8 @@ typeInput.addEventListener("change", () => {
   syncFlightFields();
   syncTransportFields();
 });
+timeHourInput.addEventListener("change", syncTimeInput);
+timeMinuteInput.addEventListener("change", syncTimeInput);
 transportModeInput.addEventListener("change", () => {
   const segments = collectTransportSegments();
   renderTransportSegments(segments.map((segment) => ({ ...segment, mode: transportModeInput.value })));
@@ -899,7 +922,7 @@ itemForm.addEventListener("submit", (event) => {
   if (isReadonly) return;
 
   const item = {
-    time: timeInput.value.trim(),
+    time: `${timeHourInput.value}:${timeMinuteInput.value}`,
     place: placeInput.value.trim(),
     type: typeInput.value.trim(),
     note: noteInput.value.trim(),
