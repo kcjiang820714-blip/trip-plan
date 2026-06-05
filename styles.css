@@ -687,6 +687,36 @@ h2 {
   line-height: 1.5;
 }
 
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.attachment-link {
+  display: inline-grid;
+  place-items: center;
+  min-height: 32px;
+  max-width: 100%;
+  border: 1px solid rgba(15, 107, 95, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--brand-dark);
+  font-size: 0.82rem;
+  font-weight: 950;
+  padding: 0 11px;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-link:hover {
+  border-color: color-mix(in srgb, var(--brand), white 60%);
+  background: color-mix(in srgb, var(--brand), white 91%);
+}
+
 .todo-group header {
   display: flex;
   align-items: center;

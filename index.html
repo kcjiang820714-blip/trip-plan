@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=16" />
+    <link rel="stylesheet" href="./styles.css?v=17" />
   </head>
   <body>
     <main class="app-shell">
@@ -376,6 +376,11 @@
           <textarea id="bookingNoteInput" rows="3" placeholder="付款狀態、注意事項"></textarea>
         </label>
 
+        <label>
+          訂單附件
+          <input id="bookingAttachmentInput" type="file" accept="image/*,.pdf" multiple />
+        </label>
+
         <footer>
           <button class="primary-button" value="default" type="submit">儲存</button>
         </footer>
@@ -470,6 +475,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=23" type="module"></script>
+    <script src="./app.js?v=25" type="module"></script>
   </body>
 </html>

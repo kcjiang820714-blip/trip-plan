@@ -1,5 +1,6 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
+const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
 const defaultTrip = {
@@ -122,6 +123,7 @@ const bookingTimeInput = document.querySelector("#bookingTimeInput");
 const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
 const bookingNoteInput = document.querySelector("#bookingNoteInput");
+const bookingAttachmentInput = document.querySelector("#bookingAttachmentInput");
 const todoDialog = document.querySelector("#todoDialog");
 const todoForm = document.querySelector("#todoForm");
 const todoGroupInput = document.querySelector("#todoGroupInput");
@@ -190,7 +192,19 @@ function normalizeBooking(booking) {
     time: booking.time || "",
     place: booking.place || "",
     code: booking.code || "",
-    note: booking.note || ""
+    note: booking.note || "",
+    attachments: Array.isArray(booking.attachments) ? booking.attachments.map(normalizeAttachment).filter(Boolean) : []
+  };
+}
+
+function normalizeAttachment(attachment) {
+  if (!attachment || !attachment.dataUrl) return null;
+  return {
+    id: attachment.id || createId(),
+    name: attachment.name || "訂單附件",
+    type: attachment.type || "",
+    size: Number(attachment.size) || 0,
+    dataUrl: attachment.dataUrl
   };
 }
 
@@ -571,11 +585,29 @@ function renderBookings() {
             <p>${escapeHtml([booking.date, booking.time, booking.place].filter(Boolean).join(" · "))}</p>
             ${booking.code ? `<p>代碼：${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p>${escapeHtml(booking.note)}</p>` : ""}
+            ${renderBookingAttachments(booking.attachments)}
           </div>
         </article>
       `
     )
     .join("");
+}
+
+function renderBookingAttachments(attachments) {
+  if (!attachments?.length) return "";
+  return `
+    <div class="attachment-list" aria-label="訂單附件">
+      ${attachments
+        .map(
+          (attachment) => `
+            <a class="attachment-link" href="${escapeHtml(attachment.dataUrl)}" target="_blank" rel="noopener" title="查看 ${escapeHtml(attachment.name)}">
+              ${escapeHtml(attachment.name)}
+            </a>
+          `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function getBookingGroup(booking) {
@@ -790,6 +822,32 @@ function closeModal(dialog) {
   }
 
   dialog.removeAttribute("open");
+}
+
+function readBookingAttachment(file) {
+  if (file.size > MAX_BOOKING_ATTACHMENT_SIZE) {
+    throw new Error(`「${file.name}」超過 4 MB，請改用較小的檔案。`);
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      resolve({
+        id: createId(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl: reader.result
+      });
+    });
+    reader.addEventListener("error", () => reject(new Error(`無法讀取「${file.name}」。`)));
+    reader.readAsDataURL(file);
+  });
+}
+
+function readBookingAttachments() {
+  const files = Array.from(bookingAttachmentInput.files || []);
+  return Promise.all(files.map(readBookingAttachment));
 }
 
 function openItemDialog(index = null) {
@@ -1202,9 +1260,17 @@ itemForm.addEventListener("submit", (event) => {
   render();
 });
 
-bookingForm.addEventListener("submit", (event) => {
+bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (isReadonly) return;
+
+  let attachments = [];
+  try {
+    attachments = await readBookingAttachments();
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
 
   currentTrip().bookings.push(normalizeBooking({
     id: createId(),
@@ -1214,10 +1280,18 @@ bookingForm.addEventListener("submit", (event) => {
     time: bookingTimeInput.value,
     place: bookingPlaceInput.value.trim(),
     code: bookingCodeInput.value.trim(),
-    note: bookingNoteInput.value.trim()
+    note: bookingNoteInput.value.trim(),
+    attachments
   }));
 
-  saveLibrary();
+  try {
+    saveLibrary();
+  } catch {
+    currentTrip().bookings.pop();
+    alert("附件容量太大，無法儲存到此裝置。請改用較小的檔案。");
+    return;
+  }
+
   closeModal(bookingDialog);
   renderBookings();
 });
