@@ -687,6 +687,33 @@ h2 {
   line-height: 1.5;
 }
 
+.stay-meta {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+}
+
+.stay-meta div {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.stay-meta dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.stay-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .attachment-list {
   display: flex;
   flex-wrap: wrap;
@@ -706,6 +733,7 @@ h2 {
   font-size: 0.82rem;
   font-weight: 950;
   padding: 0 11px;
+  cursor: pointer;
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1063,6 +1091,28 @@ h2 {
 .booking-stay-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-left-color: var(--brand);
+}
+
+.checkbox-row {
+  grid-column: 1 / -1;
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
+  color: var(--ink);
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  max-width: 18px;
+  margin: 0;
+  padding: 0;
 }
 
 .transport-segments {

@@ -127,6 +127,7 @@ const bookingTimeInput = document.querySelector("#bookingTimeInput");
 const bookingStayFields = document.querySelector("#bookingStayFields");
 const bookingCheckoutDateInput = document.querySelector("#bookingCheckoutDateInput");
 const bookingCheckoutTimeInput = document.querySelector("#bookingCheckoutTimeInput");
+const bookingBreakfastInput = document.querySelector("#bookingBreakfastInput");
 const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
 const bookingNoteInput = document.querySelector("#bookingNoteInput");
@@ -200,6 +201,7 @@ function normalizeBooking(booking) {
     time: booking.time || "",
     checkoutDate: booking.checkoutDate || "",
     checkoutTime: booking.checkoutTime || "",
+    includesBreakfast: Boolean(booking.includesBreakfast),
     place: booking.place || "",
     code: booking.code || "",
     note: booking.note || "",
@@ -592,10 +594,10 @@ function renderBookings() {
           <div>
             <span class="meta">${escapeHtml(booking.type)}</span>
             <h3>${escapeHtml(booking.name)}</h3>
-            <p>${escapeHtml(renderBookingDateMeta(booking))}</p>
+            ${renderBookingMeta(booking)}
             ${booking.code ? `<p>代碼：${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p>${escapeHtml(booking.note)}</p>` : ""}
-            ${renderBookingAttachments(booking.attachments)}
+            ${renderBookingAttachments(booking.id, booking.attachments)}
             <div class="card-actions">
               <button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>
             </div>
@@ -606,32 +608,43 @@ function renderBookings() {
     .join("");
 }
 
-function renderBookingDateMeta(booking) {
+function renderBookingMeta(booking) {
   if (booking.type !== "住宿") {
-    return [booking.date, booking.time, booking.place].filter(Boolean).join(" · ");
+    return `<p>${escapeHtml([booking.date, booking.time, booking.place].filter(Boolean).join(" · "))}</p>`;
   }
 
-  const stayMeta = [
-    booking.date ? `入住 ${booking.date}` : "",
-    booking.time ? `check-in ${booking.time}` : "",
-    booking.checkoutDate ? `退房 ${booking.checkoutDate}` : "",
-    booking.checkoutTime ? `check-out ${booking.checkoutTime}` : "",
-    booking.place
-  ];
+  const checkin = [booking.date, booking.time ? `check-in ${booking.time}` : ""].filter(Boolean).join(" · ");
+  const checkout = [booking.checkoutDate, booking.checkoutTime ? `check-out ${booking.checkoutTime}` : ""].filter(Boolean).join(" · ");
+  const details = [
+    { label: "入住", value: checkin },
+    { label: "退房", value: checkout },
+    { label: "地點", value: booking.place },
+    { label: "早餐", value: booking.includesBreakfast ? "含早餐" : "未含早餐" }
+  ].filter((detail) => detail.value);
 
-  return stayMeta.filter(Boolean).join(" · ");
+  return `
+    <dl class="stay-meta">
+      ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
+    </dl>
+  `;
 }
 
-function renderBookingAttachments(attachments) {
+function renderBookingAttachments(bookingId, attachments) {
   if (!attachments?.length) return "";
   return `
     <div class="attachment-list" aria-label="訂單附件">
       ${attachments
         .map(
           (attachment) => `
-            <a class="attachment-link" href="${escapeHtml(attachment.dataUrl)}" target="_blank" rel="noopener" title="查看 ${escapeHtml(attachment.name)}">
+            <button
+              class="attachment-link"
+              type="button"
+              data-open-booking-attachment="${escapeHtml(bookingId)}"
+              data-attachment-id="${escapeHtml(attachment.id)}"
+              title="查看 ${escapeHtml(attachment.name)}"
+            >
               ${escapeHtml(attachment.name)}
-            </a>
+            </button>
           `
         )
         .join("")}
@@ -879,6 +892,48 @@ function readBookingAttachments() {
   return Promise.all(files.map(readBookingAttachment));
 }
 
+function dataUrlToBlob(dataUrl) {
+  const [header, base64Data] = String(dataUrl || "").split(",");
+  const mimeType = header.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream";
+  const binary = atob(base64Data || "");
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
+function openBookingAttachment(bookingId, attachmentId) {
+  const booking = currentTrip().bookings.find((item) => item.id === bookingId);
+  const attachment = booking?.attachments.find((item) => item.id === attachmentId);
+
+  if (!attachment?.dataUrl) {
+    window.alert("找不到這個附件，可能是資料沒有完整儲存。");
+    return;
+  }
+
+  try {
+    const blob = dataUrlToBlob(attachment.dataUrl);
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank", "noopener");
+
+    if (!opened) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.name || "訂單附件";
+      document.body.append(link);
+      link.click();
+      link.remove();
+    }
+
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    window.alert("附件開啟失敗。請重新上傳一次附件，或改用較小的 PDF。");
+  }
+}
+
 function syncBookingStayFields() {
   const isStay = bookingTypeInput.value === "住宿";
   bookingDateLabel.firstChild.textContent = isStay ? "入住日期" : "日期";
@@ -907,6 +962,7 @@ function openBookingDialog(bookingId = null) {
   bookingTimeInput.value = booking?.time || "";
   bookingCheckoutDateInput.value = booking?.checkoutDate || addDays(bookingDateInput.value, 1);
   bookingCheckoutTimeInput.value = booking?.checkoutTime || "";
+  bookingBreakfastInput.checked = Boolean(booking?.includesBreakfast);
   bookingPlaceInput.value = booking?.place || "";
   bookingCodeInput.value = booking?.code || "";
   bookingNoteInput.value = booking?.note || "";
@@ -1257,9 +1313,15 @@ bookingSubTabs.addEventListener("click", (event) => {
 });
 
 bookingList.addEventListener("click", (event) => {
-  if (isReadonly) return;
+  const attachmentButton = event.target.closest("[data-open-booking-attachment]");
+  if (attachmentButton) {
+    openBookingAttachment(attachmentButton.dataset.openBookingAttachment, attachmentButton.dataset.attachmentId);
+    return;
+  }
+
   const button = event.target.closest("[data-edit-booking]");
   if (!button) return;
+  if (isReadonly) return;
   openBookingDialog(button.dataset.editBooking);
 });
 
@@ -1351,6 +1413,7 @@ bookingForm.addEventListener("submit", async (event) => {
     time: bookingTimeInput.value,
     checkoutDate: bookingTypeInput.value === "住宿" ? bookingCheckoutDateInput.value : "",
     checkoutTime: bookingTypeInput.value === "住宿" ? bookingCheckoutTimeInput.value : "",
+    includesBreakfast: bookingTypeInput.value === "住宿" ? bookingBreakfastInput.checked : false,
     place: bookingPlaceInput.value.trim(),
     code: bookingCodeInput.value.trim(),
     note: bookingNoteInput.value.trim(),
