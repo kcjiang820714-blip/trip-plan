@@ -539,9 +539,8 @@ h2 {
 }
 
 .trip-sticky-nav {
-  position: sticky;
-  top: max(8px, env(safe-area-inset-top));
-  z-index: 20;
+  position: relative;
+  z-index: 5;
   display: grid;
   gap: 8px;
   margin-bottom: 12px;
@@ -684,12 +683,33 @@ h2 {
   gap: 12px;
 }
 
+.expense-section {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.expense-section-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.expense-section-heading h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.06rem;
+}
+
+.expense-settings-grid {
+  display: grid;
+  gap: 12px;
+}
+
 .expense-members,
 .exchange-panel,
 .expense-dashboard {
   display: grid;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 .expense-members,
@@ -2186,6 +2206,17 @@ h2 {
 @media (min-width: 680px) {
   .app-shell {
     padding-top: 36px;
+  }
+
+  .trip-sticky-nav {
+    position: sticky;
+    top: max(8px, env(safe-area-inset-top));
+    z-index: 20;
+  }
+
+  .expense-settings-grid {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
   }
 
   .item-card {
