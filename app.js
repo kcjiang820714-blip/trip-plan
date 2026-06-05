@@ -94,6 +94,7 @@ const timeMinuteInput = document.querySelector("#timeMinuteInput");
 const placeInput = document.querySelector("#placeInput");
 const typeInput = document.querySelector("#typeInput");
 const noteInput = document.querySelector("#noteInput");
+const itemPhotoInput = document.querySelector("#itemPhotoInput");
 const flightFields = document.querySelector("#flightFields");
 const airlineInput = document.querySelector("#airlineInput");
 const flightCodeInput = document.querySelector("#flightCodeInput");
@@ -265,6 +266,7 @@ function normalizeItem(item) {
     arrivalTime: item.arrivalTime || "",
     arrivalAirport: item.arrivalAirport || "",
     arrivalTerminal: item.arrivalTerminal || "",
+    attachments: Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment).filter(Boolean) : [],
     transportMode: item.transportMode || "",
     transportSegments: Array.isArray(item.transportSegments) ? item.transportSegments.map(normalizeTransportSegment) : []
   };
@@ -549,6 +551,7 @@ function renderTrip() {
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
             ${renderFlightInfo(item)}
             ${renderTransportInfo(item)}
+            ${renderAttachmentGallery(item.attachments, "item", item.id)}
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
               <a class="text-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">地圖</a>
@@ -597,7 +600,7 @@ function renderBookings() {
             ${renderBookingMeta(booking)}
             ${booking.code ? `<p>代碼：${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p>${escapeHtml(booking.note)}</p>` : ""}
-            ${renderBookingAttachments(booking.id, booking.attachments)}
+            ${renderAttachmentGallery(booking.attachments, "booking", booking.id)}
             <div class="card-actions">
               <button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>
             </div>
@@ -613,41 +616,83 @@ function renderBookingMeta(booking) {
     return `<p>${escapeHtml([booking.date, booking.time, booking.place].filter(Boolean).join(" · "))}</p>`;
   }
 
-  const checkin = [booking.date, booking.time ? `check-in ${booking.time}` : ""].filter(Boolean).join(" · ");
-  const checkout = [booking.checkoutDate, booking.checkoutTime ? `check-out ${booking.checkoutTime}` : ""].filter(Boolean).join(" · ");
   const details = [
-    { label: "入住", value: checkin },
-    { label: "退房", value: checkout },
-    { label: "地點", value: booking.place },
-    { label: "早餐", value: booking.includesBreakfast ? "含早餐" : "未含早餐" }
+    { label: "入住", value: renderStayTimeValue(booking.date, booking.time, "check-in") },
+    { label: "退房", value: renderStayTimeValue(booking.checkoutDate, booking.checkoutTime, "check-out") },
+    { label: "地點", value: booking.place ? `<span class="stay-primary">${escapeHtml(booking.place)}</span>` : "" },
+    {
+      label: "早餐",
+      value: `<span class="stay-pill ${booking.includesBreakfast ? "is-included" : "is-muted"}">${booking.includesBreakfast ? "含早餐" : "未含早餐"}</span>`
+    }
   ].filter((detail) => detail.value);
 
   return `
     <dl class="stay-meta">
-      ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
+      ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${detail.value}</dd></div>`).join("")}
     </dl>
   `;
 }
 
-function renderBookingAttachments(bookingId, attachments) {
-  if (!attachments?.length) return "";
+function renderStayTimeValue(date, time, timeLabel) {
+  if (!date && !time) return "";
+
   return `
-    <div class="attachment-list" aria-label="訂單附件">
-      ${attachments
-        .map(
-          (attachment) => `
-            <button
-              class="attachment-link"
-              type="button"
-              data-open-booking-attachment="${escapeHtml(bookingId)}"
-              data-attachment-id="${escapeHtml(attachment.id)}"
-              title="查看 ${escapeHtml(attachment.name)}"
-            >
-              ${escapeHtml(attachment.name)}
-            </button>
-          `
-        )
-        .join("")}
+    ${date ? `<span class="stay-primary">${escapeHtml(date)}</span>` : ""}
+    ${time ? `<span class="stay-secondary">${escapeHtml(timeLabel)} ${escapeHtml(time)}</span>` : ""}
+  `;
+}
+
+function renderAttachmentGallery(attachments, ownerType, ownerId) {
+  if (!attachments?.length) return "";
+  const images = attachments.filter((attachment) => attachment.type.startsWith("image/"));
+  const files = attachments.filter((attachment) => !attachment.type.startsWith("image/"));
+
+  return `
+    <div class="attachment-gallery" aria-label="附件">
+      ${
+        images.length
+          ? `<div class="photo-grid">
+              ${images
+                .map(
+                  (attachment) => `
+                    <button
+                      class="photo-thumb"
+                      type="button"
+                      data-open-attachment="${escapeHtml(ownerType)}"
+                      data-owner-id="${escapeHtml(ownerId)}"
+                      data-attachment-id="${escapeHtml(attachment.id)}"
+                      title="查看 ${escapeHtml(attachment.name)}"
+                    >
+                      <img src="${escapeHtml(attachment.dataUrl)}" alt="${escapeHtml(attachment.name)}" loading="lazy" />
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
+      ${
+        files.length
+          ? `<div class="attachment-list">
+              ${files
+                .map(
+                  (attachment) => `
+                    <button
+                      class="attachment-link"
+                      type="button"
+                      data-open-attachment="${escapeHtml(ownerType)}"
+                      data-owner-id="${escapeHtml(ownerId)}"
+                      data-attachment-id="${escapeHtml(attachment.id)}"
+                      title="查看 ${escapeHtml(attachment.name)}"
+                    >
+                      ${escapeHtml(attachment.name)}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -892,6 +937,11 @@ function readBookingAttachments() {
   return Promise.all(files.map(readBookingAttachment));
 }
 
+function readItemPhotos() {
+  const files = Array.from(itemPhotoInput.files || []);
+  return Promise.all(files.map(readBookingAttachment));
+}
+
 function dataUrlToBlob(dataUrl) {
   const [header, base64Data] = String(dataUrl || "").split(",");
   const mimeType = header.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream";
@@ -905,9 +955,24 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mimeType });
 }
 
-function openBookingAttachment(bookingId, attachmentId) {
-  const booking = currentTrip().bookings.find((item) => item.id === bookingId);
-  const attachment = booking?.attachments.find((item) => item.id === attachmentId);
+function findAttachment(ownerType, ownerId, attachmentId) {
+  if (ownerType === "booking") {
+    const booking = currentTrip().bookings.find((item) => item.id === ownerId);
+    return booking?.attachments.find((item) => item.id === attachmentId);
+  }
+
+  if (ownerType === "item") {
+    const item = currentTrip()
+      .days.flatMap((day) => day.items)
+      .find((entry) => entry.id === ownerId);
+    return item?.attachments.find((attachment) => attachment.id === attachmentId);
+  }
+
+  return null;
+}
+
+function openAttachment(ownerType, ownerId, attachmentId) {
+  const attachment = findAttachment(ownerType, ownerId, attachmentId);
 
   if (!attachment?.dataUrl) {
     window.alert("找不到這個附件，可能是資料沒有完整儲存。");
@@ -999,6 +1064,7 @@ function openItemDialog(index = null) {
   placeInput.value = item.place;
   typeInput.value = [...typeInput.options].some((option) => option.value === item.type) ? item.type : "其他";
   noteInput.value = item.note;
+  itemPhotoInput.value = "";
   airlineInput.value = item.airline || "";
   flightCodeInput.value = item.flightCode || "";
   departureTimeInput.value = item.departureTime || "";
@@ -1313,9 +1379,9 @@ bookingSubTabs.addEventListener("click", (event) => {
 });
 
 bookingList.addEventListener("click", (event) => {
-  const attachmentButton = event.target.closest("[data-open-booking-attachment]");
+  const attachmentButton = event.target.closest("[data-open-attachment]");
   if (attachmentButton) {
-    openBookingAttachment(attachmentButton.dataset.openBookingAttachment, attachmentButton.dataset.attachmentId);
+    openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
     return;
   }
 
@@ -1333,6 +1399,12 @@ todoSubTabs.addEventListener("click", (event) => {
 });
 
 timeline.addEventListener("click", (event) => {
+  const attachmentButton = event.target.closest("[data-open-attachment]");
+  if (attachmentButton) {
+    openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
+    return;
+  }
+
   const toggleButton = event.target.closest("[data-toggle-details]");
   if (toggleButton) {
     const details = document.querySelector(`#${toggleButton.getAttribute("aria-controls")}`);
@@ -1349,9 +1421,17 @@ timeline.addEventListener("click", (event) => {
   openItemDialog(Number(button.dataset.edit));
 });
 
-itemForm.addEventListener("submit", (event) => {
+itemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (isReadonly) return;
+
+  let attachments = [];
+  try {
+    attachments = await readItemPhotos();
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
 
   const item = {
     time: `${timeHourInput.value}:${timeMinuteInput.value}`,
@@ -1367,24 +1447,39 @@ itemForm.addEventListener("submit", (event) => {
     arrivalAirport: typeInput.value === "飛機" ? arrivalAirportInput.value.trim() : "",
     arrivalTerminal: typeInput.value === "飛機" ? arrivalTerminalInput.value.trim() : "",
     transportMode: typeInput.value === "交通" ? transportModeInput.value : "",
-    transportSegments: typeInput.value === "交通" ? collectTransportSegments() : []
+    transportSegments: typeInput.value === "交通" ? collectTransportSegments() : [],
+    attachments
   };
 
   if (item.type === "交通") {
     item.place = getTransportTitle(item.transportSegments) || item.place;
   }
 
-  if (state.editingItemIndex === null) {
+  const editingIndex = state.editingItemIndex;
+  const existingItem = editingIndex === null ? null : currentDay().items[editingIndex];
+
+  if (editingIndex === null) {
     item.id = createId();
     currentDay().items.push(item);
   } else {
-    item.id = currentDay().items[state.editingItemIndex].id || createId();
-    currentDay().items[state.editingItemIndex] = item;
+    item.id = existingItem.id || createId();
+    item.attachments = [...(existingItem.attachments || []), ...attachments];
+    currentDay().items[editingIndex] = item;
   }
 
   currentDay().items.sort((a, b) => a.time.localeCompare(b.time));
   state.expandedItemId = item.id;
-  saveLibrary();
+  try {
+    saveLibrary();
+  } catch {
+    if (editingIndex === null) currentDay().items = currentDay().items.filter((entry) => entry.id !== item.id);
+    else {
+      const currentIndex = currentDay().items.findIndex((entry) => entry.id === item.id);
+      if (currentIndex >= 0) currentDay().items[currentIndex] = existingItem;
+    }
+    alert("圖片容量太大，無法儲存到此裝置。請改用較小的圖片。");
+    return;
+  }
   closeModal(itemDialog);
   render();
 });
