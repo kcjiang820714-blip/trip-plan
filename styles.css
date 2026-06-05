@@ -535,13 +535,28 @@ h2 {
   background: #86b6cf;
 }
 
+.trip-sticky-nav {
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top));
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(24, 37, 33, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.9);
+  padding: 8px;
+  box-shadow: 0 16px 34px rgba(24, 37, 33, 0.12);
+  backdrop-filter: blur(14px);
+}
+
 .day-tabs {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(108px, 1fr);
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 10px;
+  padding-bottom: 0;
   scrollbar-width: none;
 }
 
@@ -550,22 +565,10 @@ h2 {
 }
 
 .trip-section-tabs {
-  position: fixed;
-  left: 50%;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  z-index: 20;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  width: min(calc(100% - 24px), 748px);
   margin: 0;
-  border: 1px solid rgba(24, 37, 33, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 253, 248, 0.88);
-  padding: 8px;
-  box-shadow: 0 16px 38px rgba(24, 37, 33, 0.16);
-  transform: translateX(-50%);
-  backdrop-filter: blur(14px);
 }
 
 .trip-section-tab {
@@ -592,7 +595,7 @@ h2 {
 }
 
 #tripView {
-  padding-bottom: calc(116px + env(safe-area-inset-bottom));
+  padding-bottom: max(30px, env(safe-area-inset-bottom));
 }
 
 .day-tab {

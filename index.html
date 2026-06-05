@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=14" />
+    <link rel="stylesheet" href="./styles.css?v=15" />
   </head>
   <body>
     <main class="app-shell">
@@ -110,14 +110,16 @@
           </div>
         </section>
 
-        <nav class="day-tabs" id="dayTabs" aria-label="選擇日期"></nav>
+        <section class="trip-sticky-nav">
+          <nav class="trip-section-tabs" id="tripSectionTabs" aria-label="旅程功能">
+            <button class="trip-section-tab is-active" type="button" data-trip-section="itinerary">行程</button>
+            <button class="trip-section-tab" type="button" data-trip-section="bookings">預訂</button>
+            <button class="trip-section-tab" type="button" data-trip-section="todos">待辦</button>
+            <button class="trip-section-tab" type="button" data-trip-section="expenses">記帳</button>
+          </nav>
 
-        <nav class="trip-section-tabs" id="tripSectionTabs" aria-label="旅程功能">
-          <button class="trip-section-tab is-active" type="button" data-trip-section="itinerary">行程</button>
-          <button class="trip-section-tab" type="button" data-trip-section="bookings">預訂</button>
-          <button class="trip-section-tab" type="button" data-trip-section="todos">待辦</button>
-          <button class="trip-section-tab" type="button" data-trip-section="expenses">記帳</button>
-        </nav>
+          <nav class="day-tabs" id="dayTabs" aria-label="選擇日期"></nav>
+        </section>
 
         <section class="trip-section-panel" id="itineraryPanel" data-section-panel="itinerary">
           <section class="day-header">
