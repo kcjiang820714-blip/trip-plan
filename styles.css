@@ -594,6 +594,30 @@ h2 {
   gap: 12px;
 }
 
+.sub-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sub-tab {
+  min-height: 40px;
+  border: 1px solid rgba(24, 37, 33, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.86);
+  color: var(--brand-dark);
+  font-size: 0.86rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.sub-tab.is-active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--brand), white 12%);
+  color: white;
+  box-shadow: 0 8px 20px rgba(15, 107, 95, 0.13);
+}
+
 #tripView {
   padding-bottom: max(30px, env(safe-area-inset-bottom));
 }

@@ -44,6 +44,8 @@ const state = {
   activeTripId: null,
   activeDayIndex: 0,
   activeTripSection: "itinerary",
+  activeBookingGroup: "票券",
+  activeTodoGroup: "行前準備",
   editingItemIndex: null,
   editingTripId: null,
   expandedItemId: null
@@ -68,7 +70,11 @@ const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const timeline = document.querySelector("#timeline");
+const bookingSubTabs = document.querySelector("#bookingSubTabs");
+const bookingSectionTitle = document.querySelector("#bookingSectionTitle");
 const bookingList = document.querySelector("#bookingList");
+const todoSubTabs = document.querySelector("#todoSubTabs");
+const todoSectionTitle = document.querySelector("#todoSectionTitle");
 const todoGroups = document.querySelector("#todoGroups");
 const expenseList = document.querySelector("#expenseList");
 const expenseSummary = document.querySelector("#expenseSummary");
@@ -542,12 +548,18 @@ function renderTripSectionTabs() {
 
 function renderBookings() {
   const trip = currentTrip();
-  if (trip.bookings.length === 0) {
-    bookingList.innerHTML = `<div class="empty-state">還沒有預訂。可以先把機票、餐廳、票券或住宿收進來。</div>`;
+  const bookings = trip.bookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
+  bookingSectionTitle.textContent = state.activeBookingGroup;
+  bookingSubTabs.querySelectorAll("[data-booking-group]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.bookingGroup === state.activeBookingGroup);
+  });
+
+  if (bookings.length === 0) {
+    bookingList.innerHTML = `<div class="empty-state">這裡還沒有${escapeHtml(state.activeBookingGroup)}預訂。</div>`;
     return;
   }
 
-  bookingList.innerHTML = trip.bookings
+  bookingList.innerHTML = bookings
     .slice()
     .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
     .map(
@@ -566,46 +578,51 @@ function renderBookings() {
     .join("");
 }
 
+function getBookingGroup(booking) {
+  if (booking.type === "餐廳") return "餐廳";
+  if (booking.type === "住宿") return "住宿";
+  return "票券";
+}
+
 function renderTodos() {
   const trip = currentTrip();
-  const groups = ["行前準備", "行李打包", "購物清單"];
+  const todos = trip.todos.filter((todo) => todo.group === state.activeTodoGroup);
+  const doneCount = todos.filter((todo) => todo.done).length;
+  todoSectionTitle.textContent = state.activeTodoGroup;
+  todoSubTabs.querySelectorAll("[data-todo-group]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.todoGroup === state.activeTodoGroup);
+  });
 
-  todoGroups.innerHTML = groups
-    .map((group) => {
-      const todos = trip.todos.filter((todo) => todo.group === group);
-      const doneCount = todos.filter((todo) => todo.done).length;
+  if (todos.length === 0) {
+    todoGroups.innerHTML = `<div class="empty-state">這裡還沒有${escapeHtml(state.activeTodoGroup)}項目。</div>`;
+    return;
+  }
 
-      return `
-        <section class="todo-group">
-          <header>
-            <div>
-              <p class="eyebrow">${escapeHtml(group)}</p>
-              <h3>${doneCount}/${todos.length} 完成</h3>
-            </div>
-          </header>
-          <div class="todo-list">
-            ${
-              todos.length
-                ? todos
-                    .map(
-                      (todo) => `
-                        <label class="todo-row">
-                          <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
-                          <span>
-                            <strong>${escapeHtml(todo.text)}</strong>
-                            ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
-                          </span>
-                        </label>
-                      `
-                    )
-                    .join("")
-                : `<p class="muted-text">還沒有項目。</p>`
-            }
-          </div>
-        </section>
-      `;
-    })
-    .join("");
+  todoGroups.innerHTML = `
+    <section class="todo-group">
+      <header>
+        <div>
+          <p class="eyebrow">${escapeHtml(state.activeTodoGroup)}</p>
+          <h3>${doneCount}/${todos.length} 完成</h3>
+        </div>
+      </header>
+      <div class="todo-list">
+        ${todos
+          .map(
+            (todo) => `
+              <label class="todo-row">
+                <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
+                <span>
+                  <strong>${escapeHtml(todo.text)}</strong>
+                  ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
+                </span>
+              </label>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderExpenses() {
@@ -1028,12 +1045,14 @@ document.querySelector("#editTripButton").addEventListener("click", () => openTr
 document.querySelector("#addBookingButton").addEventListener("click", () => {
   if (isReadonly) return;
   bookingForm.reset();
+  bookingTypeInput.value = state.activeBookingGroup === "餐廳" ? "餐廳" : state.activeBookingGroup === "住宿" ? "住宿" : "景點票券";
   bookingDateInput.value = currentTrip().startDate;
   openModal(bookingDialog);
 });
 document.querySelector("#addTodoButton").addEventListener("click", () => {
   if (isReadonly) return;
   todoForm.reset();
+  todoGroupInput.value = state.activeTodoGroup;
   openModal(todoDialog);
 });
 document.querySelector("#addExpenseButton").addEventListener("click", () => {
@@ -1110,6 +1129,20 @@ tripSectionTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeTripSection = button.dataset.tripSection;
   renderTripSectionTabs();
+});
+
+bookingSubTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-booking-group]");
+  if (!button) return;
+  state.activeBookingGroup = button.dataset.bookingGroup;
+  renderBookings();
+});
+
+todoSubTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-todo-group]");
+  if (!button) return;
+  state.activeTodoGroup = button.dataset.todoGroup;
+  renderTodos();
 });
 
 timeline.addEventListener("click", (event) => {

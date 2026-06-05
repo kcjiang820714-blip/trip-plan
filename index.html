@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=15" />
+    <link rel="stylesheet" href="./styles.css?v=16" />
   </head>
   <body>
     <main class="app-shell">
@@ -137,10 +137,15 @@
           <section class="day-header">
             <div>
               <p class="eyebrow">預訂</p>
-              <h2>票券、餐廳、住宿</h2>
+              <h2 id="bookingSectionTitle">票券</h2>
             </div>
             <button class="primary-button" id="addBookingButton" type="button">新增預訂</button>
           </section>
+          <nav class="sub-tabs" id="bookingSubTabs" aria-label="預訂分類">
+            <button class="sub-tab is-active" type="button" data-booking-group="票券">票券</button>
+            <button class="sub-tab" type="button" data-booking-group="餐廳">餐廳</button>
+            <button class="sub-tab" type="button" data-booking-group="住宿">住宿</button>
+          </nav>
           <section class="utility-list" id="bookingList"></section>
         </section>
 
@@ -148,10 +153,15 @@
           <section class="day-header">
             <div>
               <p class="eyebrow">待辦事項</p>
-              <h2>準備、打包、購物</h2>
+              <h2 id="todoSectionTitle">行前準備</h2>
             </div>
             <button class="primary-button" id="addTodoButton" type="button">新增待辦</button>
           </section>
+          <nav class="sub-tabs" id="todoSubTabs" aria-label="待辦分類">
+            <button class="sub-tab is-active" type="button" data-todo-group="行前準備">行前準備</button>
+            <button class="sub-tab" type="button" data-todo-group="行李打包">行李打包</button>
+            <button class="sub-tab" type="button" data-todo-group="購物清單">購物清單</button>
+          </nav>
           <section class="todo-groups" id="todoGroups"></section>
         </section>
 
@@ -460,6 +470,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=20" type="module"></script>
+    <script src="./app.js?v=23" type="module"></script>
   </body>
 </html>
