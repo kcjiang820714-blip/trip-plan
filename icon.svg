@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="旅程本圖示">
+  <rect width="512" height="512" rx="96" fill="#136f63"/>
+  <path d="M132 144h248c22 0 40 18 40 40v176c0 22-18 40-40 40H132c-22 0-40-18-40-40V184c0-22 18-40 40-40Z" fill="#f6f3ed"/>
+  <path d="M132 188h248v48H132z" fill="#e6a23c"/>
+  <path d="M164 296c44-70 92-70 144 0 22 30 46 45 72 45" fill="none" stroke="#136f63" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="172" cy="292" r="20" fill="#136f63"/>
+  <circle cx="306" cy="296" r="20" fill="#136f63"/>
+  <circle cx="380" cy="341" r="20" fill="#136f63"/>
+  <path d="M180 112v72M332 112v72" stroke="#f6f3ed" stroke-width="24" stroke-linecap="round"/>
+</svg>

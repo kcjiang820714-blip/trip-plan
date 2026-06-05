@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#136f63" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="旅程本" />
+    <meta name="apple-mobile-web-app-title" content="旅．拾光" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>旅程本</title>
+    <title>旅．拾光</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
   </head>
   <body>
     <main class="app-shell">
@@ -20,13 +20,58 @@
         <p>你可以查看行程與開啟地圖，不能新增、編輯或匯入資料。</p>
       </section>
 
-      <section id="homeView">
+      <section class="landing-view" id="landingView">
+        <header class="landing-hero">
+          <p class="eyebrow">旅．拾光</p>
+          <h1>把旅途裡的時光<br />好好收起來</h1>
+          <p class="landing-copy">從出發、轉乘、停留到返程，把每一段路整理成值得回看的旅程。</p>
+
+          <div class="landing-actions">
+            <button class="primary-button" id="enterTripsButton" type="button">進入旅程</button>
+            <button class="secondary-action" id="quickAddTripButton" type="button">新增旅程</button>
+          </div>
+        </header>
+
+        <section class="landing-ticket" aria-label="最近旅程">
+          <div class="ticket-map" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <p class="eyebrow">最近拾起的旅程</p>
+            <h2 id="landingTripTitle">京都三日散步</h2>
+            <p id="landingTripMeta">3 天，9 個行程</p>
+          </div>
+          <button class="icon-button" id="openRecentTripButton" type="button" aria-label="開啟最近旅程" title="開啟最近旅程">›</button>
+        </section>
+
+        <section class="landing-stats" aria-label="旅程摘要">
+          <div>
+            <span id="landingTripCount">0</span>
+            <p>旅程</p>
+          </div>
+          <div>
+            <span id="landingItemCount">0</span>
+            <p>行程</p>
+          </div>
+          <div>
+            <span id="landingToday">今天</span>
+            <p>拾光日</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="homeView" hidden>
         <header class="topbar">
           <div>
-            <p class="eyebrow">旅程本</p>
+            <p class="eyebrow">旅．拾光</p>
             <h1>我的旅程</h1>
           </div>
-          <button class="primary-button" id="addTripButton" type="button">新增旅程</button>
+          <div class="topbar-actions">
+            <button class="secondary-action" id="backToLandingButton" type="button">封面</button>
+            <button class="primary-button" id="addTripButton" type="button">新增旅程</button>
+          </div>
         </header>
 
         <section class="data-actions" aria-label="資料同步">
@@ -223,6 +268,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=17" type="module"></script>
+    <script src="./app.js?v=18" type="module"></script>
   </body>
 </html>

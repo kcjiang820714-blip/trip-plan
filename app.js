@@ -50,9 +50,15 @@ const state = {
 
 state.activeTripId = state.library.trips[0]?.id || null;
 
+const landingView = document.querySelector("#landingView");
 const homeView = document.querySelector("#homeView");
 const tripView = document.querySelector("#tripView");
 const tripList = document.querySelector("#tripList");
+const landingTripTitle = document.querySelector("#landingTripTitle");
+const landingTripMeta = document.querySelector("#landingTripMeta");
+const landingTripCount = document.querySelector("#landingTripCount");
+const landingItemCount = document.querySelector("#landingItemCount");
+const landingToday = document.querySelector("#landingToday");
 const tripTitle = document.querySelector("#tripTitle");
 const tripDates = document.querySelector("#tripDates");
 const tripSummary = document.querySelector("#tripSummary");
@@ -287,8 +293,22 @@ function currentDay() {
 }
 
 function render() {
+  renderLanding();
   renderHome();
   renderTrip();
+}
+
+function renderLanding() {
+  const recentTrip = state.library.trips[0];
+  const tripCount = state.library.trips.length;
+  const itemCount = state.library.trips.reduce((total, trip) => total + countItems(trip), 0);
+  const today = new Date();
+
+  landingTripTitle.textContent = recentTrip?.title || "還沒有旅程";
+  landingTripMeta.textContent = recentTrip ? `${recentTrip.days.length} 天，${countItems(recentTrip)} 個行程` : "新增第一段旅程";
+  landingTripCount.textContent = tripCount;
+  landingItemCount.textContent = itemCount;
+  landingToday.textContent = `${today.getMonth() + 1}/${today.getDate()}`;
 }
 
 function renderHome() {
@@ -325,17 +345,17 @@ function renderReadonlyMode() {
 function exportLibrary() {
   const payload = {
     exportedAt: new Date().toISOString(),
-    app: "trip-notebook",
+    app: "旅．拾光",
     version: 1,
     trips: state.library.trips
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  const firstTrip = state.library.trips[0]?.title || "旅程本";
+  const firstTrip = state.library.trips[0]?.title || "旅．拾光";
 
   link.href = url;
-  link.download = `${safeFileName(firstTrip)}-旅程本備份.json`;
+  link.download = `${safeFileName(firstTrip)}-旅拾光備份.json`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -351,7 +371,7 @@ async function importLibrary(file) {
     const trips = Array.isArray(parsed.trips) ? parsed.trips : Array.isArray(parsed) ? parsed : null;
 
     if (!trips || trips.length === 0) {
-      window.alert("這個檔案不是有效的旅程本備份。");
+      window.alert("這個檔案不是有效的旅．拾光備份。");
       return;
     }
 
@@ -361,7 +381,7 @@ async function importLibrary(file) {
     setLibrary({ trips });
     window.alert("匯入完成。");
   } catch {
-    window.alert("匯入失敗。請確認你選的是旅程本匯出的 JSON 檔。");
+    window.alert("匯入失敗。請確認你選的是旅．拾光匯出的 JSON 檔。");
   } finally {
     importFileInput.value = "";
   }
@@ -516,14 +536,23 @@ function renderTransportInfo(item) {
 }
 
 function showHome() {
+  landingView.hidden = true;
   homeView.hidden = false;
   tripView.hidden = true;
   renderHome();
 }
 
+function showLanding() {
+  landingView.hidden = false;
+  homeView.hidden = true;
+  tripView.hidden = true;
+  renderLanding();
+}
+
 function showTrip(tripId) {
   state.activeTripId = tripId;
   state.activeDayIndex = 0;
+  landingView.hidden = true;
   homeView.hidden = true;
   tripView.hidden = false;
   renderTrip();
@@ -776,6 +805,13 @@ function updateTripDayPreview() {
   tripDaysInput.value = `${dayCount} 天`;
 }
 
+document.querySelector("#enterTripsButton").addEventListener("click", showHome);
+document.querySelector("#quickAddTripButton").addEventListener("click", () => openTripDialog());
+document.querySelector("#openRecentTripButton").addEventListener("click", () => {
+  const trip = state.library.trips[0];
+  if (trip) showTrip(trip.id);
+});
+document.querySelector("#backToLandingButton").addEventListener("click", showLanding);
 document.querySelector("#addTripButton").addEventListener("click", () => openTripDialog());
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
@@ -1009,4 +1045,4 @@ populateTimeOptions();
 saveLibrary();
 render();
 renderReadonlyMode();
-showHome();
+showLanding();

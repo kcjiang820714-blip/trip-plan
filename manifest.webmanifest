@@ -1,7 +1,7 @@
 {
-  "name": "旅程本",
-  "short_name": "旅程本",
-  "description": "手機可加入主畫面的旅遊行程查看工具",
+  "name": "旅．拾光",
+  "short_name": "旅．拾光",
+  "description": "手機可加入主畫面的旅遊行程與交通整理工具",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
