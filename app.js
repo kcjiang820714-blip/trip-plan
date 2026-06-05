@@ -1014,12 +1014,82 @@ function renderMemberLedgerList(ledger) {
   `;
 }
 
+function calculateExpenseCategoryTotals(trip) {
+  return trip.expenses.reduce((result, expense) => {
+    const category = expense.category || "其他";
+    if (!result[category]) {
+      result[category] = {
+        totalTwd: 0,
+        count: 0,
+        currencies: {}
+      };
+    }
+
+    result[category].totalTwd += convertToTwd(expense.amount, expense.currency, trip);
+    result[category].count += 1;
+    result[category].currencies[expense.currency] = (result[category].currencies[expense.currency] || 0) + expense.amount;
+    return result;
+  }, {});
+}
+
+function renderExpenseCategoryStats(trip) {
+  const categories = Object.entries(calculateExpenseCategoryTotals(trip))
+    .sort(([, a], [, b]) => b.totalTwd - a.totalTwd);
+  const totalTwd = categories.reduce((total, [, category]) => total + category.totalTwd, 0);
+
+  if (totalTwd <= 0) {
+    return `<section class="category-stats-card"><div class="empty-state">新增支出後，這裡會顯示整趟旅程的分類花費。</div></section>`;
+  }
+
+  return `
+    <section class="category-stats-card">
+      <header>
+        <div>
+          <p class="eyebrow">整趟旅程</p>
+          <h3>分類花費統計</h3>
+        </div>
+        <strong>${escapeHtml(formatTwd(totalTwd))}</strong>
+      </header>
+      <div class="category-stat-list">
+        ${categories
+          .map(([category, data], index) => {
+            const percent = totalTwd > 0 ? (data.totalTwd / totalTwd) * 100 : 0;
+            const currencySummary = Object.entries(data.currencies)
+              .map(([currency, total]) => `${escapeHtml(currency)} ${formatAmount(total)}`)
+              .join(" · ");
+            return `
+              <article class="category-stat-row">
+                <div class="category-stat-heading">
+                  <span>
+                    <i style="background: ${pieColor(index)};"></i>
+                    ${escapeHtml(category)}
+                  </span>
+                  <strong>${escapeHtml(formatTwd(data.totalTwd))}</strong>
+                </div>
+                <div class="category-stat-track" aria-hidden="true">
+                  <span style="width: ${Math.max(4, percent).toFixed(2)}%; background: ${pieColor(index)};"></span>
+                </div>
+                <footer>
+                  <span>${data.count} 筆</span>
+                  <span>${percent.toFixed(1)}%</span>
+                  <span>${currencySummary}</span>
+                </footer>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderExpenseDashboard(trip) {
   const ledger = calculateExpenseLedger(trip);
   const settlements = calculateSettlements(ledger);
   const total = Object.values(ledger).reduce((sum, entry) => sum + entry.share, 0);
 
   return `
+    ${renderExpenseCategoryStats(trip)}
     <section class="ledger-card">
       <header>
         <h3>TWD 帳務總表</h3>
