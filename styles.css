@@ -550,19 +550,31 @@ h2 {
 }
 
 .trip-section-tabs {
+  position: fixed;
+  left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 20;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin: 2px 0 12px;
+  width: min(calc(100% - 24px), 748px);
+  margin: 0;
+  border: 1px solid rgba(24, 37, 33, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.88);
+  padding: 8px;
+  box-shadow: 0 16px 38px rgba(24, 37, 33, 0.16);
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
 }
 
 .trip-section-tab {
-  min-height: 44px;
-  border: 1px solid rgba(24, 37, 33, 0.1);
+  min-height: 42px;
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: rgba(255, 253, 248, 0.86);
+  background: transparent;
   color: var(--brand-dark);
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   font-weight: 950;
   cursor: pointer;
 }
@@ -577,6 +589,10 @@ h2 {
 .trip-section-panel {
   display: grid;
   gap: 12px;
+}
+
+#tripView {
+  padding-bottom: calc(116px + env(safe-area-inset-bottom));
 }
 
 .day-tab {
@@ -1113,10 +1129,6 @@ h2 {
   .topbar-actions .primary-button,
   .topbar-actions .secondary-action {
     min-height: 40px;
-  }
-
-  .trip-section-tabs {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .trip-card {
