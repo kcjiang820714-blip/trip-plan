@@ -55,6 +55,7 @@ const state = {
   activeDayIndex: 0,
   activeExpenseDate: null,
   activeExpenseStatsTab: "category",
+  activeExpenseMember: null,
   activeTripSection: "itinerary",
   activeBookingGroup: "票券",
   activeTodoGroup: "行前準備",
@@ -1109,6 +1110,11 @@ function calculateMemberCategoryTotals(trip) {
 
 function renderMemberCategoryStats(trip) {
   const memberStats = calculateMemberCategoryTotals(trip);
+  const members = Object.keys(memberStats);
+  const activeMember = members.includes(state.activeExpenseMember) ? state.activeExpenseMember : members[0];
+  state.activeExpenseMember = activeMember;
+  const data = memberStats[activeMember] || { totalTwd: 0, categories: {} };
+  const categories = Object.entries(data.categories).sort(([, a], [, b]) => b.totalTwd - a.totalTwd);
 
   return `
     <div class="member-category-pane">
@@ -1116,47 +1122,51 @@ function renderMemberCategoryStats(trip) {
         <p class="eyebrow">整趟旅程</p>
         <h3>每人分類花費</h3>
       </header>
-      <div class="member-category-list">
-        ${Object.entries(memberStats)
-          .map(([member, data]) => {
-            const categories = Object.entries(data.categories).sort(([, a], [, b]) => b.totalTwd - a.totalTwd);
+      <nav class="member-category-tabs" aria-label="選擇成員分類花費">
+        ${members
+          .map((member) => {
+            const memberData = memberStats[member];
             return `
-              <article class="member-category-row">
-                <header>
-                  <strong>${escapeHtml(member)}</strong>
-                  <span>${escapeHtml(formatTwd(data.totalTwd))}</span>
-                </header>
-                ${
-                  categories.length
-                    ? `<div class="member-category-items">
-                        ${categories
-                          .map(([category, categoryData], index) => {
-                            const percent = data.totalTwd > 0 ? (categoryData.totalTwd / data.totalTwd) * 100 : 0;
-                            return `
-                              <div class="member-category-item">
-                                <div>
-                                  <span>
-                                    <i style="background: ${pieColor(index)};"></i>
-                                    ${escapeHtml(category)}
-                                  </span>
-                                  <strong>${escapeHtml(formatTwd(categoryData.totalTwd))}</strong>
-                                </div>
-                                <div class="category-stat-track" aria-hidden="true">
-                                  <span style="width: ${Math.max(4, percent).toFixed(2)}%; background: ${pieColor(index)};"></span>
-                                </div>
-                                <small>${categoryData.count} 筆 · ${percent.toFixed(1)}%</small>
-                              </div>
-                            `;
-                          })
-                          .join("")}
-                      </div>`
-                    : `<p>尚無分攤花費。</p>`
-                }
-              </article>
+              <button class="member-category-tab ${member === activeMember ? "is-active" : ""}" type="button" data-expense-member="${escapeHtml(member)}">
+                <strong>${escapeHtml(member)}</strong>
+                <span>${escapeHtml(formatTwd(memberData.totalTwd))}</span>
+              </button>
             `;
           })
           .join("")}
-      </div>
+      </nav>
+      <article class="member-category-row">
+        <header>
+          <strong>${escapeHtml(activeMember)}</strong>
+          <span>${escapeHtml(formatTwd(data.totalTwd))}</span>
+        </header>
+        ${
+          categories.length
+            ? `<div class="member-category-items">
+                ${categories
+                  .map(([category, categoryData], index) => {
+                    const percent = data.totalTwd > 0 ? (categoryData.totalTwd / data.totalTwd) * 100 : 0;
+                    return `
+                      <div class="member-category-item">
+                        <div>
+                          <span>
+                            <i style="background: ${pieColor(index)};"></i>
+                            ${escapeHtml(category)}
+                          </span>
+                          <strong>${escapeHtml(formatTwd(categoryData.totalTwd))}</strong>
+                        </div>
+                        <div class="category-stat-track" aria-hidden="true">
+                          <span style="width: ${Math.max(4, percent).toFixed(2)}%; background: ${pieColor(index)};"></span>
+                        </div>
+                        <small>${categoryData.count} 筆 · ${percent.toFixed(1)}%</small>
+                      </div>
+                    `;
+                  })
+                  .join("")}
+              </div>`
+            : `<p>尚無分攤花費。</p>`
+        }
+      </article>
     </div>
   `;
 }
@@ -1967,6 +1977,13 @@ expenseList.addEventListener("click", (event) => {
 });
 
 expenseDashboard.addEventListener("click", (event) => {
+  const memberButton = event.target.closest("[data-expense-member]");
+  if (memberButton) {
+    state.activeExpenseMember = memberButton.dataset.expenseMember;
+    renderExpenses();
+    return;
+  }
+
   const button = event.target.closest("[data-expense-stats-tab]");
   if (!button) return;
   state.activeExpenseStatsTab = button.dataset.expenseStatsTab;
