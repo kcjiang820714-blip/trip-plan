@@ -1083,6 +1083,83 @@ function renderExpenseCategoryStats(trip) {
   `;
 }
 
+function calculateMemberCategoryTotals(trip) {
+  const members = normalizeMembers(trip.members);
+  const result = Object.fromEntries(members.map((member) => [member, { totalTwd: 0, categories: {} }]));
+
+  trip.expenses.forEach((expense) => {
+    const category = expense.category || "其他";
+    const shareWith = normalizeMembers(expense.shareWith).filter((member) => members.includes(member));
+    const participants = shareWith.length ? shareWith : members;
+    const amount = convertToTwd(expense.amount, expense.currency, trip);
+    const shareAmount = participants.length ? amount / participants.length : 0;
+
+    participants.forEach((member) => {
+      if (!result[member]) result[member] = { totalTwd: 0, categories: {} };
+      if (!result[member].categories[category]) result[member].categories[category] = { totalTwd: 0, count: 0 };
+      result[member].totalTwd += shareAmount;
+      result[member].categories[category].totalTwd += shareAmount;
+      result[member].categories[category].count += 1;
+    });
+  });
+
+  return result;
+}
+
+function renderMemberCategoryStats(trip) {
+  const memberStats = calculateMemberCategoryTotals(trip);
+
+  return `
+    <section class="member-category-card">
+      <header>
+        <p class="eyebrow">整趟旅程</p>
+        <h3>每人分類花費</h3>
+      </header>
+      <div class="member-category-list">
+        ${Object.entries(memberStats)
+          .map(([member, data]) => {
+            const categories = Object.entries(data.categories).sort(([, a], [, b]) => b.totalTwd - a.totalTwd);
+            return `
+              <article class="member-category-row">
+                <header>
+                  <strong>${escapeHtml(member)}</strong>
+                  <span>${escapeHtml(formatTwd(data.totalTwd))}</span>
+                </header>
+                ${
+                  categories.length
+                    ? `<div class="member-category-items">
+                        ${categories
+                          .map(([category, categoryData], index) => {
+                            const percent = data.totalTwd > 0 ? (categoryData.totalTwd / data.totalTwd) * 100 : 0;
+                            return `
+                              <div class="member-category-item">
+                                <div>
+                                  <span>
+                                    <i style="background: ${pieColor(index)};"></i>
+                                    ${escapeHtml(category)}
+                                  </span>
+                                  <strong>${escapeHtml(formatTwd(categoryData.totalTwd))}</strong>
+                                </div>
+                                <div class="category-stat-track" aria-hidden="true">
+                                  <span style="width: ${Math.max(4, percent).toFixed(2)}%; background: ${pieColor(index)};"></span>
+                                </div>
+                                <small>${categoryData.count} 筆 · ${percent.toFixed(1)}%</small>
+                              </div>
+                            `;
+                          })
+                          .join("")}
+                      </div>`
+                    : `<p>尚無分攤花費。</p>`
+                }
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderExpenseDashboard(trip) {
   const ledger = calculateExpenseLedger(trip);
   const settlements = calculateSettlements(ledger);
@@ -1090,6 +1167,7 @@ function renderExpenseDashboard(trip) {
 
   return `
     ${renderExpenseCategoryStats(trip)}
+    ${renderMemberCategoryStats(trip)}
     <section class="ledger-card">
       <header>
         <h3>TWD 帳務總表</h3>
