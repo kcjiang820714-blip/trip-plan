@@ -49,6 +49,7 @@ const state = {
   activeTodoGroup: "行前準備",
   editingItemIndex: null,
   editingTripId: null,
+  editingBookingId: null,
   expandedItemId: null
 };
 
@@ -116,14 +117,21 @@ const importFileInput = document.querySelector("#importFileInput");
 const readonlyBanner = document.querySelector("#readonlyBanner");
 const bookingDialog = document.querySelector("#bookingDialog");
 const bookingForm = document.querySelector("#bookingForm");
+const bookingDialogTitle = document.querySelector("#bookingDialogTitle");
 const bookingTypeInput = document.querySelector("#bookingTypeInput");
 const bookingNameInput = document.querySelector("#bookingNameInput");
+const bookingDateLabel = document.querySelector("#bookingDateLabel");
 const bookingDateInput = document.querySelector("#bookingDateInput");
+const bookingTimeLabel = document.querySelector("#bookingTimeLabel");
 const bookingTimeInput = document.querySelector("#bookingTimeInput");
+const bookingStayFields = document.querySelector("#bookingStayFields");
+const bookingCheckoutDateInput = document.querySelector("#bookingCheckoutDateInput");
+const bookingCheckoutTimeInput = document.querySelector("#bookingCheckoutTimeInput");
 const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
 const bookingNoteInput = document.querySelector("#bookingNoteInput");
 const bookingAttachmentInput = document.querySelector("#bookingAttachmentInput");
+const deleteBookingButton = document.querySelector("#deleteBookingButton");
 const todoDialog = document.querySelector("#todoDialog");
 const todoForm = document.querySelector("#todoForm");
 const todoGroupInput = document.querySelector("#todoGroupInput");
@@ -190,6 +198,8 @@ function normalizeBooking(booking) {
     name: booking.name || "",
     date: booking.date || "",
     time: booking.time || "",
+    checkoutDate: booking.checkoutDate || "",
+    checkoutTime: booking.checkoutTime || "",
     place: booking.place || "",
     code: booking.code || "",
     note: booking.note || "",
@@ -582,15 +592,34 @@ function renderBookings() {
           <div>
             <span class="meta">${escapeHtml(booking.type)}</span>
             <h3>${escapeHtml(booking.name)}</h3>
-            <p>${escapeHtml([booking.date, booking.time, booking.place].filter(Boolean).join(" · "))}</p>
+            <p>${escapeHtml(renderBookingDateMeta(booking))}</p>
             ${booking.code ? `<p>代碼：${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p>${escapeHtml(booking.note)}</p>` : ""}
             ${renderBookingAttachments(booking.attachments)}
+            <div class="card-actions">
+              <button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>
+            </div>
           </div>
         </article>
       `
     )
     .join("");
+}
+
+function renderBookingDateMeta(booking) {
+  if (booking.type !== "住宿") {
+    return [booking.date, booking.time, booking.place].filter(Boolean).join(" · ");
+  }
+
+  const stayMeta = [
+    booking.date ? `入住 ${booking.date}` : "",
+    booking.time ? `check-in ${booking.time}` : "",
+    booking.checkoutDate ? `退房 ${booking.checkoutDate}` : "",
+    booking.checkoutTime ? `check-out ${booking.checkoutTime}` : "",
+    booking.place
+  ];
+
+  return stayMeta.filter(Boolean).join(" · ");
 }
 
 function renderBookingAttachments(attachments) {
@@ -850,6 +879,41 @@ function readBookingAttachments() {
   return Promise.all(files.map(readBookingAttachment));
 }
 
+function syncBookingStayFields() {
+  const isStay = bookingTypeInput.value === "住宿";
+  bookingDateLabel.firstChild.textContent = isStay ? "入住日期" : "日期";
+  bookingTimeLabel.firstChild.textContent = isStay ? "check-in 時間" : "時間";
+  bookingStayFields.hidden = !isStay;
+  bookingCheckoutDateInput.required = isStay;
+  bookingCheckoutTimeInput.required = isStay;
+
+  if (isStay && bookingDateInput.value && !bookingCheckoutDateInput.value) {
+    bookingCheckoutDateInput.value = addDays(bookingDateInput.value, 1);
+  }
+}
+
+function openBookingDialog(bookingId = null) {
+  if (isReadonly) return;
+
+  state.editingBookingId = bookingId;
+  const booking = bookingId ? currentTrip().bookings.find((item) => item.id === bookingId) : null;
+
+  bookingForm.reset();
+  bookingDialogTitle.textContent = booking ? "編輯預訂" : "新增預訂";
+  deleteBookingButton.hidden = !booking;
+  bookingTypeInput.value = booking?.type || (state.activeBookingGroup === "餐廳" ? "餐廳" : state.activeBookingGroup === "住宿" ? "住宿" : "景點票券");
+  bookingNameInput.value = booking?.name || "";
+  bookingDateInput.value = booking?.date || currentTrip().startDate;
+  bookingTimeInput.value = booking?.time || "";
+  bookingCheckoutDateInput.value = booking?.checkoutDate || addDays(bookingDateInput.value, 1);
+  bookingCheckoutTimeInput.value = booking?.checkoutTime || "";
+  bookingPlaceInput.value = booking?.place || "";
+  bookingCodeInput.value = booking?.code || "";
+  bookingNoteInput.value = booking?.note || "";
+  syncBookingStayFields();
+  openModal(bookingDialog);
+}
+
 function openItemDialog(index = null) {
   if (isReadonly) return;
   state.editingItemIndex = index;
@@ -1100,13 +1164,7 @@ document.querySelector("#addTripButton").addEventListener("click", () => openTri
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
-document.querySelector("#addBookingButton").addEventListener("click", () => {
-  if (isReadonly) return;
-  bookingForm.reset();
-  bookingTypeInput.value = state.activeBookingGroup === "餐廳" ? "餐廳" : state.activeBookingGroup === "住宿" ? "住宿" : "景點票券";
-  bookingDateInput.value = currentTrip().startDate;
-  openModal(bookingDialog);
-});
+document.querySelector("#addBookingButton").addEventListener("click", () => openBookingDialog());
 document.querySelector("#addTodoButton").addEventListener("click", () => {
   if (isReadonly) return;
   todoForm.reset();
@@ -1130,6 +1188,8 @@ importFileInput.addEventListener("change", () => {
 });
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
+bookingTypeInput.addEventListener("change", syncBookingStayFields);
+bookingDateInput.addEventListener("change", syncBookingStayFields);
 typeInput.addEventListener("change", () => {
   syncFlightFields();
   syncTransportFields();
@@ -1194,6 +1254,13 @@ bookingSubTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeBookingGroup = button.dataset.bookingGroup;
   renderBookings();
+});
+
+bookingList.addEventListener("click", (event) => {
+  if (isReadonly) return;
+  const button = event.target.closest("[data-edit-booking]");
+  if (!button) return;
+  openBookingDialog(button.dataset.editBooking);
 });
 
 todoSubTabs.addEventListener("click", (event) => {
@@ -1272,26 +1339,40 @@ bookingForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  currentTrip().bookings.push(normalizeBooking({
-    id: createId(),
+  const editingIndex = state.editingBookingId
+    ? currentTrip().bookings.findIndex((booking) => booking.id === state.editingBookingId)
+    : -1;
+  const existingBooking = editingIndex >= 0 ? currentTrip().bookings[editingIndex] : null;
+  const booking = normalizeBooking({
+    id: existingBooking?.id || createId(),
     type: bookingTypeInput.value,
     name: bookingNameInput.value.trim(),
     date: bookingDateInput.value,
     time: bookingTimeInput.value,
+    checkoutDate: bookingTypeInput.value === "住宿" ? bookingCheckoutDateInput.value : "",
+    checkoutTime: bookingTypeInput.value === "住宿" ? bookingCheckoutTimeInput.value : "",
     place: bookingPlaceInput.value.trim(),
     code: bookingCodeInput.value.trim(),
     note: bookingNoteInput.value.trim(),
-    attachments
-  }));
+    attachments: [...(existingBooking?.attachments || []), ...attachments]
+  });
+
+  if (existingBooking) {
+    currentTrip().bookings[editingIndex] = booking;
+  } else {
+    currentTrip().bookings.push(booking);
+  }
 
   try {
     saveLibrary();
   } catch {
-    currentTrip().bookings.pop();
+    if (existingBooking) currentTrip().bookings[editingIndex] = existingBooking;
+    else currentTrip().bookings.pop();
     alert("附件容量太大，無法儲存到此裝置。請改用較小的檔案。");
     return;
   }
 
+  state.editingBookingId = null;
   closeModal(bookingDialog);
   renderBookings();
 });
@@ -1390,6 +1471,20 @@ deleteItemButton.addEventListener("click", () => {
   saveLibrary();
   closeModal(itemDialog);
   render();
+});
+
+deleteBookingButton.addEventListener("click", () => {
+  if (isReadonly) return;
+  if (!state.editingBookingId) return;
+  const booking = currentTrip().bookings.find((item) => item.id === state.editingBookingId);
+  const confirmed = window.confirm(`確定刪除「${booking?.name || "這筆預訂"}」？這只會刪除這台裝置瀏覽器裡的資料。`);
+  if (!confirmed) return;
+
+  currentTrip().bookings = currentTrip().bookings.filter((item) => item.id !== state.editingBookingId);
+  state.editingBookingId = null;
+  saveLibrary();
+  closeModal(bookingDialog);
+  renderBookings();
 });
 
 tripForm.addEventListener("submit", (event) => {

@@ -933,6 +933,7 @@ h2 {
 
 .card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 13px;
 }
@@ -1026,10 +1027,12 @@ h2 {
   background: white;
 }
 
-.editor input[type="date"] {
+.editor input[type="date"],
+.editor input[type="time"] {
   display: block;
   appearance: none;
   -webkit-appearance: none;
+  line-height: 1.2;
 }
 
 .time-selects {
@@ -1045,7 +1048,8 @@ h2 {
 }
 
 .flight-fields,
-.transport-fields {
+.transport-fields,
+.booking-stay-fields {
   display: grid;
   gap: 14px;
   border-left: 4px solid var(--accent);
@@ -1054,6 +1058,11 @@ h2 {
 
 .transport-fields {
   border-left-color: var(--indigo);
+}
+
+.booking-stay-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-left-color: var(--brand);
 }
 
 .transport-segments {
@@ -1211,6 +1220,10 @@ h2 {
 
   .item-details {
     margin: 0 13px 13px 95px;
+  }
+
+  .booking-stay-fields {
+    grid-template-columns: 1fr;
   }
 
   .expand-indicator {
