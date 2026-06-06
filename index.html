@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=58" />
+    <link rel="stylesheet" href="./styles.css?v=62" />
   </head>
   <body>
     <main class="app-shell">
@@ -202,6 +202,10 @@
                 <form class="inline-form" id="memberForm">
                   <input id="memberNameInput" placeholder="新增成員，例如 小美" />
                   <button class="secondary-action" type="submit">新增</button>
+                </form>
+                <form class="inline-form member-profile-form" id="memberProfileForm" hidden>
+                  <input id="memberDisplayNameInput" placeholder="設定我的記帳名稱" />
+                  <button class="secondary-action" type="submit">儲存名稱</button>
                 </form>
               </section>
               <section class="exchange-panel">
@@ -412,6 +416,7 @@
           </div>
           <div class="trip-invite-form" id="tripInviteForm">
             <input id="tripInviteEmailInput" type="email" placeholder="朋友的 Email" autocomplete="email" />
+            <input id="tripInviteDisplayNameInput" placeholder="記帳顯示名稱，例如 小美" />
             <select id="tripInviteRoleInput" aria-label="共享權限">
               <option value="viewer">只能查看</option>
               <option value="participant">可記帳與待辦</option>
@@ -520,7 +525,7 @@
     <dialog class="editor" id="todoDialog">
       <form method="dialog" id="todoForm">
         <header>
-          <h2>新增待辦</h2>
+          <h2 id="todoDialogTitle">新增待辦</h2>
           <button class="icon-button" data-close-dialog="todoDialog" type="button" aria-label="關閉" title="關閉">×</button>
         </header>
 
@@ -544,6 +549,7 @@
         </label>
 
         <footer>
+          <button class="secondary-button" id="deleteTodoButton" type="button">刪除待辦</button>
           <button class="primary-button" value="default" type="submit">儲存</button>
         </footer>
       </form>
@@ -625,6 +631,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=68" type="module"></script>
+    <script src="./app.js?v=72" type="module"></script>
   </body>
 </html>

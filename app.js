@@ -75,6 +75,7 @@ const state = {
   editingItemIndex: null,
   editingTripId: null,
   editingBookingId: null,
+  editingTodoId: null,
   editingExpenseId: null,
   expandedItemId: null
 };
@@ -117,6 +118,8 @@ const expenseSummary = document.querySelector("#expenseSummary");
 const memberChips = document.querySelector("#memberChips");
 const memberForm = document.querySelector("#memberForm");
 const memberNameInput = document.querySelector("#memberNameInput");
+const memberProfileForm = document.querySelector("#memberProfileForm");
+const memberDisplayNameInput = document.querySelector("#memberDisplayNameInput");
 const exchangeRateList = document.querySelector("#exchangeRateList");
 const expenseDashboard = document.querySelector("#expenseDashboard");
 const itemDialog = document.querySelector("#itemDialog");
@@ -163,6 +166,7 @@ const tripDayTitleEditor = document.querySelector("#tripDayTitleEditor");
 const tripSharePanel = document.querySelector("#tripSharePanel");
 const tripInviteForm = document.querySelector("#tripInviteForm");
 const tripInviteEmailInput = document.querySelector("#tripInviteEmailInput");
+const tripInviteDisplayNameInput = document.querySelector("#tripInviteDisplayNameInput");
 const tripInviteRoleInput = document.querySelector("#tripInviteRoleInput");
 const tripInviteButton = document.querySelector("#tripInviteButton");
 const tripShareStatus = document.querySelector("#tripShareStatus");
@@ -196,9 +200,11 @@ const bookingExistingAttachments = document.querySelector("#bookingExistingAttac
 const deleteBookingButton = document.querySelector("#deleteBookingButton");
 const todoDialog = document.querySelector("#todoDialog");
 const todoForm = document.querySelector("#todoForm");
+const todoDialogTitle = document.querySelector("#todoDialogTitle");
 const todoGroupInput = document.querySelector("#todoGroupInput");
 const todoTextInput = document.querySelector("#todoTextInput");
 const todoNoteInput = document.querySelector("#todoNoteInput");
+const deleteTodoButton = document.querySelector("#deleteTodoButton");
 const expenseDialog = document.querySelector("#expenseDialog");
 const expenseForm = document.querySelector("#expenseForm");
 const expenseDialogTitle = document.querySelector("#expenseDialogTitle");
@@ -284,10 +290,39 @@ function normalizeSharedMembers(members) {
       id: member.id || member.cloudId || "",
       userId: member.userId || member.user_id || "",
       email: member.email || "",
+      displayName: member.displayName || member.display_name || "",
       role: member.role === "participant" ? "participant" : "viewer",
       createdAt: member.createdAt || member.created_at || ""
     }))
     .filter((member) => member.id || member.userId || member.email);
+}
+
+function sharedMemberDisplayName(member) {
+  const fallbackName = member.email ? member.email.split("@")[0] : "旅伴";
+  return String(member.displayName || fallbackName).trim();
+}
+
+function currentSharedMember(trip = currentTrip()) {
+  if (!state.cloudUser) return null;
+  return normalizeSharedMembers(trip?.sharedMembers).find((member) => member.userId === state.cloudUser.id) || null;
+}
+
+function expenseMemberNames(trip = currentTrip()) {
+  const manualMembers = normalizeMembers(trip?.members);
+  const sharedNames = normalizeSharedMembers(trip?.sharedMembers).map(sharedMemberDisplayName);
+  return normalizeMembers([...manualMembers, ...sharedNames]);
+}
+
+function renameExpenseMemberReferences(trip, oldName, newName) {
+  const fromName = String(oldName || "").trim();
+  const toName = String(newName || "").trim();
+  if (!fromName || !toName || fromName === toName) return;
+
+  trip.expenses = (trip.expenses || []).map((expense) => ({
+    ...expense,
+    payer: expense.payer === fromName ? toName : expense.payer,
+    shareWith: normalizeMembers(expense.shareWith).map((member) => (member === fromName ? toName : member))
+  }));
 }
 
 function normalizeExchangeRates(rates) {
@@ -632,6 +667,7 @@ function fromCloudTripMember(row) {
     id: row.id || "",
     userId: row.user_id || "",
     email: row.email || "",
+    displayName: row.display_name || "",
     role: row.role === "participant" ? "participant" : "viewer",
     createdAt: row.created_at || ""
   };
@@ -752,7 +788,7 @@ function isMissingCloudFunctionError(error) {
   return /function .* does not exist|Could not find the function|schema cache/i.test(String(error?.message || ""));
 }
 
-async function inviteTripMemberByEmail(trip, email, role) {
+async function inviteTripMemberByEmail(trip, email, role, displayName) {
   if (!trip?.cloudId || !state.cloudUser || !state.cloudReady) {
     throw new Error("請先登入並同步這趟旅程，再邀請旅伴。");
   }
@@ -761,7 +797,8 @@ async function inviteTripMemberByEmail(trip, email, role) {
   const { data, error } = await client.rpc("invite_trip_member_by_email", {
     target_trip_id: trip.cloudId,
     invitee_email: email,
-    invitee_role: role
+    invitee_role: role,
+    invitee_display_name: displayName
   });
 
   if (error) throw error;
@@ -773,6 +810,36 @@ async function removeTripMember(memberId) {
   const client = await getSupabaseClient();
   const { error } = await client.from("trip_members").delete().eq("id", memberId);
   if (error) throw error;
+}
+
+async function updateTripMemberDisplayName(trip, displayName) {
+  if (!trip?.cloudId || !state.cloudUser || !state.cloudReady) {
+    throw new Error("請先登入並同步旅程。");
+  }
+
+  const client = await getSupabaseClient();
+  const { data, error } = await client.rpc("update_trip_member_display_name", {
+    target_trip_id: trip.cloudId,
+    member_display_name: displayName
+  });
+
+  if (error) throw error;
+  return fromCloudTripMember(Array.isArray(data) ? data[0] : data);
+}
+
+async function updateTripMemberDisplayNameById(memberId, displayName) {
+  if (!memberId || !state.cloudUser || !state.cloudReady) {
+    throw new Error("請先登入並同步旅程。");
+  }
+
+  const client = await getSupabaseClient();
+  const { data, error } = await client.rpc("update_trip_member_display_name_by_id", {
+    target_member_id: memberId,
+    member_display_name: displayName
+  });
+
+  if (error) throw error;
+  return fromCloudTripMember(Array.isArray(data) ? data[0] : data);
 }
 
 async function loadCloudLibrary() {
@@ -1051,6 +1118,12 @@ function canEditExpense(expense, trip = currentTrip()) {
   if (!canUseCollaborativeTools(trip)) return false;
   if (!state.cloudUser) return true;
   return trip?.role === "owner" || !expense?.createdBy || expense.createdBy === state.cloudUser.id;
+}
+
+function canEditTodo(todo, trip = currentTrip()) {
+  if (!canUseCollaborativeTools(trip)) return false;
+  if (!state.cloudUser) return true;
+  return trip?.role === "owner" || !todo?.ownerId || todo.ownerId === state.cloudUser.id;
 }
 
 function render() {
@@ -1464,13 +1537,20 @@ function renderTodos() {
         ${todos
           .map(
             (todo) => `
-              <label class="todo-row">
-                <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
-                <span>
-                  <strong>${escapeHtml(todo.text)}</strong>
-                  ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
-                </span>
-              </label>
+              <article class="todo-row">
+                <label class="todo-check">
+                  <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
+                  <span>
+                    <strong>${escapeHtml(todo.text)}</strong>
+                    ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
+                  </span>
+                </label>
+                ${
+                  canEditTodo(todo, trip)
+                    ? `<button class="text-button todo-edit-button" type="button" data-edit-todo="${escapeHtml(todo.id)}">編輯</button>`
+                    : ""
+                }
+              </article>
             `
           )
           .join("")}
@@ -1588,11 +1668,19 @@ function renderExpenseDayCard(date, expenses, trip) {
 function renderMembers() {
   const trip = currentTrip();
   trip.members = normalizeMembers(trip.members);
-  memberChips.innerHTML = trip.members.map((member) => `<span class="member-chip">${escapeHtml(member)}</span>`).join("");
+  const activeMembers = expenseMemberNames(trip);
+  const ownSharedMember = currentSharedMember(trip);
+  memberChips.innerHTML = activeMembers.map((member) => `<span class="member-chip">${escapeHtml(member)}</span>`).join("");
+  memberForm.hidden = !canManageTrip(trip);
+  memberProfileForm.hidden = !ownSharedMember;
+  if (ownSharedMember) {
+    memberDisplayNameInput.value = ownSharedMember.displayName || "";
+    memberDisplayNameInput.placeholder = `目前顯示：${sharedMemberDisplayName(ownSharedMember)}`;
+  }
 }
 
 function calculateExpenseLedger(trip) {
-  const members = normalizeMembers(trip.members);
+  const members = expenseMemberNames(trip);
   const ledger = Object.fromEntries(members.map((member) => [member, { paid: 0, share: 0, balance: 0 }]));
 
   trip.expenses.forEach((expense) => {
@@ -1775,7 +1863,7 @@ function renderExpenseCategoryStats(trip) {
 }
 
 function calculateMemberCategoryTotals(trip) {
-  const members = normalizeMembers(trip.members);
+  const members = expenseMemberNames(trip);
   const result = Object.fromEntries(members.map((member) => [member, { totalTwd: 0, categories: {} }]));
 
   trip.expenses.forEach((expense) => {
@@ -1933,7 +2021,7 @@ function renderExpenseDashboard(trip) {
 }
 
 function renderExpenseFormMembers() {
-  const members = normalizeMembers(currentTrip().members);
+  const members = expenseMemberNames(currentTrip());
   expensePayerInput.innerHTML = members.map((member) => `<option value="${escapeHtml(member)}">${escapeHtml(member)}</option>`).join("");
   expenseShareInputs.innerHTML = members
     .map(
@@ -1962,15 +2050,29 @@ function openExpenseDialog(expenseId = null) {
   expenseAmountInput.value = expense?.amount || "";
   expenseCurrencyInput.value = expense?.currency || "JPY";
   expenseCategoryInput.value = expense?.category || "餐飲";
-  expensePayerInput.value = expense?.payer || normalizeMembers(currentTrip().members)[0];
+  expensePayerInput.value = expense?.payer || expenseMemberNames(currentTrip())[0];
   expenseNoteInput.value = expense?.note || "";
 
-  const shareWith = expense ? normalizeMembers(expense.shareWith) : normalizeMembers(currentTrip().members);
+  const shareWith = expense ? normalizeMembers(expense.shareWith) : expenseMemberNames(currentTrip());
   expenseShareInputs.querySelectorAll('input[type="checkbox"]').forEach((input) => {
     input.checked = shareWith.includes(input.value);
   });
 
   openModal(expenseDialog);
+}
+
+function openTodoDialog(todoId = null) {
+  if (!canUseCollaborativeTools()) return;
+  const todo = todoId ? currentTrip().todos.find((item) => item.id === todoId) : null;
+  if (todo && !canEditTodo(todo)) return;
+
+  state.editingTodoId = todo?.id || null;
+  todoDialogTitle.textContent = todo ? "編輯待辦" : "新增待辦";
+  deleteTodoButton.hidden = !todo;
+  todoGroupInput.value = todo?.group || state.activeTodoGroup;
+  todoTextInput.value = todo?.text || "";
+  todoNoteInput.value = todo?.note || "";
+  openModal(todoDialog);
 }
 
 function selectedExpenseShareMembers() {
@@ -2806,6 +2908,7 @@ function renderTripSharePanel(trip) {
 
   const needsCloudSave = !trip.cloudId;
   tripInviteEmailInput.disabled = needsCloudSave;
+  tripInviteDisplayNameInput.disabled = needsCloudSave;
   tripInviteRoleInput.disabled = needsCloudSave;
   tripInviteButton.disabled = needsCloudSave;
   tripShareStatus.textContent = needsCloudSave
@@ -2822,6 +2925,11 @@ function renderTripSharePanel(trip) {
                 <strong>${escapeHtml(member.email || member.userId || "旅伴")}</strong>
                 <span>${member.role === "participant" ? "可記帳與待辦" : "只能查看"}</span>
               </div>
+              <label class="trip-member-name-field">
+                <span>記帳名稱</span>
+                <input data-trip-member-name="${escapeHtml(member.id)}" value="${escapeHtml(sharedMemberDisplayName(member))}" />
+              </label>
+              <button class="text-button" type="button" data-save-trip-member-name="${escapeHtml(member.id)}">儲存名稱</button>
               <button class="text-button" type="button" data-remove-trip-member="${escapeHtml(member.id)}">移除</button>
             </article>
           `
@@ -2848,18 +2956,14 @@ document.querySelector("[data-trip-section-add]")?.addEventListener("click", () 
   }
   else if (state.activeTripSection === "todos") {
     if (!canUseCollaborativeTools()) return;
-    todoForm.reset();
-    todoGroupInput.value = state.activeTodoGroup;
-    openModal(todoDialog);
+    openTodoDialog();
   } else if (state.activeTripSection === "expenses") {
     if (canUseCollaborativeTools()) openExpenseDialog();
   } else if (canManageTrip()) openItemDialog();
 });
 document.querySelector("#addTodoButton")?.addEventListener("click", () => {
   if (isReadonly) return;
-  todoForm.reset();
-  todoGroupInput.value = state.activeTodoGroup;
-  openModal(todoDialog);
+  openTodoDialog();
 });
 document.querySelector("#addExpenseButton")?.addEventListener("click", () => openExpenseDialog());
 exportButton.addEventListener("click", () => {
@@ -2948,20 +3052,26 @@ tripInviteButton?.addEventListener("click", async () => {
   if (!trip || !canManageTrip(trip)) return;
 
   const email = tripInviteEmailInput.value.trim().toLowerCase();
+  const displayName = tripInviteDisplayNameInput.value.trim();
   const role = tripInviteRoleInput.value === "participant" ? "participant" : "viewer";
   if (!email) {
     tripShareStatus.textContent = "請輸入朋友註冊 Supabase 用的 Email。";
     return;
   }
+  if (!displayName) {
+    tripShareStatus.textContent = "請輸入朋友在記帳區要顯示的名稱。";
+    return;
+  }
 
   try {
     tripShareStatus.textContent = "正在加入旅伴...";
-    const member = await inviteTripMemberByEmail(trip, email, role);
+    const member = await inviteTripMemberByEmail(trip, email, role, displayName);
     trip.sharedMembers = normalizeSharedMembers([...(trip.sharedMembers || []).filter((item) => item.email !== member.email), member]);
     tripInviteEmailInput.value = "";
+    tripInviteDisplayNameInput.value = "";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
     renderTripSharePanel(trip);
-    tripShareStatus.textContent = "已加入旅伴。朋友登入後按「立即同步」就能看到這趟旅程。";
+    tripShareStatus.textContent = "已加入旅伴，也已加入記帳成員。朋友登入後按「立即同步」就能看到這趟旅程。";
   } catch (error) {
     tripShareStatus.textContent = isMissingCloudFunctionError(error)
       ? "Supabase 還沒建立邀請用的 function。請先執行我提供的邀請功能 SQL。"
@@ -2970,6 +3080,37 @@ tripInviteButton?.addEventListener("click", async () => {
 });
 
 tripMemberList?.addEventListener("click", async (event) => {
+  const saveNameButton = event.target.closest("[data-save-trip-member-name]");
+  if (saveNameButton) {
+    const trip = state.editingTripId ? state.library.trips.find((item) => item.id === state.editingTripId) : null;
+    if (!trip || !canManageTrip(trip)) return;
+
+    const memberId = saveNameButton.dataset.saveTripMemberName;
+    const input = tripMemberList.querySelector(`[data-trip-member-name="${CSS.escape(memberId)}"]`);
+    const displayName = input?.value.trim() || "";
+    if (!displayName) {
+      tripShareStatus.textContent = "記帳名稱不能空白。";
+      return;
+    }
+
+    try {
+      tripShareStatus.textContent = "正在更新記帳名稱...";
+      const updatedMember = await updateTripMemberDisplayNameById(memberId, displayName);
+      const oldMember = normalizeSharedMembers(trip.sharedMembers).find((member) => member.id === memberId);
+      trip.sharedMembers = normalizeSharedMembers(trip.sharedMembers.map((member) => (member.id === updatedMember.id ? updatedMember : member)));
+      renameExpenseMemberReferences(trip, sharedMemberDisplayName(oldMember), sharedMemberDisplayName(updatedMember));
+      saveLibrary();
+      renderTripSharePanel(trip);
+      renderExpenses();
+      tripShareStatus.textContent = "已更新記帳名稱，既有支出也已同步改名。";
+    } catch (error) {
+      tripShareStatus.textContent = isMissingCloudFunctionError(error)
+        ? "Supabase 還沒建立更新名稱的 function。請重新執行邀請功能 SQL。"
+        : `更新失敗：${error.message}`;
+    }
+    return;
+  }
+
   const button = event.target.closest("[data-remove-trip-member]");
   if (!button) return;
 
@@ -3303,16 +3444,27 @@ todoForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!canUseCollaborativeTools()) return;
 
-  currentTrip().todos.push(normalizeTodo({
-    id: createId(),
-    ownerId: state.cloudUser?.id || null,
-    group: todoGroupInput.value,
-    text: todoTextInput.value.trim(),
-    note: todoNoteInput.value.trim(),
-    done: false,
-    visibility: "private"
-  }));
+  const trip = currentTrip();
+  const existingTodo = state.editingTodoId ? trip.todos.find((item) => item.id === state.editingTodoId) : null;
+  if (existingTodo && !canEditTodo(existingTodo, trip)) return;
 
+  if (existingTodo) {
+    existingTodo.group = todoGroupInput.value;
+    existingTodo.text = todoTextInput.value.trim();
+    existingTodo.note = todoNoteInput.value.trim();
+  } else {
+    trip.todos.push(normalizeTodo({
+      id: createId(),
+      ownerId: state.cloudUser?.id || null,
+      group: todoGroupInput.value,
+      text: todoTextInput.value.trim(),
+      note: todoNoteInput.value.trim(),
+      done: false,
+      visibility: "private"
+    }));
+  }
+
+  state.editingTodoId = null;
   saveLibrary();
   closeModal(todoDialog);
   renderTodos();
@@ -3328,6 +3480,13 @@ todoGroups.addEventListener("change", (event) => {
   renderTodos();
 });
 
+todoGroups.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-todo]");
+  if (!button) return;
+  event.preventDefault();
+  openTodoDialog(button.dataset.editTodo);
+});
+
 memberForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!canManageTrip()) return;
@@ -3339,6 +3498,33 @@ memberForm.addEventListener("submit", (event) => {
   memberNameInput.value = "";
   saveLibrary();
   renderExpenses();
+});
+
+memberProfileForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const trip = currentTrip();
+  const ownSharedMember = currentSharedMember(trip);
+  if (!ownSharedMember) return;
+
+  const displayName = memberDisplayNameInput.value.trim();
+  if (!displayName) {
+    alert("請輸入要顯示在記帳裡的名稱。");
+    return;
+  }
+
+  try {
+    const oldMember = { ...ownSharedMember };
+    const updatedMember = await updateTripMemberDisplayName(trip, displayName);
+    trip.sharedMembers = normalizeSharedMembers(
+      trip.sharedMembers.map((member) => (member.id === updatedMember.id ? updatedMember : member))
+    );
+    renameExpenseMemberReferences(trip, sharedMemberDisplayName(oldMember), sharedMemberDisplayName(updatedMember));
+    saveLibrary();
+    renderExpenses();
+    alert("已更新你的記帳名稱，既有支出也已同步改名。");
+  } catch (error) {
+    alert(isMissingCloudFunctionError(error) ? "Supabase 還沒建立更新名稱的 function。請重新執行邀請功能 SQL。" : `更新失敗：${error.message}`);
+  }
 });
 
 function applyExchangeRateInput(input) {
@@ -3494,6 +3680,25 @@ deleteBookingButton.addEventListener("click", () => {
   saveLibrary();
   closeModal(bookingDialog);
   renderBookings();
+});
+
+deleteTodoButton.addEventListener("click", () => {
+  if (!canUseCollaborativeTools()) return;
+  if (!state.editingTodoId) return;
+
+  const trip = currentTrip();
+  const todo = trip.todos.find((item) => item.id === state.editingTodoId);
+  if (todo && !canEditTodo(todo, trip)) return;
+
+  const confirmed = window.confirm(`確定刪除「${todo?.text || "這筆待辦"}」？如果已登入雲端，也會同步刪除 Supabase 裡的這筆待辦。`);
+  if (!confirmed) return;
+
+  trip.todos = trip.todos.filter((item) => item.id !== state.editingTodoId);
+  deleteCloudRow("trip_todos", todo?.cloudId);
+  state.editingTodoId = null;
+  saveLibrary();
+  closeModal(todoDialog);
+  renderTodos();
 });
 
 deleteExpenseButton.addEventListener("click", () => {
