@@ -9,6 +9,7 @@ const IMAGE_COMPRESSION_STEPS = [
 ];
 const SUPABASE_URL = "https://dxkrkhtnusihjukanphe.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CCraWaVPLSPzzE-u7Guvlg_Dfe6q91a";
+const SUPABASE_ATTACHMENT_BUCKET = "trip-attachments";
 const DEFAULT_EXCHANGE_RATES = {
   TWD: 1,
   JPY: 0.22,
@@ -280,13 +281,19 @@ function normalizeBooking(booking) {
 }
 
 function normalizeAttachment(attachment) {
-  if (!attachment || !attachment.dataUrl) return null;
+  if (!attachment || (!attachment.dataUrl && !attachment.publicUrl && !attachment.url)) return null;
+
+  const publicUrl = attachment.publicUrl || attachment.url || "";
+
   return {
     id: attachment.id || createId(),
     name: attachment.name || "訂單附件",
     type: attachment.type || "",
     size: Number(attachment.size) || 0,
-    dataUrl: attachment.dataUrl
+    dataUrl: attachment.dataUrl || "",
+    publicUrl,
+    storagePath: attachment.storagePath || "",
+    uploadedAt: attachment.uploadedAt || ""
   };
 }
 
@@ -544,13 +551,27 @@ function stripAttachmentsForCloudTrip(trip) {
       ...day,
       items: (day.items || []).map((item) => ({
         ...item,
-        attachments: []
+        attachments: (item.attachments || []).map(toCloudAttachment).filter(Boolean)
       }))
     })),
     bookings: (trip.bookings || []).map((booking) => ({
       ...booking,
-      attachments: []
+      attachments: (booking.attachments || []).map(toCloudAttachment).filter(Boolean)
     }))
+  };
+}
+
+function toCloudAttachment(attachment) {
+  if (!attachment?.publicUrl) return null;
+
+  return {
+    id: attachment.id || createId(),
+    name: attachment.name || "附件",
+    type: attachment.type || "",
+    size: Number(attachment.size) || 0,
+    publicUrl: attachment.publicUrl,
+    storagePath: attachment.storagePath || "",
+    uploadedAt: attachment.uploadedAt || ""
   };
 }
 
@@ -601,6 +622,65 @@ function scheduleCloudSave() {
   }, 500);
 }
 
+function attachmentStoragePath(trip, ownerType, ownerId, attachment) {
+  const extension = attachment.type?.split("/")[1]?.replace("jpeg", "jpg") || attachment.name.split(".").pop() || "file";
+  const fileName = `${attachment.id}-${safeFileName(attachment.name || "attachment")}.${extension}`.replace(/\.+/g, ".");
+  return `${state.cloudUser.id}/${trip.id}/${ownerType}/${ownerId}/${fileName}`;
+}
+
+async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment) {
+  if (attachment.publicUrl || !attachment.dataUrl) return;
+
+  const blob = dataUrlToBlob(attachment.dataUrl);
+  const storagePath = attachment.storagePath || attachmentStoragePath(trip, ownerType, ownerId, attachment);
+  const { error } = await client.storage.from(SUPABASE_ATTACHMENT_BUCKET).upload(storagePath, blob, {
+    cacheControl: "3600",
+    contentType: attachment.type || blob.type || "application/octet-stream",
+    upsert: true
+  });
+
+  if (error) throw error;
+
+  const { data } = client.storage.from(SUPABASE_ATTACHMENT_BUCKET).getPublicUrl(storagePath);
+  attachment.storagePath = storagePath;
+  attachment.publicUrl = data.publicUrl;
+  attachment.uploadedAt = new Date().toISOString();
+}
+
+async function uploadTripAttachments(client, trip) {
+  for (const day of trip.days || []) {
+    for (const item of day.items || []) {
+      for (const attachment of item.attachments || []) {
+        await uploadAttachmentToCloud(client, trip, "item", item.id || "item", attachment);
+      }
+    }
+  }
+
+  for (const booking of trip.bookings || []) {
+    for (const attachment of booking.attachments || []) {
+      await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment);
+    }
+  }
+}
+
+function formatCloudSaveError(error) {
+  const message = String(error.message || "");
+
+  if (/bucket|not found/i.test(message)) {
+    return "雲端儲存失敗：Supabase 還沒有建立 trip-attachments Storage bucket。";
+  }
+
+  if (/row-level security|policy|permission|not allowed|unauthorized/i.test(message)) {
+    return "雲端儲存失敗：Supabase Storage 權限尚未開放，請檢查 trip-attachments 的上傳政策。";
+  }
+
+  if (/quota|exceeded|too large/i.test(message)) {
+    return "雲端儲存失敗：資料太大或 Supabase 額度不足。請確認照片已壓縮，或改用較小的 PDF。";
+  }
+
+  return `雲端儲存失敗：${message}`;
+}
+
 async function saveCloudLibrary() {
   if (!state.cloudUser || !state.cloudReady || state.cloudSyncing) return;
 
@@ -610,6 +690,7 @@ async function saveCloudLibrary() {
     const client = await getSupabaseClient();
 
     for (const trip of state.library.trips) {
+      await uploadTripAttachments(client, trip);
       const payload = toCloudTripPayload(trip);
       const query = trip.cloudId
         ? client.from("trips").update(payload).eq("id", trip.cloudId).select("id").single()
@@ -622,10 +703,7 @@ async function saveCloudLibrary() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
     state.cloudError = "";
   } catch (error) {
-    const message = String(error.message || "");
-    state.cloudError = /quota|exceeded|too large/i.test(message)
-      ? "雲端儲存失敗：資料太大或 Supabase 額度不足。目前雲端同步先不包含圖片/PDF，請重新整理後按「立即同步」。"
-      : `雲端儲存失敗：${message}`;
+    state.cloudError = formatCloudSaveError(error);
   } finally {
     state.cloudSyncing = false;
     renderCloudStatus();
@@ -942,7 +1020,7 @@ function renderAttachmentGallery(attachments, ownerType, ownerId) {
                       data-attachment-id="${escapeHtml(attachment.id)}"
                       title="查看 ${escapeHtml(attachment.name)}"
                     >
-                      <img src="${escapeHtml(attachment.dataUrl)}" alt="${escapeHtml(attachment.name)}" loading="lazy" />
+                      <img src="${escapeHtml(getAttachmentSource(attachment))}" alt="${escapeHtml(attachment.name)}" loading="lazy" />
                     </button>
                   `
                 )
@@ -974,6 +1052,10 @@ function renderAttachmentGallery(attachments, ownerType, ownerId) {
       }
     </div>
   `;
+}
+
+function getAttachmentSource(attachment) {
+  return attachment?.dataUrl || attachment?.publicUrl || attachment?.url || "";
 }
 
 function getBookingGroup(booking) {
@@ -1870,8 +1952,9 @@ function findAttachment(ownerType, ownerId, attachmentId) {
 
 function openAttachment(ownerType, ownerId, attachmentId) {
   const attachment = findAttachment(ownerType, ownerId, attachmentId);
+  const attachmentSource = getAttachmentSource(attachment);
 
-  if (!attachment?.dataUrl) {
+  if (!attachmentSource) {
     window.alert("找不到這個附件，可能是資料沒有完整儲存。");
     return;
   }
@@ -1882,14 +1965,18 @@ function openAttachment(ownerType, ownerId, attachmentId) {
       activeAttachmentUrl = null;
     }
 
-    const blob = dataUrlToBlob(attachment.dataUrl);
-    activeAttachmentUrl = URL.createObjectURL(blob);
+    if (attachment.dataUrl) {
+      const blob = dataUrlToBlob(attachment.dataUrl);
+      activeAttachmentUrl = URL.createObjectURL(blob);
+    }
+
+    const viewerUrl = activeAttachmentUrl || attachmentSource;
     attachmentViewerTitle.textContent = attachment.name || "附件預覽";
 
     if (attachment.type.startsWith("image/")) {
-      attachmentViewerBody.innerHTML = `<img class="attachment-viewer-image" src="${escapeHtml(activeAttachmentUrl)}" alt="${escapeHtml(attachment.name)}" />`;
+      attachmentViewerBody.innerHTML = `<img class="attachment-viewer-image" src="${escapeHtml(viewerUrl)}" alt="${escapeHtml(attachment.name)}" />`;
     } else {
-      attachmentViewerBody.innerHTML = `<iframe class="attachment-viewer-frame" src="${escapeHtml(activeAttachmentUrl)}" title="${escapeHtml(attachment.name || "附件預覽")}"></iframe>`;
+      attachmentViewerBody.innerHTML = `<iframe class="attachment-viewer-frame" src="${escapeHtml(viewerUrl)}" title="${escapeHtml(attachment.name || "附件預覽")}"></iframe>`;
     }
 
     openModal(attachmentViewer);
