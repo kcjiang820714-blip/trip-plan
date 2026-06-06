@@ -136,6 +136,7 @@ const attractionFields = document.querySelector("#attractionFields");
 const attractionIntroInput = document.querySelector("#attractionIntroInput");
 const noteInput = document.querySelector("#noteInput");
 const itemPhotoInput = document.querySelector("#itemPhotoInput");
+const itemExistingAttachments = document.querySelector("#itemExistingAttachments");
 const flightFields = document.querySelector("#flightFields");
 const airlineInput = document.querySelector("#airlineInput");
 const flightCodeInput = document.querySelector("#flightCodeInput");
@@ -174,6 +175,7 @@ const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
 const bookingNoteInput = document.querySelector("#bookingNoteInput");
 const bookingAttachmentInput = document.querySelector("#bookingAttachmentInput");
+const bookingExistingAttachments = document.querySelector("#bookingExistingAttachments");
 const deleteBookingButton = document.querySelector("#deleteBookingButton");
 const todoDialog = document.querySelector("#todoDialog");
 const todoForm = document.querySelector("#todoForm");
@@ -661,6 +663,27 @@ async function uploadTripAttachments(client, trip) {
     for (const attachment of booking.attachments || []) {
       await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment);
     }
+  }
+}
+
+async function deleteAttachmentFromCloud(client, attachment) {
+  if (!attachment?.storagePath) return;
+  const { error } = await client.storage.from(SUPABASE_ATTACHMENT_BUCKET).remove([attachment.storagePath]);
+  if (error) throw error;
+}
+
+async function deleteRemovedAttachmentsFromCloud(attachments = []) {
+  const cloudAttachments = attachments.filter((attachment) => attachment.storagePath);
+  if (!state.cloudUser || !state.cloudReady || cloudAttachments.length === 0) return;
+
+  try {
+    const client = await getSupabaseClient();
+    for (const attachment of cloudAttachments) {
+      await deleteAttachmentFromCloud(client, attachment);
+    }
+  } catch (error) {
+    state.cloudError = `附件已從行程移除，但雲端檔案刪除失敗：${error.message}`;
+    renderCloudStatus();
   }
 }
 
@@ -1734,10 +1757,16 @@ function openAttractionIntro(itemId) {
   const item = currentDay().items.find((entry) => entry.id === itemId);
   if (!item?.attractionIntro) return;
 
+  const introImage = (item.attachments || []).find((attachment) => attachment.type.startsWith("image/") && getAttachmentSource(attachment));
   attachmentViewerTitle.textContent = `${item.place || "景點"}介紹`;
   attachmentViewer.classList.add("is-text-viewer");
   attachmentViewerBody.innerHTML = `
     <article class="attraction-intro-view">
+      ${
+        introImage
+          ? `<img class="attraction-intro-image" src="${escapeHtml(getAttachmentSource(introImage))}" alt="${escapeHtml(introImage.name || item.place || "景點照片")}" />`
+          : ""
+      }
       <p>${escapeHtml(item.attractionIntro)}</p>
     </article>
   `;
@@ -2044,6 +2073,8 @@ function openBookingDialog(bookingId = null) {
   bookingPlaceInput.value = booking?.place || "";
   bookingCodeInput.value = booking?.code || "";
   bookingNoteInput.value = booking?.note || "";
+  bookingAttachmentInput.value = "";
+  renderExistingAttachmentsEditor(bookingExistingAttachments, booking?.attachments || []);
   syncBookingStayFields();
   openModal(bookingDialog);
 }
@@ -2080,6 +2111,7 @@ function openItemDialog(index = null) {
   attractionIntroInput.value = item.attractionIntro || "";
   noteInput.value = item.note;
   itemPhotoInput.value = "";
+  renderExistingAttachmentsEditor(itemExistingAttachments, item.attachments || []);
   airlineInput.value = item.airline || "";
   flightCodeInput.value = item.flightCode || "";
   departureTimeInput.value = item.departureTime || "";
@@ -2097,6 +2129,58 @@ function openItemDialog(index = null) {
   syncTransportFields();
   syncAttractionFields();
   openModal(itemDialog);
+}
+
+function renderExistingAttachmentsEditor(container, attachments = []) {
+  if (!container) return;
+  container.hidden = attachments.length === 0;
+  container.innerHTML = attachments.length
+    ? `
+      <div class="existing-attachments-heading">
+        <strong>已加入附件</strong>
+        <span>按「移除」後，儲存才會生效</span>
+      </div>
+      <div class="existing-attachments-list">
+        ${attachments
+          .map((attachment) => {
+            const source = getAttachmentSource(attachment);
+            const preview = attachment.type.startsWith("image/") && source
+              ? `<img src="${escapeHtml(source)}" alt="${escapeHtml(attachment.name)}" />`
+              : `<span class="attachment-file-icon">PDF</span>`;
+            return `
+              <article class="existing-attachment" data-existing-attachment-id="${escapeHtml(attachment.id)}">
+                <div class="existing-attachment-preview">${preview}</div>
+                <div>
+                  <strong>${escapeHtml(attachment.name || "附件")}</strong>
+                  <span>${escapeHtml(formatFileSize(attachment.size))}</span>
+                </div>
+                <button class="text-button danger-text" type="button" data-remove-existing-attachment="${escapeHtml(attachment.id)}">移除</button>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    `
+    : "";
+}
+
+function formatFileSize(size) {
+  const bytes = Number(size) || 0;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return bytes ? `${bytes} B` : "雲端附件";
+}
+
+function getKeptAttachments(container, attachments = []) {
+  const keptIds = new Set(
+    Array.from(container?.querySelectorAll("[data-existing-attachment-id]") || []).map((element) => element.dataset.existingAttachmentId)
+  );
+  return attachments.filter((attachment) => keptIds.has(attachment.id));
+}
+
+function getRemovedAttachments(originalAttachments = [], keptAttachments = []) {
+  const keptIds = new Set(keptAttachments.map((attachment) => attachment.id));
+  return originalAttachments.filter((attachment) => !keptIds.has(attachment.id));
 }
 
 function createBlankTransportSegment(mode = transportModeInput.value || "火車") {
@@ -2435,6 +2519,15 @@ document.querySelectorAll("[data-close-dialog]").forEach((button) => {
   });
 });
 
+[itemExistingAttachments, bookingExistingAttachments].forEach((container) => {
+  container?.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-remove-existing-attachment]");
+    if (!removeButton) return;
+    removeButton.closest("[data-existing-attachment-id]")?.remove();
+    container.hidden = !container.querySelector("[data-existing-attachment-id]");
+  });
+});
+
 closeAttachmentViewerButton.addEventListener("click", closeAttachmentViewer);
 attachmentViewer.addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -2581,13 +2674,15 @@ itemForm.addEventListener("submit", async (event) => {
 
   const editingIndex = state.editingItemIndex;
   const existingItem = editingIndex === null ? null : currentDay().items[editingIndex];
+  const keptItemAttachments = existingItem ? getKeptAttachments(itemExistingAttachments, existingItem.attachments || []) : [];
+  const removedItemAttachments = existingItem ? getRemovedAttachments(existingItem.attachments || [], keptItemAttachments) : [];
 
   if (editingIndex === null) {
     item.id = createId();
     currentDay().items.push(item);
   } else {
     item.id = existingItem.id || createId();
-    item.attachments = [...(existingItem.attachments || []), ...attachments];
+    item.attachments = [...keptItemAttachments, ...attachments];
     currentDay().items[editingIndex] = item;
   }
 
@@ -2598,6 +2693,7 @@ itemForm.addEventListener("submit", async (event) => {
     await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "item", item.id, item.attachments);
     itemLocalSaveStarted = true;
     saveLibrary();
+    deleteRemovedAttachmentsFromCloud(removedItemAttachments);
   } catch (error) {
     if (editingIndex === null) currentDay().items = currentDay().items.filter((entry) => entry.id !== item.id);
     else {
@@ -2627,6 +2723,8 @@ bookingForm.addEventListener("submit", async (event) => {
     ? currentTrip().bookings.findIndex((booking) => booking.id === state.editingBookingId)
     : -1;
   const existingBooking = editingIndex >= 0 ? currentTrip().bookings[editingIndex] : null;
+  const keptBookingAttachments = existingBooking ? getKeptAttachments(bookingExistingAttachments, existingBooking.attachments || []) : [];
+  const removedBookingAttachments = existingBooking ? getRemovedAttachments(existingBooking.attachments || [], keptBookingAttachments) : [];
   const booking = normalizeBooking({
     id: existingBooking?.id || createId(),
     type: bookingTypeInput.value,
@@ -2639,7 +2737,7 @@ bookingForm.addEventListener("submit", async (event) => {
     place: bookingPlaceInput.value.trim(),
     code: bookingCodeInput.value.trim(),
     note: bookingNoteInput.value.trim(),
-    attachments: [...(existingBooking?.attachments || []), ...attachments]
+    attachments: [...keptBookingAttachments, ...attachments]
   });
 
   if (existingBooking) {
@@ -2653,6 +2751,7 @@ bookingForm.addEventListener("submit", async (event) => {
     await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "booking", booking.id, booking.attachments);
     bookingLocalSaveStarted = true;
     saveLibrary();
+    deleteRemovedAttachmentsFromCloud(removedBookingAttachments);
   } catch (error) {
     if (existingBooking) currentTrip().bookings[editingIndex] = existingBooking;
     else currentTrip().bookings.pop();

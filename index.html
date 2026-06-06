@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=43" />
+    <link rel="stylesheet" href="./styles.css?v=44" />
   </head>
   <body>
     <main class="app-shell">
@@ -355,6 +355,8 @@
           <input id="itemPhotoInput" type="file" accept="image/*" multiple />
         </label>
 
+        <section class="existing-attachments" id="itemExistingAttachments" hidden></section>
+
         <footer>
           <button class="secondary-button" id="deleteItemButton" type="button">刪除</button>
           <button class="primary-button" value="default" type="submit">儲存</button>
@@ -466,6 +468,8 @@
           訂單附件
           <input id="bookingAttachmentInput" type="file" accept="image/*,.pdf" multiple />
         </label>
+
+        <section class="existing-attachments" id="bookingExistingAttachments" hidden></section>
 
         <footer>
           <button class="secondary-button" id="deleteBookingButton" type="button">刪除預訂</button>
@@ -582,6 +586,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=55" type="module"></script>
+    <script src="./app.js?v=56" type="module"></script>
   </body>
 </html>
