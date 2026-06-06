@@ -288,7 +288,11 @@
 
           <label>
             出發時間
-            <input id="departureTimeInput" name="departureTime" type="time" />
+            <input id="departureTimeInput" name="departureTime" type="hidden" />
+            <span class="time-selects">
+              <select id="departureHourInput" aria-label="出發小時"></select>
+              <select id="departureMinuteInput" aria-label="出發分鐘"></select>
+            </span>
           </label>
 
           <label>
@@ -303,7 +307,11 @@
 
           <label>
             抵達時間
-            <input id="arrivalTimeInput" name="arrivalTime" type="time" />
+            <input id="arrivalTimeInput" name="arrivalTime" type="hidden" />
+            <span class="time-selects">
+              <select id="arrivalHourInput" aria-label="抵達小時"></select>
+              <select id="arrivalMinuteInput" aria-label="抵達分鐘"></select>
+            </span>
           </label>
 
           <label>
@@ -433,7 +441,11 @@
 
         <label id="bookingTimeLabel">
           時間
-          <input id="bookingTimeInput" type="time" />
+          <input id="bookingTimeInput" type="hidden" />
+          <span class="time-selects">
+            <select id="bookingHourInput" aria-label="預訂小時"></select>
+            <select id="bookingMinuteInput" aria-label="預訂分鐘"></select>
+          </span>
         </label>
 
         <section class="booking-stay-fields" id="bookingStayFields" hidden>
@@ -444,7 +456,11 @@
 
           <label>
             check-out 時間
-            <input id="bookingCheckoutTimeInput" type="time" />
+            <input id="bookingCheckoutTimeInput" type="hidden" />
+            <span class="time-selects">
+              <select id="bookingCheckoutHourInput" aria-label="check-out 小時"></select>
+              <select id="bookingCheckoutMinuteInput" aria-label="check-out 分鐘"></select>
+            </span>
           </label>
 
           <label class="checkbox-row">
@@ -590,6 +606,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=64" type="module"></script>
+    <script src="./app.js?v=65" type="module"></script>
   </body>
 </html>

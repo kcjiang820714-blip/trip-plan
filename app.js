@@ -142,9 +142,13 @@ const flightFields = document.querySelector("#flightFields");
 const airlineInput = document.querySelector("#airlineInput");
 const flightCodeInput = document.querySelector("#flightCodeInput");
 const departureTimeInput = document.querySelector("#departureTimeInput");
+const departureHourInput = document.querySelector("#departureHourInput");
+const departureMinuteInput = document.querySelector("#departureMinuteInput");
 const departureAirportInput = document.querySelector("#departureAirportInput");
 const departureTerminalInput = document.querySelector("#departureTerminalInput");
 const arrivalTimeInput = document.querySelector("#arrivalTimeInput");
+const arrivalHourInput = document.querySelector("#arrivalHourInput");
+const arrivalMinuteInput = document.querySelector("#arrivalMinuteInput");
 const arrivalAirportInput = document.querySelector("#arrivalAirportInput");
 const arrivalTerminalInput = document.querySelector("#arrivalTerminalInput");
 const transportFields = document.querySelector("#transportFields");
@@ -169,9 +173,13 @@ const bookingDateLabel = document.querySelector("#bookingDateLabel");
 const bookingDateInput = document.querySelector("#bookingDateInput");
 const bookingTimeLabel = document.querySelector("#bookingTimeLabel");
 const bookingTimeInput = document.querySelector("#bookingTimeInput");
+const bookingHourInput = document.querySelector("#bookingHourInput");
+const bookingMinuteInput = document.querySelector("#bookingMinuteInput");
 const bookingStayFields = document.querySelector("#bookingStayFields");
 const bookingCheckoutDateInput = document.querySelector("#bookingCheckoutDateInput");
 const bookingCheckoutTimeInput = document.querySelector("#bookingCheckoutTimeInput");
+const bookingCheckoutHourInput = document.querySelector("#bookingCheckoutHourInput");
+const bookingCheckoutMinuteInput = document.querySelector("#bookingCheckoutMinuteInput");
 const bookingBreakfastInput = document.querySelector("#bookingBreakfastInput");
 const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
@@ -2089,7 +2097,9 @@ function syncBookingStayFields() {
   bookingTimeLabel.firstChild.textContent = isStay ? "check-in 時間" : "時間";
   bookingStayFields.hidden = !isStay;
   bookingCheckoutDateInput.required = isStay;
-  bookingCheckoutTimeInput.required = isStay;
+  bookingCheckoutTimeInput.required = false;
+  bookingCheckoutHourInput.required = isStay;
+  bookingCheckoutMinuteInput.required = isStay;
 
   if (isStay && bookingDateInput.value && !bookingCheckoutDateInput.value) {
     bookingCheckoutDateInput.value = addDays(bookingDateInput.value, 1);
@@ -2109,8 +2119,10 @@ function openBookingDialog(bookingId = null) {
   bookingNameInput.value = booking?.name || "";
   bookingDateInput.value = booking?.date || currentTrip().startDate;
   bookingTimeInput.value = booking?.time || "";
+  setTimeSelectPair(bookingHourInput, bookingMinuteInput, booking?.time || "");
   bookingCheckoutDateInput.value = booking?.checkoutDate || addDays(bookingDateInput.value, 1);
   bookingCheckoutTimeInput.value = booking?.checkoutTime || "";
+  setTimeSelectPair(bookingCheckoutHourInput, bookingCheckoutMinuteInput, booking?.checkoutTime || "");
   bookingBreakfastInput.checked = Boolean(booking?.includesBreakfast);
   bookingPlaceInput.value = booking?.place || "";
   bookingCodeInput.value = booking?.code || "";
@@ -2159,9 +2171,11 @@ function openItemDialog(index = null) {
   airlineInput.value = item.airline || "";
   flightCodeInput.value = item.flightCode || "";
   departureTimeInput.value = item.departureTime || "";
+  setTimeSelectPair(departureHourInput, departureMinuteInput, item.departureTime || "");
   departureAirportInput.value = item.departureAirport || "";
   departureTerminalInput.value = item.departureTerminal || "";
   arrivalTimeInput.value = item.arrivalTime || "";
+  setTimeSelectPair(arrivalHourInput, arrivalMinuteInput, item.arrivalTime || "");
   arrivalAirportInput.value = item.arrivalAirport || "";
   arrivalTerminalInput.value = item.arrivalTerminal || "";
   transportModeInput.value = item.transportMode || item.transportSegments[0]?.mode || "火車";
@@ -2243,7 +2257,29 @@ function createBlankTransportSegment(mode = transportModeInput.value || "火車"
 
 function renderTransportSegments(segments) {
   transportSegments.innerHTML = segments.map((segment, index) => renderTransportSegment(segment, index)).join("");
+  syncTransportTimeSelects();
   syncTransportSegmentModeFields();
+}
+
+function syncTransportTimeSelects() {
+  transportSegments.querySelectorAll("[data-transport-segment]").forEach((segmentElement) => {
+    ["departureTime", "arrivalTime"].forEach((field) => {
+      const hiddenInput = segmentElement.querySelector(`[data-transport-field="${field}"]`);
+      const hourSelect = segmentElement.querySelector(`[data-transport-time-hour="${field}"]`);
+      const minuteSelect = segmentElement.querySelector(`[data-transport-time-minute="${field}"]`);
+      populateTimeSelectPair(hourSelect, minuteSelect);
+      setTimeSelectPair(hourSelect, minuteSelect, hiddenInput?.value || "");
+    });
+  });
+}
+
+function syncTransportTimeValue(selectElement) {
+  const segmentElement = selectElement.closest("[data-transport-segment]");
+  const field = selectElement.dataset.transportTimeHour || selectElement.dataset.transportTimeMinute;
+  const hiddenInput = segmentElement?.querySelector(`[data-transport-field="${field}"]`);
+  const hourSelect = segmentElement?.querySelector(`[data-transport-time-hour="${field}"]`);
+  const minuteSelect = segmentElement?.querySelector(`[data-transport-time-minute="${field}"]`);
+  syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect);
 }
 
 function renderTransportSegment(segment, index) {
@@ -2295,7 +2331,11 @@ function renderTransportSegment(segment, index) {
 
       <label>
         出發時間
-        <input data-transport-field="departureTime" type="time" value="${escapeHtml(segment.departureTime)}" />
+        <input data-transport-field="departureTime" type="hidden" value="${escapeHtml(segment.departureTime)}" />
+        <span class="time-selects">
+          <select data-transport-time-hour="departureTime" aria-label="出發小時"></select>
+          <select data-transport-time-minute="departureTime" aria-label="出發分鐘"></select>
+        </span>
       </label>
 
       <label data-mode-field="trainNumber">
@@ -2310,7 +2350,11 @@ function renderTransportSegment(segment, index) {
 
       <label>
         抵達時間
-        <input data-transport-field="arrivalTime" type="time" value="${escapeHtml(segment.arrivalTime)}" />
+        <input data-transport-field="arrivalTime" type="hidden" value="${escapeHtml(segment.arrivalTime)}" />
+        <span class="time-selects">
+          <select data-transport-time-hour="arrivalTime" aria-label="抵達小時"></select>
+          <select data-transport-time-minute="arrivalTime" aria-label="抵達分鐘"></select>
+        </span>
       </label>
     </section>
   `;
@@ -2347,15 +2391,26 @@ function syncTransportSegmentModeFields() {
 }
 
 function populateTimeOptions() {
-  timeHourInput.innerHTML = `<option value="">時</option>`;
-  timeMinuteInput.innerHTML = `<option value="">分</option>`;
+  [
+    [timeHourInput, timeMinuteInput],
+    [departureHourInput, departureMinuteInput],
+    [arrivalHourInput, arrivalMinuteInput],
+    [bookingHourInput, bookingMinuteInput],
+    [bookingCheckoutHourInput, bookingCheckoutMinuteInput]
+  ].forEach(([hourSelect, minuteSelect]) => populateTimeSelectPair(hourSelect, minuteSelect));
+}
+
+function populateTimeSelectPair(hourSelect, minuteSelect) {
+  if (!hourSelect || !minuteSelect) return;
+  hourSelect.innerHTML = `<option value="">時</option>`;
+  minuteSelect.innerHTML = `<option value="">分</option>`;
 
   for (let hour = 0; hour < 24; hour += 1) {
     const value = String(hour).padStart(2, "0");
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value;
-    timeHourInput.append(option);
+    hourSelect.append(option);
   }
 
   for (let minute = 0; minute < 60; minute += 1) {
@@ -2363,19 +2418,31 @@ function populateTimeOptions() {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value;
-    timeMinuteInput.append(option);
+    minuteSelect.append(option);
   }
 }
 
 function setTimeSelects(time) {
-  const [hour = "", minute = ""] = String(time || "").split(":");
-  timeHourInput.value = hour;
-  timeMinuteInput.value = minute;
+  setTimeSelectPair(timeHourInput, timeMinuteInput, time);
   syncTimeInput();
 }
 
 function syncTimeInput() {
-  timeInput.value = timeHourInput.value && timeMinuteInput.value ? `${timeHourInput.value}:${timeMinuteInput.value}` : "";
+  timeInput.value = composeTimeValue(timeHourInput, timeMinuteInput);
+}
+
+function setTimeSelectPair(hourSelect, minuteSelect, time) {
+  const [hour = "", minute = ""] = String(time || "").split(":");
+  if (hourSelect) hourSelect.value = hour;
+  if (minuteSelect) minuteSelect.value = minute;
+}
+
+function composeTimeValue(hourSelect, minuteSelect) {
+  return hourSelect?.value && minuteSelect?.value ? `${hourSelect.value}:${minuteSelect.value}` : "";
+}
+
+function syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect) {
+  if (hiddenInput) hiddenInput.value = composeTimeValue(hourSelect, minuteSelect);
 }
 
 function openTripDialog(tripId = null) {
@@ -2573,6 +2640,15 @@ typeInput.addEventListener("change", () => {
 });
 timeHourInput.addEventListener("change", syncTimeInput);
 timeMinuteInput.addEventListener("change", syncTimeInput);
+[
+  [departureTimeInput, departureHourInput, departureMinuteInput],
+  [arrivalTimeInput, arrivalHourInput, arrivalMinuteInput],
+  [bookingTimeInput, bookingHourInput, bookingMinuteInput],
+  [bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput]
+].forEach(([hiddenInput, hourSelect, minuteSelect]) => {
+  hourSelect?.addEventListener("change", () => syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect));
+  minuteSelect?.addEventListener("change", () => syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect));
+});
 transportModeInput.addEventListener("change", () => {
   const segments = collectTransportSegments();
   renderTransportSegments(segments.map((segment) => ({ ...segment, mode: transportModeInput.value })));
@@ -2583,6 +2659,9 @@ addTransportSegmentButton.addEventListener("click", () => {
   renderTransportSegments(segments);
 });
 transportSegments.addEventListener("change", (event) => {
+  if (event.target.matches("[data-transport-time-hour], [data-transport-time-minute]")) {
+    syncTransportTimeValue(event.target);
+  }
   if (event.target.matches('[data-transport-field="mode"]')) {
     renderTransportSegments(collectTransportSegments());
   }
@@ -2727,6 +2806,8 @@ timeline.addEventListener("click", (event) => {
 itemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (isReadonly) return;
+  syncHiddenTimeInput(departureTimeInput, departureHourInput, departureMinuteInput);
+  syncHiddenTimeInput(arrivalTimeInput, arrivalHourInput, arrivalMinuteInput);
 
   let attachments = [];
   try {
@@ -2798,6 +2879,8 @@ itemForm.addEventListener("submit", async (event) => {
 bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (isReadonly) return;
+  syncHiddenTimeInput(bookingTimeInput, bookingHourInput, bookingMinuteInput);
+  syncHiddenTimeInput(bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput);
 
   let attachments = [];
   try {
@@ -2974,10 +3057,14 @@ function syncFlightFields() {
   flightFields.hidden = !isFlight;
   airlineInput.required = isFlight;
   flightCodeInput.required = isFlight;
-  departureTimeInput.required = isFlight;
+  departureTimeInput.required = false;
+  departureHourInput.required = isFlight;
+  departureMinuteInput.required = isFlight;
   departureAirportInput.required = isFlight;
   departureTerminalInput.required = isFlight;
-  arrivalTimeInput.required = isFlight;
+  arrivalTimeInput.required = false;
+  arrivalHourInput.required = isFlight;
+  arrivalMinuteInput.required = isFlight;
   arrivalAirportInput.required = isFlight;
   arrivalTerminalInput.required = isFlight;
 }
