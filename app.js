@@ -164,6 +164,7 @@ const tripSharePanel = document.querySelector("#tripSharePanel");
 const tripInviteForm = document.querySelector("#tripInviteForm");
 const tripInviteEmailInput = document.querySelector("#tripInviteEmailInput");
 const tripInviteRoleInput = document.querySelector("#tripInviteRoleInput");
+const tripInviteButton = document.querySelector("#tripInviteButton");
 const tripShareStatus = document.querySelector("#tripShareStatus");
 const tripMemberList = document.querySelector("#tripMemberList");
 const exportButton = document.querySelector("#exportButton");
@@ -2806,7 +2807,7 @@ function renderTripSharePanel(trip) {
   const needsCloudSave = !trip.cloudId;
   tripInviteEmailInput.disabled = needsCloudSave;
   tripInviteRoleInput.disabled = needsCloudSave;
-  tripInviteForm.querySelector("button").disabled = needsCloudSave;
+  tripInviteButton.disabled = needsCloudSave;
   tripShareStatus.textContent = needsCloudSave
     ? "這趟旅程還沒同步到雲端。請先儲存並按「立即同步」，再回來邀請旅伴。"
     : "朋友必須先用這個 Email 註冊或登入，才能被加入。";
@@ -2942,8 +2943,7 @@ cloudSyncButton.addEventListener("click", async () => {
   if (!state.cloudError) alert("已同步到 Supabase。");
 });
 
-tripInviteForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
+tripInviteButton?.addEventListener("click", async () => {
   const trip = state.editingTripId ? state.library.trips.find((item) => item.id === state.editingTripId) : null;
   if (!trip || !canManageTrip(trip)) return;
 

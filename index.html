@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=57" />
+    <link rel="stylesheet" href="./styles.css?v=58" />
   </head>
   <body>
     <main class="app-shell">
@@ -410,14 +410,14 @@
               <span>輸入朋友註冊用的 Email，讓他看到這趟旅程。</span>
             </div>
           </div>
-          <form class="trip-invite-form" id="tripInviteForm">
+          <div class="trip-invite-form" id="tripInviteForm">
             <input id="tripInviteEmailInput" type="email" placeholder="朋友的 Email" autocomplete="email" />
             <select id="tripInviteRoleInput" aria-label="共享權限">
               <option value="viewer">只能查看</option>
               <option value="participant">可記帳與待辦</option>
             </select>
-            <button class="secondary-action" type="submit">邀請</button>
-          </form>
+            <button class="secondary-action" id="tripInviteButton" type="button">邀請</button>
+          </div>
           <p class="trip-share-status" id="tripShareStatus"></p>
           <div class="trip-member-list" id="tripMemberList"></div>
         </section>
@@ -625,6 +625,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=67" type="module"></script>
+    <script src="./app.js?v=68" type="module"></script>
   </body>
 </html>
