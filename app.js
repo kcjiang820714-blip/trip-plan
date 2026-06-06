@@ -1,6 +1,12 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
+const MAX_IMAGE_ATTACHMENT_SIZE = 950 * 1024;
+const IMAGE_COMPRESSION_STEPS = [
+  { maxDimension: 1600, quality: 0.72 },
+  { maxDimension: 1280, quality: 0.62 },
+  { maxDimension: 1024, quality: 0.52 }
+];
 const SUPABASE_URL = "https://dxkrkhtnusihjukanphe.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CCraWaVPLSPzzE-u7Guvlg_Dfe6q91a";
 const DEFAULT_EXCHANGE_RATES = {
@@ -516,6 +522,8 @@ async function initCloudSync() {
 }
 
 function toCloudTripPayload(trip) {
+  const cloudTrip = stripAttachmentsForCloudTrip(trip);
+
   return {
     owner_id: state.cloudUser.id,
     title: trip.title || "未命名旅程",
@@ -523,9 +531,26 @@ function toCloudTripPayload(trip) {
     end_date: trip.endDate || null,
     updated_at: new Date().toISOString(),
     data: {
-      ...trip,
+      ...cloudTrip,
       cloudId: trip.cloudId || null
     }
+  };
+}
+
+function stripAttachmentsForCloudTrip(trip) {
+  return {
+    ...trip,
+    days: (trip.days || []).map((day) => ({
+      ...day,
+      items: (day.items || []).map((item) => ({
+        ...item,
+        attachments: []
+      }))
+    })),
+    bookings: (trip.bookings || []).map((booking) => ({
+      ...booking,
+      attachments: []
+    }))
   };
 }
 
@@ -597,7 +622,10 @@ async function saveCloudLibrary() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
     state.cloudError = "";
   } catch (error) {
-    state.cloudError = `雲端儲存失敗：${error.message}`;
+    const message = String(error.message || "");
+    state.cloudError = /quota|exceeded|too large/i.test(message)
+      ? "雲端儲存失敗：資料太大或 Supabase 額度不足。目前雲端同步先不包含圖片/PDF，請重新整理後按「立即同步」。"
+      : `雲端儲存失敗：${message}`;
   } finally {
     state.cloudSyncing = false;
     renderCloudStatus();
@@ -1703,25 +1731,102 @@ function closeAttachmentViewer() {
   }
 }
 
-function readBookingAttachment(file) {
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", () => reject(new Error(`無法讀取「${file.name || "檔案"}」。`)));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.addEventListener("load", () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    });
+    image.addEventListener("error", () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error(`無法讀取「${file.name}」這張圖片。`));
+    });
+    image.src = objectUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("圖片壓縮失敗，請改用較小的圖片。"));
+    }, type, quality);
+  });
+}
+
+async function compressImageAttachment(file) {
+  const image = await loadImageFromFile(file);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+
+  if (!sourceWidth || !sourceHeight) {
+    throw new Error(`無法讀取「${file.name}」這張圖片。`);
+  }
+
+  let bestBlob = null;
+
+  for (const step of IMAGE_COMPRESSION_STEPS) {
+    const ratio = Math.min(1, step.maxDimension / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * ratio));
+    const height = Math.max(1, Math.round(sourceHeight * ratio));
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = width;
+    canvas.height = height;
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await canvasToBlob(canvas, "image/jpeg", step.quality);
+    bestBlob = blob;
+    if (blob.size <= MAX_IMAGE_ATTACHMENT_SIZE) break;
+  }
+
+  if (!bestBlob) {
+    throw new Error("圖片壓縮失敗，請改用較小的圖片。");
+  }
+
+  const dataUrl = await readFileAsDataUrl(bestBlob);
+  const imageName = file.name.replace(/\.[^.]+$/, "") || "trip-photo";
+
+  return {
+    id: createId(),
+    name: `${imageName}.jpg`,
+    type: "image/jpeg",
+    size: bestBlob.size,
+    dataUrl
+  };
+}
+
+async function readBookingAttachment(file) {
+  if (file.type.startsWith("image/")) {
+    return compressImageAttachment(file);
+  }
+
   if (file.size > MAX_BOOKING_ATTACHMENT_SIZE) {
     throw new Error(`「${file.name}」超過 4 MB，請改用較小的檔案。`);
   }
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      resolve({
-        id: createId(),
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        dataUrl: reader.result
-      });
-    });
-    reader.addEventListener("error", () => reject(new Error(`無法讀取「${file.name}」。`)));
-    reader.readAsDataURL(file);
-  });
+  return {
+    id: createId(),
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    size: file.size,
+    dataUrl: await readFileAsDataUrl(file)
+  };
 }
 
 function readBookingAttachments() {
