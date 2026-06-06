@@ -645,6 +645,7 @@ async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachm
   attachment.storagePath = storagePath;
   attachment.publicUrl = data.publicUrl;
   attachment.uploadedAt = new Date().toISOString();
+  attachment.dataUrl = "";
 }
 
 async function uploadTripAttachments(client, trip) {
@@ -663,8 +664,30 @@ async function uploadTripAttachments(client, trip) {
   }
 }
 
+async function uploadOwnerAttachmentsBeforeLocalSave(trip, ownerType, ownerId, attachments) {
+  if (!state.cloudUser || !state.cloudReady || !attachments?.length) return;
+
+  try {
+    state.cloudSyncing = true;
+    renderCloudStatus();
+    const client = await getSupabaseClient();
+
+    for (const attachment of attachments) {
+      await uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment);
+    }
+
+    state.cloudError = "";
+  } catch (error) {
+    state.cloudError = formatCloudSaveError(error);
+    throw error;
+  } finally {
+    state.cloudSyncing = false;
+    renderCloudStatus();
+  }
+}
+
 function formatCloudSaveError(error) {
-  const message = String(error.message || "");
+  const message = String(error?.message || "");
 
   if (/bucket|not found/i.test(message)) {
     return "雲端儲存失敗：Supabase 還沒有建立 trip-attachments Storage bucket。";
@@ -679,6 +702,10 @@ function formatCloudSaveError(error) {
   }
 
   return `雲端儲存失敗：${message}`;
+}
+
+function formatAttachmentUploadError(error) {
+  return formatCloudSaveError(error).replace("雲端儲存失敗：", "附件上傳失敗：");
 }
 
 async function saveCloudLibrary() {
@@ -2566,15 +2593,18 @@ itemForm.addEventListener("submit", async (event) => {
 
   currentDay().items.sort((a, b) => a.time.localeCompare(b.time));
   state.expandedItemId = item.id;
+  let itemLocalSaveStarted = false;
   try {
+    await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "item", item.id, item.attachments);
+    itemLocalSaveStarted = true;
     saveLibrary();
-  } catch {
+  } catch (error) {
     if (editingIndex === null) currentDay().items = currentDay().items.filter((entry) => entry.id !== item.id);
     else {
       const currentIndex = currentDay().items.findIndex((entry) => entry.id === item.id);
       if (currentIndex >= 0) currentDay().items[currentIndex] = existingItem;
     }
-    alert("圖片容量太大，無法儲存到此裝置。請改用較小的圖片。");
+    alert(itemLocalSaveStarted ? "圖片容量太大，無法儲存到此裝置。請改用較小的圖片。" : formatAttachmentUploadError(error));
     return;
   }
   closeModal(itemDialog);
@@ -2618,12 +2648,15 @@ bookingForm.addEventListener("submit", async (event) => {
     currentTrip().bookings.push(booking);
   }
 
+  let bookingLocalSaveStarted = false;
   try {
+    await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "booking", booking.id, booking.attachments);
+    bookingLocalSaveStarted = true;
     saveLibrary();
-  } catch {
+  } catch (error) {
     if (existingBooking) currentTrip().bookings[editingIndex] = existingBooking;
     else currentTrip().bookings.pop();
-    alert("附件容量太大，無法儲存到此裝置。請改用較小的檔案。");
+    alert(bookingLocalSaveStarted ? "附件容量太大，無法儲存到此裝置。請改用較小的檔案。" : formatAttachmentUploadError(error));
     return;
   }
 
