@@ -83,6 +83,7 @@ const cloudEmailInput = document.querySelector("#cloudEmailInput");
 const cloudPasswordInput = document.querySelector("#cloudPasswordInput");
 const cloudSignUpButton = document.querySelector("#cloudSignUpButton");
 const cloudSignInButton = document.querySelector("#cloudSignInButton");
+const cloudSyncButton = document.querySelector("#cloudSyncButton");
 const cloudSignOutButton = document.querySelector("#cloudSignOutButton");
 const cloudStatus = document.querySelector("#cloudStatus");
 const landingTripTitle = document.querySelector("#landingTripTitle");
@@ -470,6 +471,7 @@ function renderCloudStatus() {
   cloudPasswordInput.hidden = Boolean(state.cloudUser);
   cloudSignUpButton.hidden = Boolean(state.cloudUser);
   cloudSignInButton.hidden = Boolean(state.cloudUser);
+  cloudSyncButton.hidden = !state.cloudUser;
   cloudSignOutButton.hidden = !state.cloudUser;
 
   if (!state.cloudReady) {
@@ -552,7 +554,9 @@ async function loadCloudLibrary() {
       render();
       showHome();
     } else {
+      state.cloudSyncing = false;
       await saveCloudLibrary();
+      state.cloudSyncing = true;
     }
 
     state.cloudError = "";
@@ -2160,6 +2164,12 @@ cloudSignOutButton.addEventListener("click", async () => {
     state.cloudError = "";
     renderCloudStatus();
   }
+});
+
+cloudSyncButton.addEventListener("click", async () => {
+  if (isReadonly) return;
+  await saveCloudLibrary();
+  if (!state.cloudError) alert("已同步到 Supabase。");
 });
 
 tripStartInput.addEventListener("change", updateTripDayPreview);
