@@ -626,7 +626,7 @@ h2 {
 .day-tabs {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(82px, max-content);
+  grid-auto-columns: max-content;
   gap: 14px;
   overflow-x: auto;
   padding-bottom: 0;
@@ -722,6 +722,11 @@ h2 {
 }
 
 .day-tab {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 92px;
   min-height: 46px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -732,6 +737,7 @@ h2 {
   box-shadow: none;
   font-size: 1rem;
   font-weight: 950;
+  line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
 }
