@@ -155,6 +155,7 @@ const tripNameInput = document.querySelector("#tripNameInput");
 const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
 const tripDaysInput = document.querySelector("#tripDaysInput");
+const tripDayTitleEditor = document.querySelector("#tripDayTitleEditor");
 const exportButton = document.querySelector("#exportButton");
 const importButton = document.querySelector("#importButton");
 const importFileInput = document.querySelector("#importFileInput");
@@ -2416,6 +2417,40 @@ function updateTripDayPreview() {
 
   const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
   tripDaysInput.value = `${dayCount} 天`;
+  renderTripDayTitleEditor();
+}
+
+function renderTripDayTitleEditor() {
+  if (!tripDayTitleEditor || !tripStartInput.value || !tripEndInput.value) return;
+
+  const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
+  const editingTrip = state.editingTripId ? state.library.trips.find((item) => item.id === state.editingTripId) : null;
+  const existingInputs = Array.from(tripDayTitleEditor.querySelectorAll("[data-trip-day-title]"));
+  const draftTitles = new Map(existingInputs.map((input) => [Number(input.dataset.tripDayTitle), input.value]));
+
+  tripDayTitleEditor.innerHTML = `
+    <div class="trip-day-title-heading">
+      <strong>每日標題</strong>
+      <span>會顯示在每天的行程總覽上</span>
+    </div>
+    ${Array.from({ length: dayCount }, (_, index) => {
+      const date = formatShortDate(addDays(tripStartInput.value, index));
+      const title = draftTitles.get(index) ?? editingTrip?.days[index]?.title ?? `第 ${index + 1} 天`;
+      return `
+        <label>
+          <span>Day ${index + 1} · ${escapeHtml(date)}</span>
+          <input data-trip-day-title="${index}" value="${escapeHtml(title)}" placeholder="例如：琉森與湖邊" />
+        </label>
+      `;
+    }).join("")}
+  `;
+}
+
+function collectTripDayTitles(dayCount) {
+  return Array.from({ length: dayCount }, (_, index) => {
+    const input = tripDayTitleEditor?.querySelector(`[data-trip-day-title="${index}"]`);
+    return input?.value.trim() || `第 ${index + 1} 天`;
+  });
 }
 
 document.querySelector("#enterTripsButton").addEventListener("click", showHome);
@@ -2429,7 +2464,7 @@ document.querySelector("#addTripButton").addEventListener("click", () => openTri
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
-document.querySelector("#addBookingButton").addEventListener("click", () => openBookingDialog());
+document.querySelector("#addBookingButton")?.addEventListener("click", () => openBookingDialog());
 document.querySelector("[data-trip-section-add]")?.addEventListener("click", () => {
   if (state.activeTripSection === "bookings") openBookingDialog();
   else if (state.activeTripSection === "todos") {
@@ -2439,13 +2474,13 @@ document.querySelector("[data-trip-section-add]")?.addEventListener("click", () 
   } else if (state.activeTripSection === "expenses") openExpenseDialog();
   else openItemDialog();
 });
-document.querySelector("#addTodoButton").addEventListener("click", () => {
+document.querySelector("#addTodoButton")?.addEventListener("click", () => {
   if (isReadonly) return;
   todoForm.reset();
   todoGroupInput.value = state.activeTodoGroup;
   openModal(todoDialog);
 });
-document.querySelector("#addExpenseButton").addEventListener("click", () => openExpenseDialog());
+document.querySelector("#addExpenseButton")?.addEventListener("click", () => openExpenseDialog());
 exportButton.addEventListener("click", () => {
   if (!isReadonly) exportLibrary();
 });
@@ -3027,6 +3062,7 @@ tripForm.addEventListener("submit", (event) => {
   const startDate = tripStartInput.value;
   const endDate = tripEndInput.value;
   const dayCount = calculateDayCount(startDate, endDate);
+  const dayTitles = collectTripDayTitles(dayCount);
   let trip = state.editingTripId
     ? state.library.trips.find((item) => item.id === state.editingTripId)
     : null;
@@ -3038,7 +3074,7 @@ tripForm.addEventListener("submit", (event) => {
       startDate,
       endDate,
       dates: formatDateRange(startDate, endDate),
-      days: createBlankDays(dayCount, startDate),
+      days: createBlankDays(dayCount, startDate).map((day, index) => ({ ...day, title: dayTitles[index] })),
       members: ["我"],
       exchangeRates: { ...DEFAULT_EXCHANGE_RATES },
       bookings: [],
@@ -3053,6 +3089,7 @@ tripForm.addEventListener("submit", (event) => {
     trip.dates = formatDateRange(startDate, endDate);
     resizeTripDays(trip, dayCount);
     syncTripDayDates(trip);
+    trip.days = trip.days.map((day, index) => ({ ...day, title: dayTitles[index] || day.title }));
   }
 
   state.activeTripId = trip.id;

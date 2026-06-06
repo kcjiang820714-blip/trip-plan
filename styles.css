@@ -1847,7 +1847,7 @@ h2 {
   content: "";
   position: absolute;
   left: 63px;
-  top: 34px;
+  top: 20px;
   width: 12px;
   height: 12px;
   border: 3px solid var(--paper);
@@ -1887,7 +1887,7 @@ h2 {
   z-index: 1;
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr) 34px;
-  align-items: center;
+  align-items: start;
   gap: 20px;
   width: 100%;
   min-height: 88px;
@@ -1930,7 +1930,8 @@ h2 {
 .time {
   display: grid;
   place-items: start end;
-  align-self: center;
+  align-self: start;
+  padding-top: 22px;
   min-height: 0;
   border-radius: 0;
   background: transparent;
@@ -1947,7 +1948,7 @@ h2 {
   display: grid;
   gap: 7px;
   min-width: 0;
-  padding: 16px 0 16px 16px;
+  padding: 20px 0 16px 16px;
 }
 
 .item-title {
@@ -2271,6 +2272,36 @@ h2 {
   display: none;
 }
 
+.trip-day-title-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.trip-day-title-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.trip-day-title-heading strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.trip-day-title-heading span,
+.trip-day-title-editor label span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.trip-day-title-editor label {
+  gap: 6px;
+}
+
 .existing-attachments-heading {
   display: grid;
   gap: 3px;
@@ -2555,7 +2586,7 @@ h2 {
 
   .item-card::after {
     left: 57px;
-    top: 33px;
+    top: 20px;
   }
 
   .item-summary::before {

@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=53" />
+    <link rel="stylesheet" href="./styles.css?v=55" />
   </head>
   <body>
     <main class="app-shell">
@@ -157,7 +157,6 @@
               <p class="eyebrow">預訂</p>
               <h2 id="bookingSectionTitle">票券</h2>
             </div>
-            <button class="primary-button" id="addBookingButton" type="button">新增預訂</button>
           </section>
           <nav class="sub-tabs" id="bookingSubTabs" aria-label="預訂分類">
             <button class="sub-tab is-active" type="button" data-booking-group="票券">票券</button>
@@ -173,7 +172,6 @@
               <p class="eyebrow">待辦事項</p>
               <h2 id="todoSectionTitle">行前準備</h2>
             </div>
-            <button class="primary-button" id="addTodoButton" type="button">新增待辦</button>
           </section>
           <nav class="sub-tabs" id="todoSubTabs" aria-label="待辦分類">
             <button class="sub-tab is-active" type="button" data-todo-group="行前準備">行前準備</button>
@@ -189,7 +187,6 @@
               <p class="eyebrow">記帳</p>
               <h2 id="expenseSummary">尚無支出</h2>
             </div>
-            <button class="primary-button" id="addExpenseButton" type="button">新增支出</button>
           </section>
           <section class="expense-section">
             <header class="expense-section-heading">
@@ -396,6 +393,8 @@
           <input id="tripDaysInput" name="tripDays" readonly />
         </label>
 
+        <section class="trip-day-title-editor" id="tripDayTitleEditor" aria-label="每日標題"></section>
+
         <footer>
           <button class="secondary-button" id="deleteTripButton" type="button">刪除旅程</button>
           <button class="primary-button" value="default" type="submit">儲存</button>
@@ -591,6 +590,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=62" type="module"></script>
+    <script src="./app.js?v=64" type="module"></script>
   </body>
 </html>
