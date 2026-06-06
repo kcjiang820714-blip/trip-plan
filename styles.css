@@ -1712,16 +1712,15 @@ h2 {
   --card-accent: var(--brand);
   position: relative;
   min-height: 104px;
-  border: 1px solid color-mix(in srgb, var(--card-accent), white 72%);
+  border: 1px solid rgba(24, 37, 33, 0.08);
   border-radius: 8px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 9px 9px, rgba(24, 37, 33, 0.05) 1px, transparent 1.5px) 0 0 / 18px 18px,
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), transparent 44%),
-    linear-gradient(135deg, rgba(255, 253, 248, 0.99), rgba(247, 242, 232, 0.98));
+    linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(255, 253, 248, 0.94)),
+    var(--paper);
   box-shadow:
-    0 18px 34px rgba(24, 37, 33, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+    0 12px 28px rgba(24, 37, 33, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -1731,33 +1730,22 @@ h2 {
 .item-card::before {
   content: "";
   position: absolute;
-  inset: 18px auto 18px 22px;
+  inset: 18px auto 18px 24px;
   width: 2px;
-  background:
-    linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.55) 10%, rgba(255, 255, 255, 0.55) 90%, transparent),
-    var(--card-accent);
-  opacity: 0.72;
+  background: color-mix(in srgb, var(--card-accent), white 24%);
+  opacity: 0.48;
 }
 
 .item-card::after {
-  content: "";
-  position: absolute;
-  right: 96px;
-  top: -13px;
-  width: 26px;
-  height: calc(100% + 26px);
-  background:
-    radial-gradient(circle at center 13px, var(--paper) 0 12px, transparent 12.5px),
-    radial-gradient(circle at center calc(100% - 13px), var(--paper) 0 12px, transparent 12.5px);
-  pointer-events: none;
+  content: none;
 }
 
 .item-card:hover {
-  border-color: color-mix(in srgb, var(--card-accent), white 68%);
+  border-color: color-mix(in srgb, var(--card-accent), white 64%);
   box-shadow:
-    0 22px 40px rgba(24, 37, 33, 0.13),
+    0 16px 34px rgba(24, 37, 33, 0.11),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .item-card[data-type="餐廳"],
@@ -1782,15 +1770,15 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr) 112px;
+  grid-template-columns: 76px minmax(0, 1fr) 108px;
   align-items: stretch;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
   min-height: 104px;
   border: 0;
   background: transparent;
   color: var(--ink);
-  padding: 14px;
+  padding: 14px 14px 14px 16px;
   text-align: left;
   cursor: pointer;
 }
@@ -1800,37 +1788,37 @@ h2 {
   display: grid;
   place-items: center;
   align-self: center;
-  min-height: 58px;
+  min-height: 54px;
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent),
-    color-mix(in srgb, var(--card-accent), white 86%);
-  color: color-mix(in srgb, var(--card-accent), black 34%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), transparent),
+    color-mix(in srgb, var(--card-accent), white 90%);
+  color: color-mix(in srgb, var(--card-accent), black 42%);
   font-weight: 950;
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--card-accent), white 72%),
-    0 8px 16px rgba(24, 37, 33, 0.06);
+    inset 0 0 0 1px color-mix(in srgb, var(--card-accent), white 68%),
+    0 6px 12px rgba(24, 37, 33, 0.04);
 }
 
 .time::before,
 .time::after {
   content: "";
   position: absolute;
-  left: -20px;
-  width: 11px;
-  height: 11px;
-  border: 3px solid white;
+  left: -21px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid white;
   border-radius: 50%;
   background: var(--card-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-accent), white 40%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-accent), white 52%);
 }
 
 .time::before {
-  top: -9px;
+  top: -7px;
 }
 
 .time::after {
-  bottom: -9px;
+  bottom: -7px;
 }
 
 .time span {
@@ -1876,11 +1864,11 @@ h2 {
   max-width: 100%;
   margin-bottom: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--card-accent), white 88%);
-  color: color-mix(in srgb, var(--card-accent), black 36%);
-  padding: 5px 10px;
-  font-size: 0.78rem;
-  font-weight: 900;
+  background: rgba(255, 255, 255, 0.68);
+  color: color-mix(in srgb, var(--card-accent), black 34%);
+  padding: 5px 9px;
+  font-size: 0.76rem;
+  font-weight: 950;
 }
 
 .meta::before {
@@ -1889,7 +1877,7 @@ h2 {
   height: 7px;
   border-radius: 50%;
   background: var(--card-accent);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.58);
+  box-shadow: none;
 }
 
 .item-ticket-stub {
@@ -1897,16 +1885,20 @@ h2 {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
-  border-left: 1px dashed color-mix(in srgb, var(--card-accent), white 50%);
-  padding-left: 14px;
+  border-left: 1px solid rgba(24, 37, 33, 0.08);
+  border-radius: 0 7px 7px 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent),
+    color-mix(in srgb, var(--card-accent), white 94%);
+  padding: 10px 0 10px 12px;
   text-align: center;
 }
 
 .stop-code {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--card-accent), black 28%);
+  font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1918,8 +1910,8 @@ h2 {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.52);
-  color: color-mix(in srgb, var(--card-accent), black 24%);
+  background: rgba(255, 255, 255, 0.64);
+  color: color-mix(in srgb, var(--card-accent), black 30%);
   font-size: 1.2rem;
   font-weight: 950;
   line-height: 1;
@@ -1930,7 +1922,7 @@ h2 {
 }
 
 .item-summary[aria-expanded="true"] .expand-indicator {
-  background: color-mix(in srgb, var(--card-accent), white 88%);
+  background: rgba(255, 255, 255, 0.82);
   transform: rotate(180deg);
 }
 
@@ -2454,24 +2446,20 @@ h2 {
   }
 
   .item-summary {
-    grid-template-columns: 66px minmax(0, 1fr) 86px;
+    grid-template-columns: 66px minmax(0, 1fr) 78px;
     gap: 11px;
     min-height: 96px;
     padding: 13px;
   }
 
-  .item-card::after {
-    right: 76px;
-  }
-
   .item-ticket-stub {
-    gap: 7px;
-    padding-left: 10px;
+    gap: 6px;
+    padding-left: 9px;
   }
 
   .item-ticket-stub .meta {
-    padding: 5px 7px;
-    font-size: 0.72rem;
+    padding: 5px 6px;
+    font-size: 0.7rem;
   }
 
   .stop-code {
@@ -2537,7 +2525,7 @@ h2 {
   }
 
   .item-summary {
-    grid-template-columns: 88px minmax(0, 1fr) 124px;
+    grid-template-columns: 88px minmax(0, 1fr) 116px;
   }
 
   .item-details {
