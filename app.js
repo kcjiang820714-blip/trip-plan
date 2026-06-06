@@ -998,29 +998,46 @@ function renderBookings() {
   bookingList.innerHTML = bookings
     .slice()
     .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
-    .map(
-      (booking) => `
-        <article class="utility-card">
-          <div>
-            <span class="meta">${escapeHtml(booking.type)}</span>
-            <h3>${escapeHtml(booking.name)}</h3>
+    .map((booking) => {
+      const coverImage = getPrimaryImageAttachment(booking.attachments);
+
+      return `
+        <article class="utility-card booking-card ${coverImage ? "has-cover" : ""}">
+          <div class="booking-card-main">
+            <header class="booking-card-header">
+              <span class="meta">${escapeHtml(booking.type)}</span>
+              <h3>${escapeHtml(booking.name)}</h3>
+            </header>
             ${renderBookingMeta(booking)}
-            ${booking.code ? `<p>代碼：${escapeHtml(booking.code)}</p>` : ""}
-            ${booking.note ? `<p>${escapeHtml(booking.note)}</p>` : ""}
-            ${renderAttachmentGallery(booking.attachments, "booking", booking.id)}
+            ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
+            ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
+            ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
             <div class="card-actions">
               <button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>
             </div>
           </div>
+          ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
         </article>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
 function renderBookingMeta(booking) {
   if (booking.type !== "住宿") {
-    return `<p>${escapeHtml([booking.date, booking.time, booking.place].filter(Boolean).join(" · "))}</p>`;
+    const details = [
+      { label: "日期", value: booking.date },
+      { label: "時間", value: booking.time },
+      { label: "地點", value: booking.place }
+    ].filter((detail) => detail.value);
+
+    if (details.length === 0) return "";
+
+    return `
+      <dl class="booking-meta">
+        ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
+      </dl>
+    `;
   }
 
   const details = [
@@ -1034,9 +1051,28 @@ function renderBookingMeta(booking) {
   ].filter((detail) => detail.value);
 
   return `
-    <dl class="stay-meta">
+    <dl class="booking-meta stay-meta">
       ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${detail.value}</dd></div>`).join("")}
     </dl>
+  `;
+}
+
+function getPrimaryImageAttachment(attachments = []) {
+  return attachments.find((attachment) => attachment.type.startsWith("image/") && getAttachmentSource(attachment));
+}
+
+function renderBookingCover(attachment, bookingId) {
+  return `
+    <button
+      class="booking-cover"
+      type="button"
+      data-open-attachment="booking"
+      data-owner-id="${escapeHtml(bookingId)}"
+      data-attachment-id="${escapeHtml(attachment.id)}"
+      title="查看 ${escapeHtml(attachment.name)}"
+    >
+      <img src="${escapeHtml(getAttachmentSource(attachment))}" alt="${escapeHtml(attachment.name)}" loading="lazy" />
+    </button>
   `;
 }
 
@@ -1049,10 +1085,13 @@ function renderStayTimeValue(date, time, timeLabel) {
   `;
 }
 
-function renderAttachmentGallery(attachments, ownerType, ownerId) {
+function renderAttachmentGallery(attachments, ownerType, ownerId, excludedAttachmentId = "") {
   if (!attachments?.length) return "";
-  const images = attachments.filter((attachment) => attachment.type.startsWith("image/"));
-  const files = attachments.filter((attachment) => !attachment.type.startsWith("image/"));
+  const visibleAttachments = attachments.filter((attachment) => attachment.id !== excludedAttachmentId);
+  const images = visibleAttachments.filter((attachment) => attachment.type.startsWith("image/"));
+  const files = visibleAttachments.filter((attachment) => !attachment.type.startsWith("image/"));
+
+  if (images.length === 0 && files.length === 0) return "";
 
   return `
     <div class="attachment-gallery" aria-label="附件">

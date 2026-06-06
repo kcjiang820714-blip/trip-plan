@@ -1461,38 +1461,111 @@ h2 {
   line-height: 1.5;
 }
 
-.stay-meta {
+.booking-card {
   display: grid;
-  gap: 0;
-  margin: 12px 0 0;
-  border-top: 1px solid rgba(24, 37, 33, 0.08);
-}
-
-.stay-meta div {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: 16px;
   align-items: start;
-  padding: 9px 0;
-  border-bottom: 1px solid rgba(24, 37, 33, 0.06);
 }
 
-.stay-meta div:last-child {
-  border-bottom: 0;
+.booking-card:not(.has-cover) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.stay-meta dt {
+.booking-card-main {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.booking-card-header {
+  display: grid;
+  gap: 5px;
+}
+
+.booking-card-header h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.booking-cover {
+  display: block;
+  width: 128px;
+  aspect-ratio: 4 / 3;
+  border: 1px solid rgba(24, 37, 33, 0.1);
+  border-radius: 8px;
+  background: #eef4f1;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.booking-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.booking-card-line,
+.booking-card-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.booking-card-line {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+
+.booking-card-line span {
   color: var(--brand-dark);
   font-size: 0.76rem;
   font-weight: 950;
   line-height: 1.7;
 }
 
-.stay-meta dd {
+.booking-meta {
+  display: grid;
+  gap: 0;
+  margin: 2px 0 0;
+  border-top: 1px solid rgba(24, 37, 33, 0.08);
+}
+
+.booking-meta div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(24, 37, 33, 0.06);
+}
+
+.booking-meta div:last-child {
+  border-bottom: 0;
+}
+
+.booking-meta dt {
+  color: var(--brand-dark);
+  font-size: 0.76rem;
+  font-weight: 950;
+  line-height: 1.7;
+}
+
+.booking-meta dd {
   display: grid;
   gap: 3px;
   margin: 0;
   color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 900;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -2341,6 +2414,17 @@ h2 {
 
   .booking-stay-fields {
     grid-template-columns: 1fr;
+  }
+
+  .booking-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booking-cover {
+    order: -1;
+    width: 100%;
+    max-height: 190px;
+    aspect-ratio: 16 / 9;
   }
 
   .expand-indicator {
