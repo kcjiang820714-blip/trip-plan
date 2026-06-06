@@ -1905,9 +1905,91 @@ h2 {
   margin-bottom: 10px;
 }
 
-.todo-list {
+.todo-table {
   display: grid;
-  gap: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.86);
+  box-shadow: 0 10px 22px rgba(24, 37, 33, 0.05);
+}
+
+.todo-table-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.35fr) minmax(110px, 1fr) minmax(100px, 0.95fr) 78px 54px;
+  gap: 10px;
+  align-items: center;
+  border-top: 1px solid rgba(24, 37, 33, 0.08);
+  padding: 10px 12px;
+  color: var(--ink);
+}
+
+.todo-table-row:first-child {
+  border-top: 0;
+}
+
+.todo-table-head {
+  background: rgba(15, 107, 95, 0.06);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.todo-table-row.is-done {
+  background: rgba(238, 247, 244, 0.5);
+}
+
+.todo-cell {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.todo-main-cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  color: var(--ink);
+}
+
+.todo-main-cell input {
+  margin-top: 3px;
+  accent-color: var(--brand);
+}
+
+.todo-title-stack strong,
+.todo-title-stack small {
+  display: block;
+}
+
+.todo-title-stack small {
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.todo-status {
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  background: #f7eee0;
+  color: #9a6b1d;
+  font-size: 0.74rem;
+  font-weight: 950;
+  padding: 0 9px;
+}
+
+.todo-status.is-complete {
+  background: #e6f3ee;
+  color: var(--brand-dark);
+}
+
+.todo-action-cell {
+  text-align: right;
 }
 
 .todo-detail-fields {
@@ -2750,6 +2832,22 @@ h2 {
 
   .todo-detail-fields {
     grid-template-columns: 1fr;
+  }
+
+  .todo-table-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .todo-table-head {
+    display: none;
+  }
+
+  .todo-main-cell {
+    grid-column: 1 / -1;
+  }
+
+  .todo-action-cell {
+    text-align: left;
   }
 
   .booking-stay-fields {

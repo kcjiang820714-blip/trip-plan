@@ -1589,24 +1589,37 @@ function renderTodos() {
           <h3>${doneCount}/${todos.length} 完成</h3>
         </div>
       </header>
-      <div class="todo-list">
+      <div class="todo-table" role="table" aria-label="${escapeHtml(state.activeTodoGroup)}待辦">
+        <div class="todo-table-row todo-table-head" role="row">
+          <span>項目</span>
+          <span>${escapeHtml(todoSecondColumnLabel(state.activeTodoGroup))}</span>
+          <span>${escapeHtml(todoThirdColumnLabel(state.activeTodoGroup))}</span>
+          <span>狀態</span>
+          <span></span>
+        </div>
         ${todos
           .map(
             (todo) => `
-              <article class="todo-row">
-                <label class="todo-check">
+              <article class="todo-table-row ${todo.done ? "is-done" : ""}" role="row">
+                <label class="todo-cell todo-main-cell">
                   <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
-                  <span>
+                  <span class="todo-title-stack">
                     <strong>${escapeHtml(todo.text)}</strong>
-                    ${renderTodoMeta(todo)}
                     ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
                   </span>
                 </label>
+                <span class="todo-cell">${escapeHtml(todoSecondColumnValue(todo))}</span>
+                <span class="todo-cell">${escapeHtml(todoThirdColumnValue(todo))}</span>
+                <span class="todo-cell">
+                  <span class="todo-status ${todo.done ? "is-complete" : ""}">${todo.done ? "完成" : "未完成"}</span>
+                </span>
+                <span class="todo-cell todo-action-cell">
                 ${
                   canEditTodo(todo, trip)
                     ? `<button class="text-button todo-edit-button" type="button" data-edit-todo="${escapeHtml(todo.id)}">編輯</button>`
                     : ""
                 }
+                </span>
               </article>
             `
           )
@@ -1616,17 +1629,38 @@ function renderTodos() {
   `;
 }
 
-function renderTodoMeta(todo) {
-  const details = [];
+function todoSecondColumnLabel(group) {
+  if (group === "行前準備") return "期限 / 重要度";
+  if (group === "行李打包") return "數量";
+  if (group === "購物清單") return "數量 / 預估";
+  if (group === "旅途中提醒") return "日期時間";
+  return "資訊";
+}
 
-  if (todo.quantity) details.push(`${formatAmount(todo.quantity)}${todo.unit ? ` ${todo.unit}` : ""}`);
-  if (todo.group === "行前準備" && todo.dueDate) details.push(`期限 ${todo.dueDate}`);
-  if (todo.group === "行前準備" && todo.priority) details.push(`${todo.priority}重要度`);
-  if (todo.group === "購物清單" && todo.amount) details.push(`預估 ${todo.currency || "TWD"} ${formatAmount(todo.amount)}`);
-  if (todo.group === "旅途中提醒" && todo.date) details.push(todo.time ? `${todo.date} ${todo.time}` : todo.date);
-  if (todo.place) details.push(todo.place);
+function todoThirdColumnLabel(group) {
+  if (group === "行前準備") return "備註";
+  if (group === "行李打包") return "放置位置";
+  if (group === "購物清單") return "購買地點";
+  if (group === "旅途中提醒") return "地點";
+  return "補充";
+}
 
-  return details.length ? `<small class="todo-meta">${details.map(escapeHtml).join(" · ")}</small>` : "";
+function todoSecondColumnValue(todo) {
+  if (todo.group === "行前準備") return [todo.dueDate ? `期限 ${todo.dueDate}` : "", todo.priority ? `${todo.priority}重要度` : ""].filter(Boolean).join(" · ") || "未設定";
+  if (todo.group === "行李打包") return todo.quantity ? `${formatAmount(todo.quantity)}${todo.unit ? ` ${todo.unit}` : ""}` : "未設定";
+  if (todo.group === "購物清單") {
+    return [
+      todo.quantity ? `${formatAmount(todo.quantity)}${todo.unit ? ` ${todo.unit}` : ""}` : "",
+      todo.amount ? `${todo.currency || "TWD"} ${formatAmount(todo.amount)}` : ""
+    ].filter(Boolean).join(" · ") || "未設定";
+  }
+  if (todo.group === "旅途中提醒") return todo.date ? `${todo.date}${todo.time ? ` ${todo.time}` : ""}` : "未設定";
+  return "";
+}
+
+function todoThirdColumnValue(todo) {
+  if (todo.group === "行前準備") return todo.note || "無";
+  return todo.place || "未設定";
 }
 
 function renderExpenses() {
