@@ -949,16 +949,13 @@ function renderTrip() {
             aria-expanded="${isExpanded}"
             aria-controls="${escapeHtml(detailsId)}"
           >
-            <span class="time"><span>${escapeHtml(item.time)}</span></span>
+            <span class="time">${escapeHtml(item.time)}</span>
             <span class="item-summary-content">
               <span class="item-title">${escapeHtml(getItemTitle(item))}</span>
               ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
-            </span>
-            <span class="item-ticket-stub">
               <span class="meta">${escapeHtml(item.type)}</span>
-              <span class="stop-code">Stop ${String(index + 1).padStart(2, "0")}</span>
-              <span class="expand-indicator" aria-hidden="true">⌄</span>
             </span>
+            <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
             ${renderFlightInfo(item)}
