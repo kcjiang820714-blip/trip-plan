@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=63" />
+    <link rel="stylesheet" href="./styles.css?v=64" />
   </head>
   <body>
     <main class="app-shell">
@@ -177,6 +177,7 @@
             <button class="sub-tab is-active" type="button" data-todo-group="行前準備">行前準備</button>
             <button class="sub-tab" type="button" data-todo-group="行李打包">行李打包</button>
             <button class="sub-tab" type="button" data-todo-group="購物清單">購物清單</button>
+            <button class="sub-tab" type="button" data-todo-group="旅途中提醒">旅途中提醒</button>
           </nav>
           <section class="todo-groups" id="todoGroups"></section>
         </section>
@@ -535,6 +536,7 @@
             <option value="行前準備">行前準備</option>
             <option value="行李打包">行李打包</option>
             <option value="購物清單">購物清單</option>
+            <option value="旅途中提醒">旅途中提醒</option>
           </select>
         </label>
 
@@ -543,9 +545,74 @@
           <input id="todoTextInput" placeholder="護照、轉接頭、藥品" required />
         </label>
 
+        <section class="todo-detail-fields" id="todoPrepFields">
+          <label>
+            期限日期
+            <input id="todoDueDateInput" type="date" />
+          </label>
+          <label>
+            重要程度
+            <select id="todoPriorityInput">
+              <option value="">一般</option>
+              <option value="高">高</option>
+              <option value="中">中</option>
+              <option value="低">低</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="todo-detail-fields" id="todoQuantityFields" hidden>
+          <label>
+            數量
+            <input id="todoQuantityInput" type="number" min="0" step="0.01" placeholder="2" />
+          </label>
+          <label>
+            單位
+            <input id="todoUnitInput" placeholder="個、件、包" />
+          </label>
+        </section>
+
+        <section class="todo-detail-fields" id="todoShoppingFields" hidden>
+          <label>
+            預估金額
+            <input id="todoAmountInput" type="number" min="0" step="0.01" placeholder="300" />
+          </label>
+          <label>
+            幣別
+            <select id="todoCurrencyInput">
+              <option value="TWD">TWD</option>
+              <option value="JPY">JPY</option>
+              <option value="KRW">KRW</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="CHF">CHF</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="todo-detail-fields" id="todoReminderFields" hidden>
+          <label>
+            日期
+            <input id="todoDateInput" type="date" />
+          </label>
+          <label>
+            時間
+            <input id="todoTimeInput" type="hidden" />
+            <span class="time-selects">
+              <select id="todoHourInput" aria-label="提醒小時"></select>
+              <select id="todoMinuteInput" aria-label="提醒分鐘"></select>
+            </span>
+          </label>
+        </section>
+
+        <label id="todoPlaceLabel" hidden>
+          <span id="todoPlaceLabelText">地點</span>
+          <input id="todoPlaceInput" placeholder="行李箱、蝦皮、飯店" />
+        </label>
+
         <label>
           備註
-          <textarea id="todoNoteInput" rows="3" placeholder="數量、提醒事項"></textarea>
+          <textarea id="todoNoteInput" rows="3" placeholder="補充說明、注意事項"></textarea>
         </label>
 
         <footer>
@@ -631,6 +698,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=73" type="module"></script>
+    <script src="./app.js?v=74" type="module"></script>
   </body>
 </html>

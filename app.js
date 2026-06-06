@@ -203,6 +203,23 @@ const todoForm = document.querySelector("#todoForm");
 const todoDialogTitle = document.querySelector("#todoDialogTitle");
 const todoGroupInput = document.querySelector("#todoGroupInput");
 const todoTextInput = document.querySelector("#todoTextInput");
+const todoPrepFields = document.querySelector("#todoPrepFields");
+const todoDueDateInput = document.querySelector("#todoDueDateInput");
+const todoPriorityInput = document.querySelector("#todoPriorityInput");
+const todoQuantityFields = document.querySelector("#todoQuantityFields");
+const todoQuantityInput = document.querySelector("#todoQuantityInput");
+const todoUnitInput = document.querySelector("#todoUnitInput");
+const todoShoppingFields = document.querySelector("#todoShoppingFields");
+const todoAmountInput = document.querySelector("#todoAmountInput");
+const todoCurrencyInput = document.querySelector("#todoCurrencyInput");
+const todoReminderFields = document.querySelector("#todoReminderFields");
+const todoDateInput = document.querySelector("#todoDateInput");
+const todoTimeInput = document.querySelector("#todoTimeInput");
+const todoHourInput = document.querySelector("#todoHourInput");
+const todoMinuteInput = document.querySelector("#todoMinuteInput");
+const todoPlaceLabel = document.querySelector("#todoPlaceLabel");
+const todoPlaceLabelText = document.querySelector("#todoPlaceLabelText");
+const todoPlaceInput = document.querySelector("#todoPlaceInput");
 const todoNoteInput = document.querySelector("#todoNoteInput");
 const deleteTodoButton = document.querySelector("#deleteTodoButton");
 const expenseDialog = document.querySelector("#expenseDialog");
@@ -369,16 +386,55 @@ function normalizeAttachment(attachment) {
 }
 
 function normalizeTodo(todo) {
+  const cloudDetails = parseTodoDetails(todo.note);
   return {
     id: todo.id || createId(),
     cloudId: todo.cloudId || null,
     ownerId: todo.ownerId || todo.owner_id || null,
     group: todo.group || "行前準備",
     text: todo.text || "",
-    note: todo.note || "",
+    note: todo.notePlain ?? todo.plainNote ?? todo.noteText ?? cloudDetails.note ?? (todo.note || ""),
+    quantity: todo.quantity ?? cloudDetails.quantity ?? "",
+    unit: todo.unit || cloudDetails.unit || "",
+    dueDate: todo.dueDate || cloudDetails.dueDate || "",
+    priority: todo.priority || cloudDetails.priority || "",
+    amount: todo.amount ?? cloudDetails.amount ?? "",
+    currency: todo.currency || cloudDetails.currency || "TWD",
+    place: todo.place || cloudDetails.place || "",
+    date: todo.date || cloudDetails.date || "",
+    time: todo.time || cloudDetails.time || "",
     done: Boolean(todo.done),
     visibility: todo.visibility || "private"
   };
+}
+
+function parseTodoDetails(note) {
+  if (!note || typeof note !== "string") return { note: "" };
+
+  try {
+    const parsed = JSON.parse(note);
+    if (parsed?.__todoDetails) return parsed;
+  } catch {
+    return { note };
+  }
+
+  return { note };
+}
+
+function formatTodoCloudNote(todo) {
+  return JSON.stringify({
+    __todoDetails: true,
+    note: todo.note || "",
+    quantity: todo.quantity || "",
+    unit: todo.unit || "",
+    dueDate: todo.dueDate || "",
+    priority: todo.priority || "",
+    amount: todo.amount || "",
+    currency: todo.currency || "TWD",
+    place: todo.place || "",
+    date: todo.date || "",
+    time: todo.time || ""
+  });
 }
 
 function normalizeExpense(expense) {
@@ -724,7 +780,7 @@ function toCloudTodoPayload(trip, todo) {
     owner_id: todo.ownerId || state.cloudUser.id,
     group_name: todo.group || "行前準備",
     text: todo.text || "",
-    note: todo.note || "",
+    note: formatTodoCloudNote(todo),
     done: Boolean(todo.done),
     visibility: todo.visibility || "private",
     updated_at: new Date().toISOString()
@@ -1542,6 +1598,7 @@ function renderTodos() {
                   <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
                   <span>
                     <strong>${escapeHtml(todo.text)}</strong>
+                    ${renderTodoMeta(todo)}
                     ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
                   </span>
                 </label>
@@ -1557,6 +1614,19 @@ function renderTodos() {
       </div>
     </section>
   `;
+}
+
+function renderTodoMeta(todo) {
+  const details = [];
+
+  if (todo.quantity) details.push(`${formatAmount(todo.quantity)}${todo.unit ? ` ${todo.unit}` : ""}`);
+  if (todo.group === "行前準備" && todo.dueDate) details.push(`期限 ${todo.dueDate}`);
+  if (todo.group === "行前準備" && todo.priority) details.push(`${todo.priority}重要度`);
+  if (todo.group === "購物清單" && todo.amount) details.push(`預估 ${todo.currency || "TWD"} ${formatAmount(todo.amount)}`);
+  if (todo.group === "旅途中提醒" && todo.date) details.push(todo.time ? `${todo.date} ${todo.time}` : todo.date);
+  if (todo.place) details.push(todo.place);
+
+  return details.length ? `<small class="todo-meta">${details.map(escapeHtml).join(" · ")}</small>` : "";
 }
 
 function renderExpenses() {
@@ -2091,8 +2161,49 @@ function openTodoDialog(todoId = null) {
   deleteTodoButton.hidden = !todo;
   todoGroupInput.value = todo?.group || state.activeTodoGroup;
   todoTextInput.value = todo?.text || "";
+  todoDueDateInput.value = todo?.dueDate || "";
+  todoPriorityInput.value = todo?.priority || "";
+  todoQuantityInput.value = todo?.quantity || "";
+  todoUnitInput.value = todo?.unit || "";
+  todoAmountInput.value = todo?.amount || "";
+  todoCurrencyInput.value = todo?.currency || "TWD";
+  todoDateInput.value = todo?.date || "";
+  setTimeSelectPair(todoHourInput, todoMinuteInput, todo?.time || "");
+  syncHiddenTimeInput(todoTimeInput, todoHourInput, todoMinuteInput);
+  todoPlaceInput.value = todo?.place || "";
   todoNoteInput.value = todo?.note || "";
+  syncTodoFields();
   openModal(todoDialog);
+}
+
+function syncTodoFields() {
+  const group = todoGroupInput.value;
+  const isPrep = group === "行前準備";
+  const isPacking = group === "行李打包";
+  const isShopping = group === "購物清單";
+  const isReminder = group === "旅途中提醒";
+  const hasQuantity = isPacking || isShopping;
+  const hasPlace = isPacking || isShopping || isReminder;
+
+  todoPrepFields.hidden = !isPrep;
+  todoQuantityFields.hidden = !hasQuantity;
+  todoShoppingFields.hidden = !isShopping;
+  todoReminderFields.hidden = !isReminder;
+  todoPlaceLabel.hidden = !hasPlace;
+  todoPlaceLabelText.textContent = isPacking ? "放置位置" : isShopping ? "購買地點" : "地點";
+  todoPlaceInput.placeholder = isPacking ? "行李箱、隨身包" : isShopping ? "蝦皮、藥妝店、機場" : "飯店、車站、景點";
+
+  [
+    [todoPrepFields, isPrep],
+    [todoQuantityFields, hasQuantity],
+    [todoShoppingFields, isShopping],
+    [todoReminderFields, isReminder],
+    [todoPlaceLabel, hasPlace]
+  ].forEach(([container, enabled]) => {
+    container?.querySelectorAll("input, select, textarea").forEach((control) => {
+      control.disabled = !enabled;
+    });
+  });
 }
 
 function selectedExpenseShareMembers() {
@@ -2793,7 +2904,8 @@ function populateTimeOptions() {
     [departureHourInput, departureMinuteInput],
     [arrivalHourInput, arrivalMinuteInput],
     [bookingHourInput, bookingMinuteInput],
-    [bookingCheckoutHourInput, bookingCheckoutMinuteInput]
+    [bookingCheckoutHourInput, bookingCheckoutMinuteInput],
+    [todoHourInput, todoMinuteInput]
   ].forEach(([hourSelect, minuteSelect]) => populateTimeSelectPair(hourSelect, minuteSelect));
 }
 
@@ -3156,6 +3268,7 @@ tripMemberList?.addEventListener("click", async (event) => {
 
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
+todoGroupInput.addEventListener("change", syncTodoFields);
 bookingTypeInput.addEventListener("change", syncBookingStayFields);
 bookingDateInput.addEventListener("change", syncBookingStayFields);
 typeInput.addEventListener("change", () => {
@@ -3169,7 +3282,8 @@ timeMinuteInput.addEventListener("change", syncTimeInput);
   [departureTimeInput, departureHourInput, departureMinuteInput],
   [arrivalTimeInput, arrivalHourInput, arrivalMinuteInput],
   [bookingTimeInput, bookingHourInput, bookingMinuteInput],
-  [bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput]
+  [bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput],
+  [todoTimeInput, todoHourInput, todoMinuteInput]
 ].forEach(([hiddenInput, hourSelect, minuteSelect]) => {
   hourSelect?.addEventListener("change", () => syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect));
   minuteSelect?.addEventListener("change", () => syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect));
@@ -3463,6 +3577,7 @@ bookingForm.addEventListener("submit", async (event) => {
 todoForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!canUseCollaborativeTools()) return;
+  syncHiddenTimeInput(todoTimeInput, todoHourInput, todoMinuteInput);
 
   const trip = currentTrip();
   const existingTodo = state.editingTodoId ? trip.todos.find((item) => item.id === state.editingTodoId) : null;
@@ -3471,6 +3586,15 @@ todoForm.addEventListener("submit", (event) => {
   if (existingTodo) {
     existingTodo.group = todoGroupInput.value;
     existingTodo.text = todoTextInput.value.trim();
+    existingTodo.dueDate = todoGroupInput.value === "行前準備" ? todoDueDateInput.value : "";
+    existingTodo.priority = todoGroupInput.value === "行前準備" ? todoPriorityInput.value : "";
+    existingTodo.quantity = ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoQuantityInput.value : "";
+    existingTodo.unit = ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoUnitInput.value.trim() : "";
+    existingTodo.amount = todoGroupInput.value === "購物清單" ? todoAmountInput.value : "";
+    existingTodo.currency = todoGroupInput.value === "購物清單" ? todoCurrencyInput.value : "TWD";
+    existingTodo.date = todoGroupInput.value === "旅途中提醒" ? todoDateInput.value : "";
+    existingTodo.time = todoGroupInput.value === "旅途中提醒" ? todoTimeInput.value : "";
+    existingTodo.place = ["行李打包", "購物清單", "旅途中提醒"].includes(todoGroupInput.value) ? todoPlaceInput.value.trim() : "";
     existingTodo.note = todoNoteInput.value.trim();
   } else {
     trip.todos.push(normalizeTodo({
@@ -3478,6 +3602,15 @@ todoForm.addEventListener("submit", (event) => {
       ownerId: state.cloudUser?.id || null,
       group: todoGroupInput.value,
       text: todoTextInput.value.trim(),
+      dueDate: todoGroupInput.value === "行前準備" ? todoDueDateInput.value : "",
+      priority: todoGroupInput.value === "行前準備" ? todoPriorityInput.value : "",
+      quantity: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoQuantityInput.value : "",
+      unit: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoUnitInput.value.trim() : "",
+      amount: todoGroupInput.value === "購物清單" ? todoAmountInput.value : "",
+      currency: todoGroupInput.value === "購物清單" ? todoCurrencyInput.value : "TWD",
+      date: todoGroupInput.value === "旅途中提醒" ? todoDateInput.value : "",
+      time: todoGroupInput.value === "旅途中提醒" ? todoTimeInput.value : "",
+      place: ["行李打包", "購物清單", "旅途中提醒"].includes(todoGroupInput.value) ? todoPlaceInput.value.trim() : "",
       note: todoNoteInput.value.trim(),
       done: false,
       visibility: "private"
