@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=41" />
+    <link rel="stylesheet" href="./styles.css?v=42" />
   </head>
   <body>
     <main class="app-shell">
@@ -79,6 +79,23 @@
           <button class="secondary-action" id="exportButton" type="button">匯出資料</button>
           <button class="secondary-action" id="importButton" type="button">匯入資料</button>
           <input id="importFileInput" type="file" accept="application/json,.json" hidden />
+        </section>
+
+        <section class="cloud-panel" id="cloudPanel">
+          <div>
+            <p class="eyebrow">雲端同步</p>
+            <h2>Supabase</h2>
+            <p id="cloudStatus">尚未登入。登入後會把旅程同步到雲端。</p>
+          </div>
+          <form class="cloud-form" id="cloudAuthForm">
+            <input id="cloudEmailInput" type="email" autocomplete="email" placeholder="Email" />
+            <input id="cloudPasswordInput" type="password" autocomplete="current-password" placeholder="密碼" />
+            <div class="cloud-actions">
+              <button class="secondary-action" id="cloudSignUpButton" type="button">註冊</button>
+              <button class="primary-button" id="cloudSignInButton" type="submit">登入</button>
+              <button class="secondary-action" id="cloudSignOutButton" type="button" hidden>登出</button>
+            </div>
+          </form>
         </section>
 
         <section class="trip-list" id="tripList" aria-label="旅程清單"></section>
@@ -564,6 +581,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=50" type="module"></script>
+    <script src="./app.js?v=51" type="module"></script>
   </body>
 </html>

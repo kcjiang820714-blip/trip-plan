@@ -1,6 +1,8 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
+const SUPABASE_URL = "https://dxkrkhtnusihjukanphe.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CCraWaVPLSPzzE-u7Guvlg_Dfe6q91a";
 const DEFAULT_EXCHANGE_RATES = {
   TWD: 1,
   JPY: 0.22,
@@ -51,6 +53,10 @@ const defaultTrip = {
 
 const state = {
   library: loadLibrary(),
+  cloudUser: null,
+  cloudReady: false,
+  cloudSyncing: false,
+  cloudError: "",
   activeTripId: null,
   activeDayIndex: 0,
   activeExpenseDate: null,
@@ -72,6 +78,13 @@ const landingView = document.querySelector("#landingView");
 const homeView = document.querySelector("#homeView");
 const tripView = document.querySelector("#tripView");
 const tripList = document.querySelector("#tripList");
+const cloudAuthForm = document.querySelector("#cloudAuthForm");
+const cloudEmailInput = document.querySelector("#cloudEmailInput");
+const cloudPasswordInput = document.querySelector("#cloudPasswordInput");
+const cloudSignUpButton = document.querySelector("#cloudSignUpButton");
+const cloudSignInButton = document.querySelector("#cloudSignInButton");
+const cloudSignOutButton = document.querySelector("#cloudSignOutButton");
+const cloudStatus = document.querySelector("#cloudStatus");
 const landingTripTitle = document.querySelector("#landingTripTitle");
 const landingTripMeta = document.querySelector("#landingTripMeta");
 const landingTripCount = document.querySelector("#landingTripCount");
@@ -176,6 +189,8 @@ const attachmentViewerTitle = document.querySelector("#attachmentViewerTitle");
 const attachmentViewerBody = document.querySelector("#attachmentViewerBody");
 const closeAttachmentViewerButton = document.querySelector("#closeAttachmentViewerButton");
 let activeAttachmentUrl = null;
+let supabaseClient = null;
+let cloudSaveTimer = null;
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -209,6 +224,7 @@ function normalizeLibrary(library) {
 
       return {
         id: trip.id || createId(),
+        cloudId: trip.cloudId || null,
         title: trip.title || "未命名旅程",
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
@@ -424,6 +440,7 @@ function createId() {
 
 function saveLibrary() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+  scheduleCloudSave();
 }
 
 function setLibrary(library) {
@@ -434,6 +451,166 @@ function setLibrary(library) {
   state.activeDayIndex = 0;
   render();
   showHome();
+  scheduleCloudSave();
+}
+
+async function getSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  supabaseClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  return supabaseClient;
+}
+
+function renderCloudStatus() {
+  if (!cloudStatus) return;
+
+  const email = state.cloudUser?.email || "";
+  cloudEmailInput.hidden = Boolean(state.cloudUser);
+  cloudPasswordInput.hidden = Boolean(state.cloudUser);
+  cloudSignUpButton.hidden = Boolean(state.cloudUser);
+  cloudSignInButton.hidden = Boolean(state.cloudUser);
+  cloudSignOutButton.hidden = !state.cloudUser;
+
+  if (!state.cloudReady) {
+    cloudStatus.textContent = "雲端功能載入中。本機資料仍可正常使用。";
+    return;
+  }
+
+  if (!state.cloudUser) {
+    cloudStatus.textContent = state.cloudError || "尚未登入。登入後會把旅程同步到雲端。";
+    return;
+  }
+
+  cloudStatus.textContent = state.cloudSyncing
+    ? `已登入 ${email}，正在同步...`
+    : state.cloudError || `已登入 ${email}，旅程會同步到 Supabase。`;
+}
+
+async function initCloudSync() {
+  if (isReadonly) return;
+
+  try {
+    renderCloudStatus();
+    const client = await getSupabaseClient();
+    state.cloudReady = true;
+    const { data, error } = await client.auth.getSession();
+    if (error) throw error;
+    state.cloudUser = data.session?.user || null;
+
+    client.auth.onAuthStateChange((_event, session) => {
+      state.cloudUser = session?.user || null;
+      renderCloudStatus();
+      if (state.cloudUser) loadCloudLibrary();
+    });
+
+    renderCloudStatus();
+    if (state.cloudUser) await loadCloudLibrary();
+  } catch (error) {
+    state.cloudReady = false;
+    state.cloudError = `雲端功能暫時無法載入：${error.message}`;
+    renderCloudStatus();
+  }
+}
+
+function toCloudTripPayload(trip) {
+  return {
+    owner_id: state.cloudUser.id,
+    title: trip.title || "未命名旅程",
+    start_date: trip.startDate || null,
+    end_date: trip.endDate || null,
+    updated_at: new Date().toISOString(),
+    data: {
+      ...trip,
+      cloudId: trip.cloudId || null
+    }
+  };
+}
+
+function fromCloudTrip(row) {
+  return normalizeLibrary({ trips: [{ ...row.data, cloudId: row.id }] }).trips[0];
+}
+
+async function loadCloudLibrary() {
+  if (!state.cloudUser) return;
+
+  try {
+    state.cloudSyncing = true;
+    renderCloudStatus();
+    const client = await getSupabaseClient();
+    const { data, error } = await client
+      .from("trips")
+      .select("id,title,start_date,end_date,data,updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+
+    if (Array.isArray(data) && data.length > 0) {
+      state.library = normalizeLibrary({ trips: data.map(fromCloudTrip) });
+      state.activeTripId = state.library.trips[0]?.id || null;
+      state.activeDayIndex = 0;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+      render();
+      showHome();
+    } else {
+      await saveCloudLibrary();
+    }
+
+    state.cloudError = "";
+  } catch (error) {
+    state.cloudError = `雲端讀取失敗：${error.message}`;
+  } finally {
+    state.cloudSyncing = false;
+    renderCloudStatus();
+  }
+}
+
+function scheduleCloudSave() {
+  if (!state.cloudUser || !state.cloudReady) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => {
+    saveCloudLibrary();
+  }, 500);
+}
+
+async function saveCloudLibrary() {
+  if (!state.cloudUser || !state.cloudReady || state.cloudSyncing) return;
+
+  try {
+    state.cloudSyncing = true;
+    renderCloudStatus();
+    const client = await getSupabaseClient();
+
+    for (const trip of state.library.trips) {
+      const payload = toCloudTripPayload(trip);
+      const query = trip.cloudId
+        ? client.from("trips").update(payload).eq("id", trip.cloudId).select("id").single()
+        : client.from("trips").insert(payload).select("id").single();
+      const { data, error } = await query;
+      if (error) throw error;
+      if (!trip.cloudId && data?.id) trip.cloudId = data.id;
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+    state.cloudError = "";
+  } catch (error) {
+    state.cloudError = `雲端儲存失敗：${error.message}`;
+  } finally {
+    state.cloudSyncing = false;
+    renderCloudStatus();
+  }
+}
+
+async function deleteCloudTrip(cloudId) {
+  if (!cloudId || !state.cloudUser || !state.cloudReady) return;
+
+  try {
+    const client = await getSupabaseClient();
+    const { error } = await client.from("trips").delete().eq("id", cloudId);
+    if (error) throw error;
+  } catch (error) {
+    state.cloudError = `雲端刪除失敗：${error.message}`;
+    renderCloudStatus();
+  }
 }
 
 function currentTrip() {
@@ -1919,6 +2096,72 @@ importButton.addEventListener("click", () => {
 importFileInput.addEventListener("change", () => {
   if (!isReadonly) importLibrary(importFileInput.files[0]);
 });
+
+cloudAuthForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (isReadonly) return;
+
+  const email = cloudEmailInput.value.trim();
+  const password = cloudPasswordInput.value;
+  if (!email || !password) {
+    alert("請輸入 Email 和密碼。");
+    return;
+  }
+
+  try {
+    const client = await getSupabaseClient();
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    state.cloudUser = data.user;
+    cloudPasswordInput.value = "";
+    renderCloudStatus();
+    await loadCloudLibrary();
+  } catch (error) {
+    alert(`登入失敗：${error.message}`);
+  }
+});
+
+cloudSignUpButton.addEventListener("click", async () => {
+  if (isReadonly) return;
+
+  const email = cloudEmailInput.value.trim();
+  const password = cloudPasswordInput.value;
+  if (!email || !password) {
+    alert("請輸入 Email 和密碼。");
+    return;
+  }
+
+  try {
+    const client = await getSupabaseClient();
+    const { data, error } = await client.auth.signUp({ email, password });
+    if (error) throw error;
+    state.cloudUser = data.user;
+    cloudPasswordInput.value = "";
+    renderCloudStatus();
+    if (data.session) {
+      await saveCloudLibrary();
+      alert("註冊完成，已開始雲端同步。");
+    } else {
+      alert("註冊完成。請先到信箱確認 Email，再回來登入。");
+    }
+  } catch (error) {
+    alert(`註冊失敗：${error.message}`);
+  }
+});
+
+cloudSignOutButton.addEventListener("click", async () => {
+  if (isReadonly) return;
+
+  try {
+    const client = await getSupabaseClient();
+    await client.auth.signOut();
+  } finally {
+    state.cloudUser = null;
+    state.cloudError = "";
+    renderCloudStatus();
+  }
+});
+
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
 bookingTypeInput.addEventListener("change", syncBookingStayFields);
@@ -2436,9 +2679,10 @@ deleteTripButton.addEventListener("click", () => {
   if (isReadonly) return;
   if (!state.editingTripId || state.library.trips.length <= 1) return;
   const trip = state.library.trips.find((item) => item.id === state.editingTripId);
-  const confirmed = window.confirm(`確定刪除「${trip.title}」？這只會刪除這台手機瀏覽器裡的資料。`);
+  const confirmed = window.confirm(`確定刪除「${trip.title}」？如果已登入雲端，也會同步刪除 Supabase 裡的這趟旅程。`);
   if (!confirmed) return;
 
+  deleteCloudTrip(trip.cloudId);
   state.library.trips = state.library.trips.filter((item) => item.id !== state.editingTripId);
   state.activeTripId = state.library.trips[0].id;
   state.activeDayIndex = 0;
@@ -2455,4 +2699,5 @@ populateTimeOptions();
 saveLibrary();
 render();
 renderReadonlyMode();
+initCloudSync();
 showLanding();
