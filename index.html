@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=45" />
+    <link rel="stylesheet" href="./styles.css?v=46" />
   </head>
   <body>
     <main class="app-shell">
@@ -346,6 +346,11 @@
         </section>
 
         <label>
+          行程內容
+          <textarea id="itemContentInput" name="content" rows="3" placeholder="會顯示在行程卡片上，例如：參觀主殿、拍照、逛周邊小店"></textarea>
+        </label>
+
+        <label>
           備註
           <textarea id="noteInput" name="note" rows="4" placeholder="集合地點、訂位資訊、提醒事項"></textarea>
         </label>
@@ -586,6 +591,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=57" type="module"></script>
+    <script src="./app.js?v=58" type="module"></script>
   </body>
 </html>

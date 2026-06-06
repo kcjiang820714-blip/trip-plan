@@ -134,6 +134,7 @@ const placeInput = document.querySelector("#placeInput");
 const typeInput = document.querySelector("#typeInput");
 const attractionFields = document.querySelector("#attractionFields");
 const attractionIntroInput = document.querySelector("#attractionIntroInput");
+const itemContentInput = document.querySelector("#itemContentInput");
 const noteInput = document.querySelector("#noteInput");
 const itemPhotoInput = document.querySelector("#itemPhotoInput");
 const itemExistingAttachments = document.querySelector("#itemExistingAttachments");
@@ -337,6 +338,7 @@ function normalizeItem(item) {
     time: item.time || "",
     place: item.place || "",
     type: item.type || "",
+    content: item.content || "",
     attractionIntro: item.attractionIntro || "",
     note: item.note || "",
     airline: item.airline || "",
@@ -950,6 +952,7 @@ function renderTrip() {
             <span class="time">${escapeHtml(item.time)}</span>
             <span class="item-summary-content">
               <span class="item-title">${escapeHtml(getItemTitle(item))}</span>
+              ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
               <span class="meta">${escapeHtml(item.type)}</span>
             </span>
             <span class="expand-indicator" aria-hidden="true">⌄</span>
@@ -2126,6 +2129,7 @@ function openItemDialog(index = null) {
         time: "",
         place: "",
         type: "景點",
+        content: "",
         attractionIntro: "",
         note: "",
         airline: "",
@@ -2147,6 +2151,7 @@ function openItemDialog(index = null) {
   setTimeSelects(item.time);
   placeInput.value = item.place;
   typeInput.value = [...typeInput.options].some((option) => option.value === item.type) ? item.type : "其他";
+  itemContentInput.value = item.content || "";
   attractionIntroInput.value = item.attractionIntro || "";
   noteInput.value = item.note;
   itemPhotoInput.value = "";
@@ -2692,6 +2697,7 @@ itemForm.addEventListener("submit", async (event) => {
     time: `${timeHourInput.value}:${timeMinuteInput.value}`,
     place: placeInput.value.trim(),
     type: typeInput.value.trim(),
+    content: itemContentInput.value.trim(),
     attractionIntro: typeInput.value === "景點" ? attractionIntroInput.value.trim() : "",
     note: noteInput.value.trim(),
     airline: typeInput.value === "飛機" ? airlineInput.value.trim() : "",

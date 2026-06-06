@@ -1823,6 +1823,19 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.item-content-preview {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 820;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .meta {
   display: inline-flex;
   align-items: center;
