@@ -906,7 +906,7 @@ function renderTrip() {
   if (!trip) return;
 
   state.activeDayIndex = Math.min(state.activeDayIndex, trip.days.length - 1);
-  tripTitle.textContent = trip.title;
+  if (tripTitle) tripTitle.textContent = trip.title;
   tripDates.textContent = trip.dates;
   tripSummary.textContent = `${trip.days.length} 天，${countItems(trip)} 個行程`;
   renderTripSectionTabs();
@@ -915,7 +915,6 @@ function renderTrip() {
     .map(
       (day, index) => `
         <button class="day-tab ${index === state.activeDayIndex ? "is-active" : ""}" type="button" data-day="${index}">
-          <span>Day ${index + 1}</span>
           ${escapeHtml(day.date)}
         </button>
       `
@@ -2431,6 +2430,15 @@ document.querySelector("#backToTripsButton").addEventListener("click", showHome)
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
 document.querySelector("#addBookingButton").addEventListener("click", () => openBookingDialog());
+document.querySelector("[data-trip-section-add]")?.addEventListener("click", () => {
+  if (state.activeTripSection === "bookings") openBookingDialog();
+  else if (state.activeTripSection === "todos") {
+    todoForm.reset();
+    todoGroupInput.value = state.activeTodoGroup;
+    openModal(todoDialog);
+  } else if (state.activeTripSection === "expenses") openExpenseDialog();
+  else openItemDialog();
+});
 document.querySelector("#addTodoButton").addEventListener("click", () => {
   if (isReadonly) return;
   todoForm.reset();
