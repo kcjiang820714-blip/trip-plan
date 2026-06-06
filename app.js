@@ -245,6 +245,7 @@ function normalizeLibrary(library) {
       return {
         id: trip.id || createId(),
         cloudId: trip.cloudId || null,
+        role: trip.role || null,
         title: trip.title || "未命名旅程",
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
@@ -312,16 +313,21 @@ function normalizeAttachment(attachment) {
 function normalizeTodo(todo) {
   return {
     id: todo.id || createId(),
+    cloudId: todo.cloudId || null,
+    ownerId: todo.ownerId || todo.owner_id || null,
     group: todo.group || "行前準備",
     text: todo.text || "",
     note: todo.note || "",
-    done: Boolean(todo.done)
+    done: Boolean(todo.done),
+    visibility: todo.visibility || "private"
   };
 }
 
 function normalizeExpense(expense) {
   return {
     id: expense.id || createId(),
+    cloudId: expense.cloudId || null,
+    createdBy: expense.createdBy || expense.created_by || null,
     date: expense.date || "",
     name: expense.name || "",
     amount: Number(expense.amount) || 0,
@@ -552,6 +558,8 @@ function toCloudTripPayload(trip) {
     updated_at: new Date().toISOString(),
     data: {
       ...cloudTrip,
+      todos: [],
+      expenses: [],
       cloudId: trip.cloudId || null
     }
   };
@@ -589,7 +597,101 @@ function toCloudAttachment(attachment) {
 }
 
 function fromCloudTrip(row) {
-  return normalizeLibrary({ trips: [{ ...row.data, cloudId: row.id }] }).trips[0];
+  const trip = normalizeLibrary({ trips: [{ ...row.data, cloudId: row.id }] }).trips[0];
+  trip.role = row.owner_id === state.cloudUser?.id ? "owner" : "participant";
+  return trip;
+}
+
+function fromCloudExpense(row) {
+  return normalizeExpense({
+    id: row.id,
+    cloudId: row.id,
+    createdBy: row.created_by,
+    date: row.date || "",
+    name: row.name || "",
+    amount: row.amount,
+    currency: row.currency,
+    category: row.category,
+    payer: row.payer,
+    shareWith: Array.isArray(row.share_with) ? row.share_with : [],
+    note: row.note || ""
+  });
+}
+
+function fromCloudTodo(row) {
+  return normalizeTodo({
+    id: row.id,
+    cloudId: row.id,
+    ownerId: row.owner_id,
+    group: row.group_name || "行前準備",
+    text: row.text || "",
+    note: row.note || "",
+    done: row.done,
+    visibility: row.visibility || "private"
+  });
+}
+
+function toCloudExpensePayload(trip, expense) {
+  return {
+    trip_id: trip.cloudId,
+    created_by: expense.createdBy || state.cloudUser.id,
+    date: expense.date || null,
+    name: expense.name || "",
+    amount: Number(expense.amount) || 0,
+    currency: expense.currency || "JPY",
+    category: expense.category || "其他",
+    payer: expense.payer || "我",
+    share_with: normalizeMembers(expense.shareWith),
+    note: expense.note || "",
+    updated_at: new Date().toISOString()
+  };
+}
+
+function toCloudTodoPayload(trip, todo) {
+  return {
+    trip_id: trip.cloudId,
+    owner_id: todo.ownerId || state.cloudUser.id,
+    group_name: todo.group || "行前準備",
+    text: todo.text || "",
+    note: todo.note || "",
+    done: Boolean(todo.done),
+    visibility: todo.visibility || "private",
+    updated_at: new Date().toISOString()
+  };
+}
+
+function isMissingCloudTableError(error) {
+  return /relation .* does not exist|schema cache|Could not find the table|does not exist/i.test(String(error?.message || ""));
+}
+
+async function loadCloudCollaborativeData(client, trips) {
+  const cloudTrips = trips.filter((trip) => trip.cloudId);
+  const tripIds = cloudTrips.map((trip) => trip.cloudId);
+  if (tripIds.length === 0) return;
+
+  const [{ data: expenseRows, error: expenseError }, { data: todoRows, error: todoError }] = await Promise.all([
+    client
+      .from("trip_expenses")
+      .select("id,trip_id,created_by,date,name,amount,currency,category,payer,share_with,note,created_at,updated_at")
+      .in("trip_id", tripIds),
+    client
+      .from("trip_todos")
+      .select("id,trip_id,owner_id,group_name,text,note,done,visibility,created_at,updated_at")
+      .in("trip_id", tripIds)
+  ]);
+
+  if (expenseError || todoError) {
+    const error = expenseError || todoError;
+    if (isMissingCloudTableError(error)) return;
+    throw error;
+  }
+
+  cloudTrips.forEach((trip) => {
+    const tripExpenseRows = (expenseRows || []).filter((row) => row.trip_id === trip.cloudId);
+    const tripTodoRows = (todoRows || []).filter((row) => row.trip_id === trip.cloudId);
+    if (tripExpenseRows.length > 0 || trip.expenses.length === 0) trip.expenses = tripExpenseRows.map(fromCloudExpense);
+    if (tripTodoRows.length > 0 || trip.todos.length === 0) trip.todos = tripTodoRows.map(fromCloudTodo);
+  });
 }
 
 async function loadCloudLibrary() {
@@ -601,12 +703,13 @@ async function loadCloudLibrary() {
     const client = await getSupabaseClient();
     const { data, error } = await client
       .from("trips")
-      .select("id,title,start_date,end_date,data,updated_at")
+      .select("id,owner_id,title,start_date,end_date,data,updated_at")
       .order("updated_at", { ascending: false });
     if (error) throw error;
 
     if (Array.isArray(data) && data.length > 0) {
-      state.library = normalizeLibrary({ trips: data.map(fromCloudTrip) });
+      state.library = { trips: data.map(fromCloudTrip) };
+      await loadCloudCollaborativeData(client, state.library.trips);
       state.activeTripId = state.library.trips[0]?.id || null;
       state.activeDayIndex = 0;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
@@ -633,6 +736,10 @@ function scheduleCloudSave() {
   cloudSaveTimer = setTimeout(() => {
     saveCloudLibrary();
   }, 500);
+}
+
+function canSaveCloudTripShell(trip) {
+  return !trip.role || trip.role === "owner";
 }
 
 function attachmentStoragePath(trip, ownerType, ownerId, attachment) {
@@ -751,14 +858,21 @@ async function saveCloudLibrary() {
     const client = await getSupabaseClient();
 
     for (const trip of state.library.trips) {
-      await uploadTripAttachments(client, trip);
-      const payload = toCloudTripPayload(trip);
-      const query = trip.cloudId
-        ? client.from("trips").update(payload).eq("id", trip.cloudId).select("id").single()
-        : client.from("trips").insert(payload).select("id").single();
-      const { data, error } = await query;
-      if (error) throw error;
-      if (!trip.cloudId && data?.id) trip.cloudId = data.id;
+      if (canSaveCloudTripShell(trip)) {
+        await uploadTripAttachments(client, trip);
+        const payload = toCloudTripPayload(trip);
+        const query = trip.cloudId
+          ? client.from("trips").update(payload).eq("id", trip.cloudId).select("id").single()
+          : client.from("trips").insert(payload).select("id").single();
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!trip.cloudId && data?.id) {
+          trip.cloudId = data.id;
+          trip.role = "owner";
+        }
+      }
+
+      await saveCloudCollaborativeData(client, trip);
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
@@ -767,6 +881,54 @@ async function saveCloudLibrary() {
     state.cloudError = formatCloudSaveError(error);
   } finally {
     state.cloudSyncing = false;
+    renderCloudStatus();
+  }
+}
+
+async function upsertCloudRow(client, table, cloudId, payload) {
+  const query = cloudId
+    ? client.from(table).update(payload).eq("id", cloudId).select("id").single()
+    : client.from(table).insert(payload).select("id").single();
+  const { data, error } = await query;
+  if (error) throw error;
+  return data?.id || cloudId || null;
+}
+
+async function saveCloudCollaborativeData(client, trip) {
+  if (!trip.cloudId) return;
+
+  try {
+    for (const expense of trip.expenses || []) {
+      const cloudId = await upsertCloudRow(client, "trip_expenses", expense.cloudId, toCloudExpensePayload(trip, expense));
+      if (cloudId) {
+        expense.cloudId = cloudId;
+        expense.createdBy = expense.createdBy || state.cloudUser.id;
+      }
+    }
+
+    for (const todo of trip.todos || []) {
+      const cloudId = await upsertCloudRow(client, "trip_todos", todo.cloudId, toCloudTodoPayload(trip, todo));
+      if (cloudId) {
+        todo.cloudId = cloudId;
+        todo.ownerId = todo.ownerId || state.cloudUser.id;
+      }
+    }
+  } catch (error) {
+    if (isMissingCloudTableError(error)) return;
+    throw error;
+  }
+}
+
+async function deleteCloudRow(table, cloudId) {
+  if (!cloudId || !state.cloudUser || !state.cloudReady) return;
+
+  try {
+    const client = await getSupabaseClient();
+    const { error } = await client.from(table).delete().eq("id", cloudId);
+    if (error) throw error;
+  } catch (error) {
+    if (isMissingCloudTableError(error)) return;
+    state.cloudError = `雲端刪除失敗：${error.message}`;
     renderCloudStatus();
   }
 }
@@ -790,6 +952,24 @@ function currentTrip() {
 
 function currentDay() {
   return currentTrip().days[state.activeDayIndex];
+}
+
+function canManageTrip(trip = currentTrip()) {
+  if (isReadonly) return false;
+  if (!state.cloudUser) return true;
+  return !trip?.role || trip.role === "owner";
+}
+
+function canUseCollaborativeTools(trip = currentTrip()) {
+  if (isReadonly) return false;
+  if (!state.cloudUser) return true;
+  return !trip?.role || trip.role === "owner" || trip.role === "participant";
+}
+
+function canEditExpense(expense, trip = currentTrip()) {
+  if (!canUseCollaborativeTools(trip)) return false;
+  if (!state.cloudUser) return true;
+  return trip?.role === "owner" || !expense?.createdBy || expense.createdBy === state.cloudUser.id;
 }
 
 function render() {
@@ -973,7 +1153,7 @@ function renderTrip() {
             <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
             <div class="card-actions">
               <a class="text-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">地圖</a>
-              <button class="text-button" type="button" data-edit="${index}">編輯</button>
+              ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit="${index}">編輯</button>` : ""}
             </div>
           </div>
         </article>
@@ -984,6 +1164,19 @@ function renderTrip() {
 }
 
 function renderTripSectionTabs() {
+  const addButton = document.querySelector("[data-trip-section-add]");
+  const canManage = canManageTrip();
+  const canUseTools = canUseCollaborativeTools();
+
+  editTripButton.hidden = !canManage;
+  addItemButton.hidden = !canManage;
+  if (addButton) {
+    addButton.hidden =
+      (state.activeTripSection === "itinerary" && !canManage) ||
+      (state.activeTripSection === "bookings" && !canManage) ||
+      ((state.activeTripSection === "todos" || state.activeTripSection === "expenses") && !canUseTools);
+  }
+
   document.querySelectorAll("[data-trip-section]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.tripSection === state.activeTripSection);
   });
@@ -1024,7 +1217,7 @@ function renderBookings() {
             ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
             ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
             <div class="card-actions">
-              <button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>
+              ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
             </div>
           </div>
           ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
@@ -1297,7 +1490,7 @@ function renderExpenseDayCard(date, expenses, trip) {
                   <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
                   <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
                   ${
-                    isReadonly
+                    !canEditExpense(expense, trip)
                       ? ""
                       : `<button class="text-button expense-edit-button" type="button" data-edit-expense="${escapeHtml(expense.id)}">編輯</button>`
                   }
@@ -1674,8 +1867,9 @@ function renderExpenseFormMembers() {
 }
 
 function openExpenseDialog(expenseId = null) {
-  if (isReadonly) return;
+  if (!canUseCollaborativeTools()) return;
   const expense = expenseId ? currentTrip().expenses.find((item) => item.id === expenseId) : null;
+  if (expense && !canEditExpense(expense)) return;
   state.editingExpenseId = expense?.id || null;
   expenseDialogTitle.textContent = expense ? "編輯支出" : "新增支出";
   deleteExpenseButton.hidden = !expense;
@@ -2107,7 +2301,7 @@ function syncBookingStayFields() {
 }
 
 function openBookingDialog(bookingId = null) {
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
 
   state.editingBookingId = bookingId;
   const booking = bookingId ? currentTrip().bookings.find((item) => item.id === bookingId) : null;
@@ -2134,7 +2328,7 @@ function openBookingDialog(bookingId = null) {
 }
 
 function openItemDialog(index = null) {
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
   state.editingItemIndex = index;
   const item = index === null
     ? {
@@ -2449,6 +2643,7 @@ function openTripDialog(tripId = null) {
   if (isReadonly) return;
   state.editingTripId = tripId;
   const trip = tripId ? state.library.trips.find((item) => item.id === tripId) : null;
+  if (trip && !canManageTrip(trip)) return;
 
   tripDialogTitle.textContent = trip ? "編輯旅程" : "新增旅程";
   deleteTripButton.hidden = !trip;
@@ -2533,13 +2728,17 @@ document.querySelector("#addItemButton").addEventListener("click", () => openIte
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
 document.querySelector("#addBookingButton")?.addEventListener("click", () => openBookingDialog());
 document.querySelector("[data-trip-section-add]")?.addEventListener("click", () => {
-  if (state.activeTripSection === "bookings") openBookingDialog();
+  if (state.activeTripSection === "bookings") {
+    if (canManageTrip()) openBookingDialog();
+  }
   else if (state.activeTripSection === "todos") {
+    if (!canUseCollaborativeTools()) return;
     todoForm.reset();
     todoGroupInput.value = state.activeTodoGroup;
     openModal(todoDialog);
-  } else if (state.activeTripSection === "expenses") openExpenseDialog();
-  else openItemDialog();
+  } else if (state.activeTripSection === "expenses") {
+    if (canUseCollaborativeTools()) openExpenseDialog();
+  } else if (canManageTrip()) openItemDialog();
 });
 document.querySelector("#addTodoButton")?.addEventListener("click", () => {
   if (isReadonly) return;
@@ -2805,7 +3004,7 @@ timeline.addEventListener("click", (event) => {
 
 itemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
   syncHiddenTimeInput(departureTimeInput, departureHourInput, departureMinuteInput);
   syncHiddenTimeInput(arrivalTimeInput, arrivalHourInput, arrivalMinuteInput);
 
@@ -2878,7 +3077,7 @@ itemForm.addEventListener("submit", async (event) => {
 
 bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
   syncHiddenTimeInput(bookingTimeInput, bookingHourInput, bookingMinuteInput);
   syncHiddenTimeInput(bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput);
 
@@ -2937,14 +3136,16 @@ bookingForm.addEventListener("submit", async (event) => {
 
 todoForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (isReadonly) return;
+  if (!canUseCollaborativeTools()) return;
 
   currentTrip().todos.push(normalizeTodo({
     id: createId(),
+    ownerId: state.cloudUser?.id || null,
     group: todoGroupInput.value,
     text: todoTextInput.value.trim(),
     note: todoNoteInput.value.trim(),
-    done: false
+    done: false,
+    visibility: "private"
   }));
 
   saveLibrary();
@@ -2954,7 +3155,7 @@ todoForm.addEventListener("submit", (event) => {
 
 todoGroups.addEventListener("change", (event) => {
   const checkbox = event.target.closest("[data-toggle-todo]");
-  if (!checkbox || isReadonly) return;
+  if (!checkbox || !canUseCollaborativeTools()) return;
   const todo = currentTrip().todos.find((item) => item.id === checkbox.dataset.toggleTodo);
   if (!todo) return;
   todo.done = checkbox.checked;
@@ -2964,7 +3165,7 @@ todoGroups.addEventListener("change", (event) => {
 
 memberForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
   const memberName = memberNameInput.value.trim();
   if (!memberName) return;
 
@@ -2976,7 +3177,7 @@ memberForm.addEventListener("submit", (event) => {
 });
 
 function applyExchangeRateInput(input) {
-  if (!input || isReadonly) return;
+  if (!input || !canManageTrip()) return;
   const currency = input.dataset.exchangeCurrency;
   if (currency === "TWD") return;
 
@@ -2994,7 +3195,7 @@ function applyExchangeRateInput(input) {
 
 exchangeRateList.addEventListener("input", (event) => {
   const input = event.target.closest("[data-exchange-currency]");
-  if (!input || isReadonly) return;
+  if (!input || !canManageTrip()) return;
   const currency = input.dataset.exchangeCurrency;
   if (currency === "TWD") return;
   exchangeRateDrafts.set(currency, input.value);
@@ -3007,14 +3208,14 @@ exchangeRateList.addEventListener("change", (event) => {
 exchangeRateList.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   const input = event.target.closest("[data-exchange-currency]");
-  if (!input || isReadonly) return;
+  if (!input || !canManageTrip()) return;
   event.preventDefault();
   input.blur();
 });
 
 expenseForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (isReadonly) return;
+  if (!canUseCollaborativeTools()) return;
   const shareWith = selectedExpenseShareMembers();
   if (shareWith.length === 0) {
     alert("請至少選擇一位分攤成員。");
@@ -3022,8 +3223,12 @@ expenseForm.addEventListener("submit", (event) => {
   }
 
   const trip = currentTrip();
+  const existingExpense = state.editingExpenseId ? trip.expenses.find((expense) => expense.id === state.editingExpenseId) : null;
+  if (existingExpense && !canEditExpense(existingExpense, trip)) return;
   const payload = normalizeExpense({
     id: state.editingExpenseId || createId(),
+    cloudId: existingExpense?.cloudId || null,
+    createdBy: existingExpense?.createdBy || state.cloudUser?.id || null,
     date: expenseDateInput.value,
     name: expenseNameInput.value.trim(),
     amount: expenseAmountInput.value,
@@ -3102,7 +3307,7 @@ function getTransportTitle(segments) {
 }
 
 deleteItemButton.addEventListener("click", () => {
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
   if (state.editingItemIndex === null) return;
   const item = currentDay().items[state.editingItemIndex];
   if (item?.id === state.expandedItemId) state.expandedItemId = null;
@@ -3113,7 +3318,7 @@ deleteItemButton.addEventListener("click", () => {
 });
 
 deleteBookingButton.addEventListener("click", () => {
-  if (isReadonly) return;
+  if (!canManageTrip()) return;
   if (!state.editingBookingId) return;
   const booking = currentTrip().bookings.find((item) => item.id === state.editingBookingId);
   const confirmed = window.confirm(`確定刪除「${booking?.name || "這筆預訂"}」？這只會刪除這台裝置瀏覽器裡的資料。`);
@@ -3127,14 +3332,16 @@ deleteBookingButton.addEventListener("click", () => {
 });
 
 deleteExpenseButton.addEventListener("click", () => {
-  if (isReadonly) return;
+  if (!canUseCollaborativeTools()) return;
   if (!state.editingExpenseId) return;
   const trip = currentTrip();
   const expense = trip.expenses.find((item) => item.id === state.editingExpenseId);
-  const confirmed = window.confirm(`確定刪除「${expense?.name || "這筆支出"}」？這只會刪除這台裝置瀏覽器裡的資料。`);
+  if (expense && !canEditExpense(expense, trip)) return;
+  const confirmed = window.confirm(`確定刪除「${expense?.name || "這筆支出"}」？如果已登入雲端，也會同步刪除 Supabase 裡的這筆支出。`);
   if (!confirmed) return;
 
   trip.expenses = trip.expenses.filter((item) => item.id !== state.editingExpenseId);
+  deleteCloudRow("trip_expenses", expense?.cloudId);
   state.editingExpenseId = null;
   saveLibrary();
   closeModal(expenseDialog);
@@ -3153,6 +3360,7 @@ tripForm.addEventListener("submit", (event) => {
   let trip = state.editingTripId
     ? state.library.trips.find((item) => item.id === state.editingTripId)
     : null;
+  if (trip && !canManageTrip(trip)) return;
 
   if (!trip) {
     trip = {
@@ -3187,7 +3395,7 @@ tripForm.addEventListener("submit", (event) => {
 });
 
 deleteTripButton.addEventListener("click", () => {
-  if (isReadonly) return;
+  if (!canManageTrip(state.library.trips.find((item) => item.id === state.editingTripId))) return;
   if (!state.editingTripId || state.library.trips.length <= 1) return;
   const trip = state.library.trips.find((item) => item.id === state.editingTripId);
   const confirmed = window.confirm(`確定刪除「${trip.title}」？如果已登入雲端，也會同步刪除 Supabase 裡的這趟旅程。`);
