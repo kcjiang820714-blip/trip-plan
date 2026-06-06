@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=56" />
+    <link rel="stylesheet" href="./styles.css?v=57" />
   </head>
   <body>
     <main class="app-shell">
@@ -403,6 +403,25 @@
 
         <section class="trip-day-title-editor" id="tripDayTitleEditor" aria-label="每日標題"></section>
 
+        <section class="trip-share-panel" id="tripSharePanel" hidden>
+          <div class="trip-share-heading">
+            <div>
+              <strong>旅伴共享</strong>
+              <span>輸入朋友註冊用的 Email，讓他看到這趟旅程。</span>
+            </div>
+          </div>
+          <form class="trip-invite-form" id="tripInviteForm">
+            <input id="tripInviteEmailInput" type="email" placeholder="朋友的 Email" autocomplete="email" />
+            <select id="tripInviteRoleInput" aria-label="共享權限">
+              <option value="viewer">只能查看</option>
+              <option value="participant">可記帳與待辦</option>
+            </select>
+            <button class="secondary-action" type="submit">邀請</button>
+          </form>
+          <p class="trip-share-status" id="tripShareStatus"></p>
+          <div class="trip-member-list" id="tripMemberList"></div>
+        </section>
+
         <footer>
           <button class="secondary-button" id="deleteTripButton" type="button">刪除旅程</button>
           <button class="primary-button" value="default" type="submit">儲存</button>
@@ -606,6 +625,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=66" type="module"></script>
+    <script src="./app.js?v=67" type="module"></script>
   </body>
 </html>

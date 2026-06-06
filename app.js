@@ -160,6 +160,12 @@ const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
 const tripDaysInput = document.querySelector("#tripDaysInput");
 const tripDayTitleEditor = document.querySelector("#tripDayTitleEditor");
+const tripSharePanel = document.querySelector("#tripSharePanel");
+const tripInviteForm = document.querySelector("#tripInviteForm");
+const tripInviteEmailInput = document.querySelector("#tripInviteEmailInput");
+const tripInviteRoleInput = document.querySelector("#tripInviteRoleInput");
+const tripShareStatus = document.querySelector("#tripShareStatus");
+const tripMemberList = document.querySelector("#tripMemberList");
 const exportButton = document.querySelector("#exportButton");
 const importButton = document.querySelector("#importButton");
 const importFileInput = document.querySelector("#importFileInput");
@@ -245,12 +251,14 @@ function normalizeLibrary(library) {
       return {
         id: trip.id || createId(),
         cloudId: trip.cloudId || null,
+        ownerId: trip.ownerId || trip.owner_id || null,
         role: trip.role || null,
         title: trip.title || "未命名旅程",
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         dates: dateRange.label,
         days,
+        sharedMembers: normalizeSharedMembers(trip.sharedMembers),
         members: normalizeMembers(trip.members),
         exchangeRates: normalizeExchangeRates(trip.exchangeRates),
         bookings: Array.isArray(trip.bookings) ? trip.bookings.map(normalizeBooking) : [],
@@ -265,6 +273,20 @@ function normalizeMembers(members) {
   const source = Array.isArray(members) ? members : ["我"];
   const names = source.map((member) => String(member || "").trim()).filter(Boolean);
   return [...new Set(names.length ? names : ["我"])];
+}
+
+function normalizeSharedMembers(members) {
+  if (!Array.isArray(members)) return [];
+
+  return members
+    .map((member) => ({
+      id: member.id || member.cloudId || "",
+      userId: member.userId || member.user_id || "",
+      email: member.email || "",
+      role: member.role === "participant" ? "participant" : "viewer",
+      createdAt: member.createdAt || member.created_at || ""
+    }))
+    .filter((member) => member.id || member.userId || member.email);
 }
 
 function normalizeExchangeRates(rates) {
@@ -566,8 +588,9 @@ function toCloudTripPayload(trip) {
 }
 
 function stripAttachmentsForCloudTrip(trip) {
+  const { ownerId, role, sharedMembers, ...baseTrip } = trip;
   return {
-    ...trip,
+    ...baseTrip,
     days: (trip.days || []).map((day) => ({
       ...day,
       items: (day.items || []).map((item) => ({
@@ -598,8 +621,19 @@ function toCloudAttachment(attachment) {
 
 function fromCloudTrip(row) {
   const trip = normalizeLibrary({ trips: [{ ...row.data, cloudId: row.id }] }).trips[0];
+  trip.ownerId = row.owner_id || null;
   trip.role = row.owner_id === state.cloudUser?.id ? "owner" : "participant";
   return trip;
+}
+
+function fromCloudTripMember(row) {
+  return {
+    id: row.id || "",
+    userId: row.user_id || "",
+    email: row.email || "",
+    role: row.role === "participant" ? "participant" : "viewer",
+    createdAt: row.created_at || ""
+  };
 }
 
 function fromCloudExpense(row) {
@@ -692,6 +726,52 @@ async function loadCloudCollaborativeData(client, trips) {
     if (tripExpenseRows.length > 0 || trip.expenses.length === 0) trip.expenses = tripExpenseRows.map(fromCloudExpense);
     if (tripTodoRows.length > 0 || trip.todos.length === 0) trip.todos = tripTodoRows.map(fromCloudTodo);
   });
+
+  await loadCloudTripMembers(client, cloudTrips);
+}
+
+async function loadCloudTripMembers(client, trips) {
+  for (const trip of trips) {
+    const { data, error } = await client.rpc("list_trip_members", { target_trip_id: trip.cloudId });
+    if (error) {
+      if (isMissingCloudTableError(error) || /function .* does not exist|Could not find the function/i.test(String(error.message || ""))) return;
+      throw error;
+    }
+
+    const members = normalizeSharedMembers((data || []).map(fromCloudTripMember));
+    trip.sharedMembers = members;
+    if (trip.ownerId !== state.cloudUser?.id) {
+      const ownMembership = members.find((member) => member.userId === state.cloudUser?.id);
+      trip.role = ownMembership?.role || trip.role;
+    }
+  }
+}
+
+function isMissingCloudFunctionError(error) {
+  return /function .* does not exist|Could not find the function|schema cache/i.test(String(error?.message || ""));
+}
+
+async function inviteTripMemberByEmail(trip, email, role) {
+  if (!trip?.cloudId || !state.cloudUser || !state.cloudReady) {
+    throw new Error("請先登入並同步這趟旅程，再邀請旅伴。");
+  }
+
+  const client = await getSupabaseClient();
+  const { data, error } = await client.rpc("invite_trip_member_by_email", {
+    target_trip_id: trip.cloudId,
+    invitee_email: email,
+    invitee_role: role
+  });
+
+  if (error) throw error;
+  return fromCloudTripMember(Array.isArray(data) ? data[0] : data);
+}
+
+async function removeTripMember(memberId) {
+  if (!memberId || !state.cloudUser || !state.cloudReady) return;
+  const client = await getSupabaseClient();
+  const { error } = await client.from("trip_members").delete().eq("id", memberId);
+  if (error) throw error;
 }
 
 async function loadCloudLibrary() {
@@ -2653,6 +2733,7 @@ function openTripDialog(tripId = null) {
   tripEndInput.value = trip?.endDate || addDays(tripStartInput.value, 2);
   tripDaysInput.value = trip?.days.length || 3;
   updateTripDayPreview();
+  renderTripSharePanel(trip);
   openModal(tripDialog);
 }
 
@@ -2713,6 +2794,39 @@ function collectTripDayTitles(dayCount) {
     const input = tripDayTitleEditor?.querySelector(`[data-trip-day-title="${index}"]`);
     return input?.value.trim() || `第 ${index + 1} 天`;
   });
+}
+
+function renderTripSharePanel(trip) {
+  if (!tripSharePanel || !tripMemberList || !tripShareStatus) return;
+
+  const canInvite = Boolean(trip && canManageTrip(trip) && state.cloudUser);
+  tripSharePanel.hidden = !trip || !canInvite;
+  if (!trip || !canInvite) return;
+
+  const needsCloudSave = !trip.cloudId;
+  tripInviteEmailInput.disabled = needsCloudSave;
+  tripInviteRoleInput.disabled = needsCloudSave;
+  tripInviteForm.querySelector("button").disabled = needsCloudSave;
+  tripShareStatus.textContent = needsCloudSave
+    ? "這趟旅程還沒同步到雲端。請先儲存並按「立即同步」，再回來邀請旅伴。"
+    : "朋友必須先用這個 Email 註冊或登入，才能被加入。";
+
+  const members = normalizeSharedMembers(trip.sharedMembers);
+  tripMemberList.innerHTML = members.length
+    ? members
+        .map(
+          (member) => `
+            <article class="trip-member-row">
+              <div>
+                <strong>${escapeHtml(member.email || member.userId || "旅伴")}</strong>
+                <span>${member.role === "participant" ? "可記帳與待辦" : "只能查看"}</span>
+              </div>
+              <button class="text-button" type="button" data-remove-trip-member="${escapeHtml(member.id)}">移除</button>
+            </article>
+          `
+        )
+        .join("")
+    : `<div class="empty-state compact">尚未邀請旅伴。</div>`;
 }
 
 document.querySelector("#enterTripsButton").addEventListener("click", showHome);
@@ -2826,6 +2940,57 @@ cloudSyncButton.addEventListener("click", async () => {
   if (isReadonly) return;
   await saveCloudLibrary();
   if (!state.cloudError) alert("已同步到 Supabase。");
+});
+
+tripInviteForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const trip = state.editingTripId ? state.library.trips.find((item) => item.id === state.editingTripId) : null;
+  if (!trip || !canManageTrip(trip)) return;
+
+  const email = tripInviteEmailInput.value.trim().toLowerCase();
+  const role = tripInviteRoleInput.value === "participant" ? "participant" : "viewer";
+  if (!email) {
+    tripShareStatus.textContent = "請輸入朋友註冊 Supabase 用的 Email。";
+    return;
+  }
+
+  try {
+    tripShareStatus.textContent = "正在加入旅伴...";
+    const member = await inviteTripMemberByEmail(trip, email, role);
+    trip.sharedMembers = normalizeSharedMembers([...(trip.sharedMembers || []).filter((item) => item.email !== member.email), member]);
+    tripInviteEmailInput.value = "";
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+    renderTripSharePanel(trip);
+    tripShareStatus.textContent = "已加入旅伴。朋友登入後按「立即同步」就能看到這趟旅程。";
+  } catch (error) {
+    tripShareStatus.textContent = isMissingCloudFunctionError(error)
+      ? "Supabase 還沒建立邀請用的 function。請先執行我提供的邀請功能 SQL。"
+      : `邀請失敗：${error.message}`;
+  }
+});
+
+tripMemberList?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-remove-trip-member]");
+  if (!button) return;
+
+  const trip = state.editingTripId ? state.library.trips.find((item) => item.id === state.editingTripId) : null;
+  if (!trip || !canManageTrip(trip)) return;
+
+  const memberId = button.dataset.removeTripMember;
+  const member = normalizeSharedMembers(trip.sharedMembers).find((item) => item.id === memberId);
+  const confirmed = window.confirm(`確定移除 ${member?.email || "這位旅伴"} 的共享權限？`);
+  if (!confirmed) return;
+
+  try {
+    tripShareStatus.textContent = "正在移除旅伴...";
+    await removeTripMember(memberId);
+    trip.sharedMembers = normalizeSharedMembers(trip.sharedMembers).filter((item) => item.id !== memberId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+    renderTripSharePanel(trip);
+    tripShareStatus.textContent = "已移除旅伴。";
+  } catch (error) {
+    tripShareStatus.textContent = `移除失敗：${error.message}`;
+  }
 });
 
 tripStartInput.addEventListener("change", updateTripDayPreview);

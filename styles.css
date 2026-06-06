@@ -436,6 +436,73 @@ h2 {
   gap: 8px;
 }
 
+.trip-share-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(15, 107, 95, 0.14);
+  border-radius: 8px;
+  background: rgba(238, 247, 244, 0.58);
+  padding: 14px;
+}
+
+.trip-share-heading strong {
+  display: block;
+  color: var(--brand-dark);
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.trip-share-heading span,
+.trip-share-status,
+.trip-member-row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.trip-invite-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(120px, 0.8fr) auto;
+  gap: 8px;
+}
+
+.trip-invite-form input,
+.trip-invite-form select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(24, 37, 33, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-weight: 850;
+}
+
+.trip-member-list {
+  display: grid;
+  gap: 8px;
+}
+
+.trip-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(24, 37, 33, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.88);
+  padding: 10px 12px;
+}
+
+.trip-member-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
 .secondary-action {
   min-height: 44px;
   border: 1px solid rgba(15, 107, 95, 0.16);
@@ -2623,6 +2690,15 @@ h2 {
 
   .booking-card {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trip-invite-form {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-member-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .booking-cover {
