@@ -1668,9 +1668,29 @@ function renderExpenseDayCard(date, expenses, trip) {
 function renderMembers() {
   const trip = currentTrip();
   trip.members = normalizeMembers(trip.members);
-  const activeMembers = expenseMemberNames(trip);
   const ownSharedMember = currentSharedMember(trip);
-  memberChips.innerHTML = activeMembers.map((member) => `<span class="member-chip">${escapeHtml(member)}</span>`).join("");
+  const sharedNames = new Set(normalizeSharedMembers(trip.sharedMembers).map(sharedMemberDisplayName));
+  memberChips.innerHTML = `
+    ${trip.members
+      .map(
+        (member) => `
+          <article class="member-edit-row" data-member-row="${escapeHtml(member)}">
+            <input data-member-name="${escapeHtml(member)}" value="${escapeHtml(member)}" ${canManageTrip(trip) ? "" : "disabled"} />
+            ${
+              canManageTrip(trip)
+                ? `<button class="text-button" type="button" data-save-member="${escapeHtml(member)}">儲存</button>
+                   <button class="text-button danger-text" type="button" data-delete-member="${escapeHtml(member)}">刪除</button>`
+                : ""
+            }
+          </article>
+        `
+      )
+      .join("")}
+    ${Array.from(sharedNames)
+      .filter((member) => !trip.members.includes(member))
+      .map((member) => `<span class="member-chip is-shared">${escapeHtml(member)}<small>旅伴</small></span>`)
+      .join("")}
+  `;
   memberForm.hidden = !canManageTrip(trip);
   memberProfileForm.hidden = !ownSharedMember;
   if (ownSharedMember) {
@@ -3494,10 +3514,62 @@ memberForm.addEventListener("submit", (event) => {
   if (!memberName) return;
 
   const trip = currentTrip();
+  if (expenseMemberNames(trip).includes(memberName)) {
+    alert("這個成員名稱已經存在。");
+    return;
+  }
   trip.members = normalizeMembers([...(trip.members || []), memberName]);
   memberNameInput.value = "";
   saveLibrary();
   renderExpenses();
+});
+
+memberChips.addEventListener("click", (event) => {
+  if (!canManageTrip()) return;
+  const saveButton = event.target.closest("[data-save-member]");
+  const deleteButton = event.target.closest("[data-delete-member]");
+  if (!saveButton && !deleteButton) return;
+
+  const trip = currentTrip();
+
+  if (saveButton) {
+    const oldName = saveButton.dataset.saveMember;
+    const input = memberChips.querySelector(`[data-member-name="${CSS.escape(oldName)}"]`);
+    const newName = input?.value.trim() || "";
+    if (!newName) {
+      alert("成員名稱不能空白。");
+      return;
+    }
+    if (newName !== oldName && expenseMemberNames(trip).filter((member) => member !== oldName).includes(newName)) {
+      alert("這個成員名稱已經存在。");
+      return;
+    }
+
+    trip.members = normalizeMembers(trip.members.map((member) => (member === oldName ? newName : member)));
+    renameExpenseMemberReferences(trip, oldName, newName);
+    saveLibrary();
+    renderExpenses();
+    return;
+  }
+
+  if (deleteButton) {
+    const memberName = deleteButton.dataset.deleteMember;
+    if (trip.members.length <= 1) {
+      alert("至少需要保留一位手動成員。");
+      return;
+    }
+    const isUsed = (trip.expenses || []).some((expense) => expense.payer === memberName || normalizeMembers(expense.shareWith).includes(memberName));
+    const confirmed = window.confirm(
+      isUsed
+        ? `「${memberName}」已出現在支出紀錄中。刪除後，相關支出會保留原文字，但不會再出現在新的分攤成員清單。確定刪除？`
+        : `確定刪除「${memberName}」？`
+    );
+    if (!confirmed) return;
+
+    trip.members = normalizeMembers(trip.members.filter((member) => member !== memberName));
+    saveLibrary();
+    renderExpenses();
+  }
 });
 
 memberProfileForm?.addEventListener("submit", async (event) => {
