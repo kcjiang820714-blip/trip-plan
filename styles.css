@@ -3103,6 +3103,165 @@ h2 {
     box-shadow 160ms ease;
 }
 
+.transport-visual {
+  position: absolute;
+  z-index: 1;
+  right: 50px;
+  top: 50%;
+  width: 76px;
+  height: 50px;
+  transform: translateY(-50%);
+  color: color-mix(in srgb, var(--card-accent), white 32%);
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.transport-visual::before,
+.transport-visual::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.transport-visual.is-train::before {
+  inset: 5px 10px 10px;
+  border: 4px solid currentColor;
+  border-radius: 10px 10px 7px 7px;
+}
+
+.transport-visual.is-train::after {
+  left: 18px;
+  right: 18px;
+  bottom: 2px;
+  height: 18px;
+  border-top: 5px solid currentColor;
+  border-bottom: 4px solid currentColor;
+  background:
+    radial-gradient(circle at 0 100%, currentColor 0 4px, transparent 5px),
+    radial-gradient(circle at 100% 100%, currentColor 0 4px, transparent 5px),
+    linear-gradient(90deg, currentColor 0 15px, transparent 15px 20px, currentColor 20px);
+}
+
+.transport-visual.is-bus::before {
+  inset: 12px 7px 9px;
+  border: 4px solid currentColor;
+  border-radius: 8px;
+}
+
+.transport-visual.is-bus::after {
+  left: 15px;
+  right: 15px;
+  bottom: 2px;
+  height: 13px;
+  background:
+    radial-gradient(circle at 0 100%, currentColor 0 5px, transparent 6px),
+    radial-gradient(circle at 100% 100%, currentColor 0 5px, transparent 6px),
+    linear-gradient(currentColor, currentColor) 50% 0 / 34px 4px no-repeat;
+}
+
+.transport-visual.is-plane::before {
+  left: 6px;
+  top: 22px;
+  width: 64px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(-18deg);
+}
+
+.transport-visual.is-plane::after {
+  left: 26px;
+  top: 5px;
+  width: 24px;
+  height: 38px;
+  border-left: 8px solid currentColor;
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+  transform: rotate(-18deg);
+}
+
+.transport-visual.is-boat::before {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  height: 22px;
+  border: 4px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 28px 28px;
+}
+
+.transport-visual.is-boat::after {
+  left: 30px;
+  top: 2px;
+  width: 22px;
+  height: 26px;
+  border-left: 5px solid currentColor;
+  background: linear-gradient(135deg, currentColor 0 50%, transparent 52%);
+}
+
+.transport-visual.is-car::before {
+  left: 8px;
+  right: 8px;
+  bottom: 10px;
+  height: 22px;
+  border: 4px solid currentColor;
+  border-radius: 10px;
+}
+
+.transport-visual.is-car::after {
+  left: 17px;
+  right: 17px;
+  bottom: 2px;
+  height: 13px;
+  background:
+    radial-gradient(circle at 0 100%, currentColor 0 5px, transparent 6px),
+    radial-gradient(circle at 100% 100%, currentColor 0 5px, transparent 6px),
+    linear-gradient(currentColor, currentColor) 50% 0 / 24px 5px no-repeat;
+}
+
+.transport-visual.is-metro::before {
+  inset: 4px 18px 8px;
+  border: 4px solid currentColor;
+  border-radius: 18px 18px 8px 8px;
+}
+
+.transport-visual.is-metro::after {
+  left: 23px;
+  right: 23px;
+  bottom: 2px;
+  height: 16px;
+  border-bottom: 4px solid currentColor;
+  background:
+    radial-gradient(circle at 0 100%, currentColor 0 4px, transparent 5px),
+    radial-gradient(circle at 100% 100%, currentColor 0 4px, transparent 5px);
+}
+
+.transport-visual.is-walk::before {
+  left: 32px;
+  top: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.transport-visual.is-walk::after {
+  left: 26px;
+  top: 18px;
+  width: 27px;
+  height: 28px;
+  border-left: 5px solid currentColor;
+  border-bottom: 5px solid currentColor;
+  transform: skewX(-14deg);
+}
+
+.item-card[data-type="交通"] .item-title,
+.item-card[data-type="飛機"] .item-title,
+.item-card[data-type="交通"] .item-content-preview,
+.item-card[data-type="飛機"] .item-content-preview {
+  padding-right: 94px;
+}
+
 .item-summary:hover::before {
   border-color: color-mix(in srgb, var(--card-accent), white 68%);
   box-shadow:

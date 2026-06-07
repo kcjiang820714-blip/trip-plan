@@ -1715,6 +1715,7 @@ function renderTrip() {
       (item, index) => {
         const isExpanded = state.expandedItemId === item.id;
         const detailsId = `itemDetails${item.id}`;
+        const visualType = transportVisualType(item);
 
         return `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
@@ -1731,6 +1732,7 @@ function renderTrip() {
               ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
               <span class="meta">${escapeHtml(item.type)}</span>
             </span>
+            ${visualType ? `<span class="transport-visual is-${escapeHtml(visualType)}" aria-hidden="true"></span>` : ""}
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
@@ -3329,6 +3331,20 @@ function getMapQuery(item) {
   }
 
   return item.place;
+}
+
+function transportVisualType(item) {
+  if (item.type === "飛機") return "plane";
+  if (item.type !== "交通") return "";
+
+  const mode = String(item.transportSegments[0]?.mode || item.transportMode || "").toLowerCase();
+  if (/飛機|航空|flight|plane|air/.test(mode)) return "plane";
+  if (/巴士|公車|bus/.test(mode)) return "bus";
+  if (/船|渡輪|ferry|boat/.test(mode)) return "boat";
+  if (/計程車|包車|汽車|開車|自駕|car|taxi/.test(mode)) return "car";
+  if (/步行|走路|walk/.test(mode)) return "walk";
+  if (/地鐵|捷運|metro|subway/.test(mode)) return "metro";
+  return "train";
 }
 
 function renderFlightInfo(item) {
