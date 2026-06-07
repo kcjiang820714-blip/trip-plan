@@ -1839,6 +1839,131 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.quick-ticket-panel {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.quick-ticket-panel[hidden] {
+  display: none;
+}
+
+.quick-ticket-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.quick-ticket-header h3 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 1.03rem;
+  line-height: 1.25;
+}
+
+.quick-ticket-header > span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e7f0ed;
+  color: var(--brand-dark);
+  font-size: 0.78rem;
+  font-weight: 950;
+  padding: 7px 10px;
+}
+
+.quick-ticket-list {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-ticket-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(19, 111, 99, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(242, 248, 245, 0.86)),
+    #fffdf8;
+  padding: 13px;
+  box-shadow: 0 12px 26px rgba(24, 37, 33, 0.08);
+}
+
+.quick-ticket-main {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.quick-ticket-type {
+  justify-self: start;
+  border-radius: 999px;
+  background: rgba(19, 111, 99, 0.11);
+  color: var(--brand-dark);
+  font-size: 0.74rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.quick-ticket-main strong {
+  color: var(--ink);
+  font-size: 1.02rem;
+  line-height: 1.28;
+}
+
+.quick-ticket-main dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.quick-ticket-main dl div {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.quick-ticket-main dt {
+  color: var(--brand-dark);
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.quick-ticket-main dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.quick-ticket-main small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.quick-ticket-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+  min-width: 88px;
+}
+
+.quick-ticket-actions .primary-button,
+.quick-ticket-actions .secondary-action {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 11px;
+  text-align: center;
+}
+
 .stay-primary {
   color: var(--ink);
   font-size: 0.96rem;
@@ -2896,6 +3021,14 @@ h2 {
 
   .booking-card {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-ticket-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-ticket-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .trip-invite-form {

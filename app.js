@@ -107,6 +107,7 @@ const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const timeline = document.querySelector("#timeline");
+const quickTicketPanel = document.querySelector("#quickTicketPanel");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
 const bookingSectionTitle = document.querySelector("#bookingSectionTitle");
 const bookingList = document.querySelector("#bookingList");
@@ -1341,6 +1342,7 @@ function renderTrip() {
   activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}`;
   activeDayTitle.textContent = day.title;
   renderBookings();
+  renderQuickTickets();
   renderTodos();
   renderExpenses();
 
@@ -1388,6 +1390,98 @@ function renderTrip() {
       }
     )
     .join("");
+}
+
+function renderQuickTickets() {
+  const trip = currentTrip();
+  const dayDate = getActiveDayDateValue(trip);
+  const bookings = (trip.bookings || [])
+    .filter((booking) => booking.date === dayDate || (booking.type === "住宿" && isDateInStayRange(dayDate, booking)))
+    .sort((a, b) => `${a.time || "99:99"} ${a.name}`.localeCompare(`${b.time || "99:99"} ${b.name}`));
+
+  if (!quickTicketPanel) return;
+
+  if (bookings.length === 0) {
+    quickTicketPanel.hidden = true;
+    quickTicketPanel.innerHTML = "";
+    return;
+  }
+
+  quickTicketPanel.hidden = false;
+  quickTicketPanel.innerHTML = `
+    <header class="quick-ticket-header">
+      <div>
+        <p class="eyebrow">今日快速取用</p>
+        <h3>今天會用到的票券與預訂</h3>
+      </div>
+      <span>${bookings.length} 筆</span>
+    </header>
+    <div class="quick-ticket-list">
+      ${bookings.map(renderQuickTicketCard).join("")}
+    </div>
+  `;
+}
+
+function renderQuickTicketCard(booking) {
+  const primaryAttachment = getPrimaryTicketAttachment(booking.attachments);
+  const timeLabel = booking.type === "住宿" ? renderStayQuickTime(booking) : booking.time || "未填時間";
+  const offlineLabel = getBookingOfflineLabel(booking);
+
+  return `
+    <article class="quick-ticket-card">
+      <div class="quick-ticket-main">
+        <span class="quick-ticket-type">${escapeHtml(booking.type)}</span>
+        <strong>${escapeHtml(booking.name)}</strong>
+        <dl>
+          <div><dt>時間</dt><dd>${escapeHtml(timeLabel)}</dd></div>
+          ${booking.place ? `<div><dt>地點</dt><dd>${escapeHtml(booking.place)}</dd></div>` : ""}
+          ${booking.code ? `<div><dt>代碼</dt><dd>${escapeHtml(booking.code)}</dd></div>` : ""}
+        </dl>
+        <small>${escapeHtml(offlineLabel)}</small>
+      </div>
+      <div class="quick-ticket-actions">
+        ${
+          primaryAttachment
+            ? `<button
+                class="primary-button quick-ticket-open"
+                type="button"
+                data-open-attachment="booking"
+                data-owner-id="${escapeHtml(booking.id)}"
+                data-attachment-id="${escapeHtml(primaryAttachment.id)}"
+              >開票券</button>`
+            : ""
+        }
+        ${booking.place ? `<a class="secondary-action" href="${googleMapsUrl(booking.place)}" target="_blank" rel="noopener">導航</a>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function getActiveDayDateValue(trip) {
+  return addDays(trip.startDate, state.activeDayIndex);
+}
+
+function isDateInStayRange(dayDate, booking) {
+  if (!dayDate || !booking.date || !booking.checkoutDate) return false;
+  return booking.date <= dayDate && dayDate <= booking.checkoutDate;
+}
+
+function getPrimaryTicketAttachment(attachments = []) {
+  return attachments.find((attachment) => getAttachmentSource(attachment)) || null;
+}
+
+function renderStayQuickTime(booking) {
+  const dayDate = getActiveDayDateValue(currentTrip());
+  const parts = [];
+  if (booking.date === dayDate) parts.push(`入住 ${booking.time || ""}`.trim());
+  if (booking.checkoutDate === dayDate) parts.push(`退房 ${booking.checkoutTime || ""}`.trim());
+  return parts.length ? parts.join(" / ") : "住宿期間";
+}
+
+function getBookingOfflineLabel(booking) {
+  if (!booking.attachments?.length) return "尚未加入票券附件";
+  if (booking.attachments.some((attachment) => attachment.dataUrl)) return "已保存在此裝置，離線可開";
+  return "附件在雲端，離線時可能無法開啟";
 }
 
 function renderTripSectionTabs() {
@@ -3415,6 +3509,7 @@ tripSectionTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeTripSection = button.dataset.tripSection;
   renderTripSectionTabs();
+  if (state.activeTripSection === "itinerary") renderQuickTickets();
 });
 
 bookingSubTabs.addEventListener("click", (event) => {
@@ -3435,6 +3530,12 @@ bookingList.addEventListener("click", (event) => {
   if (!button) return;
   if (isReadonly) return;
   openBookingDialog(button.dataset.editBooking);
+});
+
+quickTicketPanel?.addEventListener("click", (event) => {
+  const attachmentButton = event.target.closest("[data-open-attachment]");
+  if (!attachmentButton) return;
+  openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
 });
 
 todoSubTabs.addEventListener("click", (event) => {
@@ -3630,6 +3731,7 @@ bookingForm.addEventListener("submit", async (event) => {
   state.editingBookingId = null;
   closeModal(bookingDialog);
   renderBookings();
+  renderQuickTickets();
 });
 
 todoForm.addEventListener("submit", (event) => {
@@ -3943,6 +4045,7 @@ deleteBookingButton.addEventListener("click", () => {
   saveLibrary();
   closeModal(bookingDialog);
   renderBookings();
+  renderQuickTickets();
 });
 
 deleteTodoButton.addEventListener("click", () => {
