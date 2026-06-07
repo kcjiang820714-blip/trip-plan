@@ -49,6 +49,7 @@ const WEATHER_LOCATIONS = [
   { id: "vancouver", group: "美洲", name: "Vancouver 溫哥華", latitude: 49.2827, longitude: -123.1207, elevation: 70 }
 ];
 const WEATHER_SEARCH_LIMIT = 6;
+const TRIP_SEGMENT_COLORS = ["teal", "amber", "sage", "rose", "blue", "slate"];
 const TRADITIONAL_CHINESE_TERMS = [
   ["意大利", "義大利"],
   ["美国", "美國"],
@@ -230,6 +231,7 @@ const state = {
   weatherSearchResults: [],
   weatherSearchStatus: "",
   editingWeatherLocations: {},
+  editingTripSegments: [],
   tripWeatherSearchQueries: {},
   tripWeatherSearchResults: {},
   tripWeatherSearchStatuses: {},
@@ -322,6 +324,7 @@ const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
 const tripDaysInput = document.querySelector("#tripDaysInput");
 const tripDayTitleEditor = document.querySelector("#tripDayTitleEditor");
+const tripSegmentEditor = document.querySelector("#tripSegmentEditor");
 const tripWeatherEditor = document.querySelector("#tripWeatherEditor");
 const tripSharePanel = document.querySelector("#tripSharePanel");
 const tripInviteForm = document.querySelector("#tripInviteForm");
@@ -442,6 +445,7 @@ function normalizeLibrary(library) {
         endDate: dateRange.endDate,
         dates: dateRange.label,
         days,
+        segments: normalizeTripSegments(trip.segments, days.length),
         sharedMembers: normalizeSharedMembers(trip.sharedMembers),
         members: normalizeMembers(trip.members),
         exchangeRates: normalizeExchangeRates(trip.exchangeRates),
@@ -484,9 +488,36 @@ function normalizeWeatherForecasts(value) {
       .map(([locationId, forecast]) => [locationId, {
         fetchedAt: forecast.fetchedAt || "",
         source: forecast.source || "Open-Meteo MeteoSwiss",
-        daily: forecast.daily || {}
+        daily: forecast.daily || {},
+        hourly: forecast.hourly || {}
       }])
   );
+}
+
+function normalizeTripSegments(value, dayCount = 1) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((segment, index) => {
+      const startDay = Math.max(1, Math.min(dayCount, Number(segment.startDay) || 1));
+      const endDay = Math.max(startDay, Math.min(dayCount, Number(segment.endDay) || startDay));
+      const title = String(segment.title || "").trim();
+      if (!title) return null;
+      const color = TRIP_SEGMENT_COLORS.includes(segment.color) ? segment.color : TRIP_SEGMENT_COLORS[index % TRIP_SEGMENT_COLORS.length];
+      return {
+        id: segment.id || createId(),
+        title,
+        startDay,
+        endDay,
+        color
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startDay - b.startDay || a.endDay - b.endDay);
+}
+
+function tripSegmentForDay(trip, dayIndex) {
+  const dayNumber = dayIndex + 1;
+  return normalizeTripSegments(trip?.segments, trip?.days?.length || 1).find((segment) => dayNumber >= segment.startDay && dayNumber <= segment.endDay) || null;
 }
 
 function normalizeWeatherLocation(value) {
@@ -1531,6 +1562,19 @@ function googleMapsUrl(place) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
 }
 
+function renderDayTab(trip, dayIndex, className, isActive = false) {
+  const day = trip.days[dayIndex];
+  const segment = tripSegmentForDay(trip, dayIndex);
+  const segmentClass = segment ? ` has-segment segment-${escapeHtml(segment.color)}` : "";
+  return `
+    <button class="day-tab ${className}${segmentClass}" type="button" data-day="${dayIndex}" ${isActive ? 'aria-current="date"' : ""}>
+      <span>Day ${dayIndex + 1}</span>
+      <strong>${escapeHtml(day.date)}</strong>
+      ${segment ? `<em>${escapeHtml(segment.title)}</em>` : ""}
+    </button>
+  `;
+}
+
 function renderTrip() {
   const trip = currentTrip();
   if (!trip) return;
@@ -1547,29 +1591,21 @@ function renderTrip() {
     <button class="day-nav-arrow" type="button" data-day-step="-1" ${previousDay ? "" : "disabled"} aria-label="前一天" title="前一天">‹</button>
     ${
       previousDay
-        ? `<button class="day-tab is-neighbor" type="button" data-day="${state.activeDayIndex - 1}">
-            <span>Day ${state.activeDayIndex}</span>
-            <strong>${escapeHtml(previousDay.date)}</strong>
-          </button>`
+        ? renderDayTab(trip, state.activeDayIndex - 1, "is-neighbor")
         : `<span class="day-tab-placeholder" aria-hidden="true"></span>`
     }
-    <button class="day-tab is-active" type="button" data-day="${state.activeDayIndex}" aria-current="date">
-      <span>Day ${state.activeDayIndex + 1}</span>
-      <strong>${escapeHtml(currentDay().date)}</strong>
-    </button>
+    ${renderDayTab(trip, state.activeDayIndex, "is-active", true)}
     ${
       nextDay
-        ? `<button class="day-tab is-neighbor" type="button" data-day="${state.activeDayIndex + 1}">
-            <span>Day ${state.activeDayIndex + 2}</span>
-            <strong>${escapeHtml(nextDay.date)}</strong>
-          </button>`
+        ? renderDayTab(trip, state.activeDayIndex + 1, "is-neighbor")
         : `<span class="day-tab-placeholder" aria-hidden="true"></span>`
     }
     <button class="day-nav-arrow" type="button" data-day-step="1" ${nextDay ? "" : "disabled"} aria-label="後一天" title="後一天">›</button>
   `;
 
   const day = currentDay();
-  activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}`;
+  const activeSegment = tripSegmentForDay(trip, state.activeDayIndex);
+  activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}${activeSegment ? ` · ${activeSegment.title}` : ""}`;
   activeDayTitle.textContent = day.title;
   renderBookings();
   renderTravelDayPanel();
@@ -1731,13 +1767,14 @@ function renderWeatherPanel(statusText = "") {
 function renderWeatherLocationForecast(trip, dayDate, location, statusText = "") {
   const cachedForecast = trip.weatherForecasts?.[location.id] || null;
   const forecast = getForecastForDate(cachedForecast, dayDate);
+  const periods = getWeatherPeriodsForDate(cachedForecast, dayDate);
   const hasForecast = Boolean(forecast);
   const displayName = weatherLocationTitle(location);
   const displayMeta = weatherDisplayText(weatherLocationMeta(location) || weatherSourceName(location));
   const iconType = weatherIconType(hasForecast ? forecast.weatherCode : null);
   const cardKey = weatherCardKey(dayDate, location.id);
   const isExpanded = state.expandedWeatherCards.has(cardKey);
-  const summary = weatherSummaryText(location, forecast, cachedForecast, statusText);
+  const summary = weatherSummaryText(location, forecast, cachedForecast, statusText, periods);
 
   return `
     <article class="weather-location-card ${hasForecast ? "" : "is-empty"} ${isExpanded ? "is-expanded" : "is-collapsed"} is-${escapeHtml(iconType)}">
@@ -1760,6 +1797,7 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
                 <span><i class="weather-metric-icon is-rain" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.precipitationProbability, "%")}</strong>降雨機率</span>
                 <span><i class="weather-metric-icon is-wind" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
               </div>
+              ${renderWeatherPeriods(periods)}
               <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
               <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
             `
@@ -1778,11 +1816,14 @@ function weatherCardKey(dayDate, locationId) {
   return `${dayDate}:${locationId}`;
 }
 
-function weatherSummaryText(location, forecast, cachedForecast, statusText = "") {
+function weatherSummaryText(location, forecast, cachedForecast, statusText = "", periods = []) {
   if (!forecast) {
     if (statusText) return weatherDisplayText(statusText);
     if (cachedForecast) return "尚無這天預報";
     return "尚未更新";
+  }
+  if (periods.length) {
+    return periods.map((period) => `${period.label} ${weatherCodeLabel(period.weatherCode)} ${formatTemperatureRange(period)} 雨${formatWeatherNumber(period.precipitationProbability, "%")}`).join(" · ");
   }
   return [
     weatherCodeLabel(forecast.weatherCode),
@@ -1790,6 +1831,22 @@ function weatherSummaryText(location, forecast, cachedForecast, statusText = "")
     `降雨 ${formatWeatherNumber(forecast.precipitationProbability, "%")}`,
     compactWeatherUpdatedLabel(cachedForecast)
   ].filter(Boolean).join(" · ");
+}
+
+function renderWeatherPeriods(periods) {
+  if (!periods.length) return "";
+  return `
+    <div class="weather-periods">
+      ${periods
+        .map((period) => `
+          <span>
+            <strong>${escapeHtml(period.label)}</strong>
+            <small>${escapeHtml(weatherCodeLabel(period.weatherCode))} · ${escapeHtml(formatTemperatureRange(period))} · 雨 ${escapeHtml(formatWeatherNumber(period.precipitationProbability, "%"))}</small>
+          </span>
+        `)
+        .join("")}
+    </div>
+  `;
 }
 
 function weatherLocationTitle(location) {
@@ -1969,6 +2026,50 @@ function getForecastForDate(forecast, dayDate) {
   };
 }
 
+function getWeatherPeriodsForDate(forecast, dayDate) {
+  const hourly = forecast?.hourly;
+  if (!hourly?.time) return [];
+  const definitions = [
+    { id: "morning", label: "上午", start: 6, end: 11 },
+    { id: "afternoon", label: "下午", start: 12, end: 17 },
+    { id: "evening", label: "晚上", start: 18, end: 23 }
+  ];
+
+  return definitions
+    .map((period) => {
+      const indexes = hourly.time
+        .map((time, index) => ({ time, index }))
+        .filter(({ time }) => {
+          if (!String(time).startsWith(dayDate)) return false;
+          const hour = Number(String(time).slice(11, 13));
+          return Number.isFinite(hour) && hour >= period.start && hour <= period.end;
+        })
+        .map(({ index }) => index);
+      if (indexes.length === 0) return null;
+
+      const temperatures = indexes.map((index) => weatherNumber(hourly.temperature_2m?.[index])).filter((value) => value !== null);
+      const rainValues = indexes.map((index) => weatherNumber(hourly.precipitation_probability?.[index])).filter((value) => value !== null);
+      const windValues = indexes.map((index) => weatherNumber(hourly.wind_speed_10m?.[index])).filter((value) => value !== null);
+      const weatherCodes = indexes.map((index) => weatherNumber(hourly.weather_code?.[index])).filter((value) => value !== null);
+
+      return {
+        ...period,
+        tempMin: temperatures.length ? Math.min(...temperatures) : null,
+        tempMax: temperatures.length ? Math.max(...temperatures) : null,
+        precipitationProbability: rainValues.length ? Math.max(...rainValues) : null,
+        windSpeed: windValues.length ? Math.max(...windValues) : null,
+        weatherCode: representativeWeatherCode(weatherCodes)
+      };
+    })
+    .filter(Boolean);
+}
+
+function representativeWeatherCode(codes) {
+  if (!codes.length) return null;
+  const priority = [95, 96, 99, 80, 81, 82, 61, 63, 65, 66, 67, 71, 73, 75, 77, 85, 86, 51, 53, 55, 56, 57, 45, 48, 3, 2, 1, 0];
+  return priority.find((code) => codes.includes(code)) ?? codes[0];
+}
+
 function weatherNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -2042,6 +2143,7 @@ async function fetchWeatherForLocation(trip, location) {
     latitude: String(location.latitude),
     longitude: String(location.longitude),
     daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
+    hourly: "weather_code,temperature_2m,precipitation_probability,wind_speed_10m",
     timezone: "auto",
     forecast_days: "7",
     wind_speed_unit: "kmh"
@@ -2054,11 +2156,12 @@ async function fetchWeatherForLocation(trip, location) {
   trip.weatherForecasts = normalizeWeatherForecasts({
     ...(trip.weatherForecasts || {}),
     [location.id]: {
-      fetchedAt: new Date().toISOString(),
-      source: weatherSourceName(location),
-      daily: data.daily || {}
-    }
-  });
+        fetchedAt: new Date().toISOString(),
+        source: weatherSourceName(location),
+        daily: data.daily || {},
+        hourly: data.hourly || {}
+      }
+    });
 }
 
 function renderQuickTickets() {
@@ -3823,6 +3926,7 @@ function openTripDialog(tripId = null) {
   tripStartInput.value = trip?.startDate || todayString();
   tripEndInput.value = trip?.endDate || addDays(tripStartInput.value, 2);
   tripDaysInput.value = trip?.days.length || 3;
+  state.editingTripSegments = structuredClone(normalizeTripSegments(trip?.segments || [], calculateDayCount(tripStartInput.value, tripEndInput.value)));
   state.editingWeatherLocations = structuredClone(normalizeWeatherLocations(trip?.weatherLocations || {}));
   state.tripWeatherSearchQueries = {};
   state.tripWeatherSearchResults = {};
@@ -3856,6 +3960,7 @@ function updateTripDayPreview() {
   const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
   tripDaysInput.value = `${dayCount} 天`;
   renderTripDayTitleEditor();
+  renderTripSegmentEditor();
   renderTripWeatherEditor();
 }
 
@@ -3890,6 +3995,91 @@ function collectTripDayTitles(dayCount) {
     const input = tripDayTitleEditor?.querySelector(`[data-trip-day-title="${index}"]`);
     return input?.value.trim() || `第 ${index + 1} 天`;
   });
+}
+
+function renderTripSegmentEditor() {
+  if (!tripSegmentEditor || !tripStartInput.value || !tripEndInput.value) return;
+
+  const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
+  state.editingTripSegments = normalizeTripSegments(state.editingTripSegments, dayCount);
+  const dayOptions = Array.from({ length: dayCount }, (_, index) => `<option value="${index + 1}">Day ${index + 1}</option>`).join("");
+
+  tripSegmentEditor.innerHTML = `
+    <div class="trip-segment-heading">
+      <div>
+        <strong>旅程分段</strong>
+        <span>把連續幾天歸成同一段，總覽日期會用同色標記。</span>
+      </div>
+      <button class="secondary-action" type="button" data-add-trip-segment>新增分段</button>
+    </div>
+    ${
+      state.editingTripSegments.length
+        ? state.editingTripSegments
+            .map((segment, index) => `
+              <article class="trip-segment-row segment-${escapeHtml(segment.color)}" data-trip-segment-index="${index}">
+                <label>
+                  <span>名稱</span>
+                  <input data-trip-segment-field="title" value="${escapeHtml(segment.title)}" placeholder="例如：琉森" />
+                </label>
+                <label>
+                  <span>開始</span>
+                  <select data-trip-segment-field="startDay">${dayOptions}</select>
+                </label>
+                <label>
+                  <span>結束</span>
+                  <select data-trip-segment-field="endDay">${dayOptions}</select>
+                </label>
+                <label>
+                  <span>顏色</span>
+                  <select data-trip-segment-field="color">
+                    ${TRIP_SEGMENT_COLORS.map((color) => `<option value="${escapeHtml(color)}">${escapeHtml(segmentColorLabel(color))}</option>`).join("")}
+                  </select>
+                </label>
+                <button class="text-button" type="button" data-remove-trip-segment="${index}">移除</button>
+              </article>
+            `)
+            .join("")
+        : `<p class="trip-segment-empty">尚未設定分段。可以新增「啟程日、琉森、策馬特」這類段落。</p>`
+    }
+  `;
+
+  tripSegmentEditor.querySelectorAll("[data-trip-segment-index]").forEach((row) => {
+    const segment = state.editingTripSegments[Number(row.dataset.tripSegmentIndex)];
+    row.querySelector('[data-trip-segment-field="startDay"]').value = String(segment.startDay);
+    row.querySelector('[data-trip-segment-field="endDay"]').value = String(segment.endDay);
+    row.querySelector('[data-trip-segment-field="color"]').value = segment.color;
+  });
+}
+
+function segmentColorLabel(color) {
+  return {
+    teal: "湖水綠",
+    amber: "暖黃",
+    sage: "鼠尾草",
+    rose: "玫瑰",
+    blue: "霧藍",
+    slate: "灰綠"
+  }[color] || color;
+}
+
+function syncTripSegmentDraftFromEditor() {
+  if (!tripSegmentEditor) return;
+  const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
+  state.editingTripSegments = normalizeTripSegments(
+    Array.from(tripSegmentEditor.querySelectorAll("[data-trip-segment-index]")).map((row) => ({
+      id: state.editingTripSegments[Number(row.dataset.tripSegmentIndex)]?.id || createId(),
+      title: row.querySelector('[data-trip-segment-field="title"]')?.value.trim() || "",
+      startDay: row.querySelector('[data-trip-segment-field="startDay"]')?.value,
+      endDay: row.querySelector('[data-trip-segment-field="endDay"]')?.value,
+      color: row.querySelector('[data-trip-segment-field="color"]')?.value
+    })),
+    dayCount
+  );
+}
+
+function collectTripSegments(dayCount) {
+  syncTripSegmentDraftFromEditor();
+  return normalizeTripSegments(state.editingTripSegments, dayCount);
 }
 
 function renderTripWeatherEditor() {
@@ -4251,6 +4441,41 @@ tripMemberList?.addEventListener("click", async (event) => {
 
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
+
+tripSegmentEditor?.addEventListener("input", (event) => {
+  if (!event.target.closest("[data-trip-segment-field]")) return;
+  syncTripSegmentDraftFromEditor();
+});
+
+tripSegmentEditor?.addEventListener("change", (event) => {
+  if (!event.target.closest("[data-trip-segment-field]")) return;
+  syncTripSegmentDraftFromEditor();
+  renderTripSegmentEditor();
+});
+
+tripSegmentEditor?.addEventListener("click", (event) => {
+  const addButton = event.target.closest("[data-add-trip-segment]");
+  if (addButton) {
+    syncTripSegmentDraftFromEditor();
+    const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
+    const nextIndex = state.editingTripSegments.length;
+    state.editingTripSegments.push({
+      id: createId(),
+      title: `分段 ${nextIndex + 1}`,
+      startDay: Math.min(dayCount, nextIndex + 1),
+      endDay: Math.min(dayCount, nextIndex + 1),
+      color: TRIP_SEGMENT_COLORS[nextIndex % TRIP_SEGMENT_COLORS.length]
+    });
+    renderTripSegmentEditor();
+    return;
+  }
+
+  const removeButton = event.target.closest("[data-remove-trip-segment]");
+  if (!removeButton) return;
+  syncTripSegmentDraftFromEditor();
+  state.editingTripSegments.splice(Number(removeButton.dataset.removeTripSegment), 1);
+  renderTripSegmentEditor();
+});
 
 tripWeatherEditor?.addEventListener("click", (event) => {
   const searchButton = event.target.closest("[data-trip-weather-search-button]");
@@ -5006,6 +5231,7 @@ tripForm.addEventListener("submit", (event) => {
   const endDate = tripEndInput.value;
   const dayCount = calculateDayCount(startDate, endDate);
   const dayTitles = collectTripDayTitles(dayCount);
+  const tripSegments = collectTripSegments(dayCount);
   const weatherLocations = collectTripWeatherLocations(dayCount);
   let trip = state.editingTripId
     ? state.library.trips.find((item) => item.id === state.editingTripId)
@@ -5020,6 +5246,7 @@ tripForm.addEventListener("submit", (event) => {
       endDate,
       dates: formatDateRange(startDate, endDate),
       days: createBlankDays(dayCount, startDate).map((day, index) => ({ ...day, title: dayTitles[index] })),
+      segments: tripSegments,
       members: ["我"],
       exchangeRates: { ...DEFAULT_EXCHANGE_RATES },
       weatherLocations,
@@ -5037,6 +5264,7 @@ tripForm.addEventListener("submit", (event) => {
     resizeTripDays(trip, dayCount);
     syncTripDayDates(trip);
     trip.days = trip.days.map((day, index) => ({ ...day, title: dayTitles[index] || day.title }));
+    trip.segments = tripSegments;
     trip.weatherLocations = weatherLocations;
   }
 

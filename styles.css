@@ -822,6 +822,66 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.day-tab em {
+  display: block;
+  max-width: 100%;
+  margin-top: 3px;
+  color: inherit;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 900;
+  opacity: 0.82;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-tab.has-segment {
+  border-color: var(--segment-border, rgba(24, 37, 33, 0.12));
+  background: var(--segment-soft, transparent);
+}
+
+.day-tab.is-active.has-segment {
+  background:
+    linear-gradient(135deg, var(--segment-strong, rgba(15, 63, 57, 0.98)), rgba(19, 111, 99, 0.9));
+}
+
+.segment-teal {
+  --segment-soft: rgba(15, 107, 95, 0.12);
+  --segment-border: rgba(15, 107, 95, 0.28);
+  --segment-strong: #0f6b5f;
+}
+
+.segment-amber {
+  --segment-soft: rgba(194, 137, 42, 0.14);
+  --segment-border: rgba(194, 137, 42, 0.28);
+  --segment-strong: #9c6a21;
+}
+
+.segment-sage {
+  --segment-soft: rgba(99, 126, 93, 0.16);
+  --segment-border: rgba(99, 126, 93, 0.3);
+  --segment-strong: #5c7758;
+}
+
+.segment-rose {
+  --segment-soft: rgba(174, 92, 86, 0.14);
+  --segment-border: rgba(174, 92, 86, 0.28);
+  --segment-strong: #9d514d;
+}
+
+.segment-blue {
+  --segment-soft: rgba(73, 118, 145, 0.14);
+  --segment-border: rgba(73, 118, 145, 0.28);
+  --segment-strong: #426f89;
+}
+
+.segment-slate {
+  --segment-soft: rgba(94, 108, 104, 0.14);
+  --segment-border: rgba(94, 108, 104, 0.28);
+  --segment-strong: #53615e;
+}
+
 .day-tab.is-neighbor {
   opacity: 0.42;
 }
@@ -2522,6 +2582,34 @@ h2 {
   line-height: 1.15;
 }
 
+.weather-periods {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.weather-periods span {
+  display: grid;
+  gap: 4px;
+  border-radius: 8px;
+  background: rgba(231, 240, 237, 0.52);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  padding: 8px;
+}
+
+.weather-periods strong {
+  color: var(--brand-dark);
+  font-size: 0.78rem;
+}
+
+.weather-periods small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .weather-advice,
 .weather-empty,
 .weather-card small {
@@ -3388,6 +3476,60 @@ h2 {
   background: rgba(255, 255, 255, 0.62);
 }
 
+.trip-segment-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.trip-segment-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.trip-segment-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.trip-segment-heading strong,
+.trip-segment-row strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.trip-segment-heading span,
+.trip-segment-row label span,
+.trip-segment-empty {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.trip-segment-empty {
+  margin: 0;
+}
+
+.trip-segment-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) repeat(3, minmax(74px, 0.5fr)) auto;
+  gap: 8px;
+  align-items: end;
+  border: 1px solid var(--segment-border, rgba(24, 37, 33, 0.09));
+  border-radius: 8px;
+  background: var(--segment-soft, rgba(255, 255, 255, 0.7));
+  padding: 10px;
+}
+
+.trip-segment-row label {
+  gap: 5px;
+}
+
 .trip-weather-heading {
   display: grid;
   gap: 3px;
@@ -3870,11 +4012,20 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .trip-segment-heading,
+  .trip-segment-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .weather-header > span {
     justify-self: start;
   }
 
   .weather-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weather-periods {
     grid-template-columns: minmax(0, 1fr);
   }
 
