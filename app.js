@@ -232,7 +232,8 @@ const state = {
   editingWeatherLocations: {},
   tripWeatherSearchQueries: {},
   tripWeatherSearchResults: {},
-  tripWeatherSearchStatuses: {}
+  tripWeatherSearchStatuses: {},
+  expandedWeatherCards: new Set()
 };
 
 state.activeTripId = state.library.trips[0]?.id || null;
@@ -1734,36 +1735,61 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
   const displayName = weatherLocationTitle(location);
   const displayMeta = weatherDisplayText(weatherLocationMeta(location) || weatherSourceName(location));
   const iconType = weatherIconType(hasForecast ? forecast.weatherCode : null);
+  const cardKey = weatherCardKey(dayDate, location.id);
+  const isExpanded = state.expandedWeatherCards.has(cardKey);
+  const summary = weatherSummaryText(location, forecast, cachedForecast, statusText);
 
   return `
-    <article class="weather-location-card ${hasForecast ? "" : "is-empty"} is-${escapeHtml(iconType)}">
-      <header>
+    <article class="weather-location-card ${hasForecast ? "" : "is-empty"} ${isExpanded ? "is-expanded" : "is-collapsed"} is-${escapeHtml(iconType)}">
+      <button class="weather-location-summary" type="button" data-toggle-weather-card="${escapeHtml(cardKey)}" aria-expanded="${isExpanded ? "true" : "false"}">
         ${renderWeatherIcon(hasForecast ? forecast.weatherCode : null)}
         <div>
           <strong>${escapeHtml(displayName)}</strong>
-          <small>${escapeHtml(displayMeta)}</small>
+          <small>${escapeHtml(summary)}</small>
         </div>
         ${hasForecast ? `<span>${escapeHtml(weatherCodeLabel(forecast.weatherCode))}</span>` : ""}
-      </header>
-      ${
-        hasForecast
-          ? `
-            <div class="weather-metrics">
-              <span><i class="weather-metric-icon is-temp" aria-hidden="true"></i><strong>${formatTemperatureRange(forecast)}</strong>高低溫</span>
-              <span><i class="weather-metric-icon is-rain" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.precipitationProbability, "%")}</strong>降雨機率</span>
-              <span><i class="weather-metric-icon is-wind" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
-            </div>
-            <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
-            <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
-          `
-          : `<p class="weather-empty">${escapeHtml(weatherDisplayText(statusText || weatherEmptyMessage(location, cachedForecast)))}</p>`
-      }
+        <i class="weather-expand-icon" aria-hidden="true"></i>
+      </button>
+      <div class="weather-location-detail" ${isExpanded ? "" : "hidden"}>
+        <small>${escapeHtml(displayMeta)}</small>
+        ${
+          hasForecast
+            ? `
+              <div class="weather-metrics">
+                <span><i class="weather-metric-icon is-temp" aria-hidden="true"></i><strong>${formatTemperatureRange(forecast)}</strong>高低溫</span>
+                <span><i class="weather-metric-icon is-rain" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.precipitationProbability, "%")}</strong>降雨機率</span>
+                <span><i class="weather-metric-icon is-wind" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
+              </div>
+              <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
+              <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
+            `
+            : `<p class="weather-empty">${escapeHtml(weatherDisplayText(statusText || weatherEmptyMessage(location, cachedForecast)))}</p>`
+        }
+      </div>
     </article>
   `;
 }
 
 function weatherDisplayText(value) {
   return toTraditionalChineseText(value);
+}
+
+function weatherCardKey(dayDate, locationId) {
+  return `${dayDate}:${locationId}`;
+}
+
+function weatherSummaryText(location, forecast, cachedForecast, statusText = "") {
+  if (!forecast) {
+    if (statusText) return weatherDisplayText(statusText);
+    if (cachedForecast) return "尚無這天預報";
+    return "尚未更新";
+  }
+  return [
+    weatherCodeLabel(forecast.weatherCode),
+    formatTemperatureRange(forecast),
+    `降雨 ${formatWeatherNumber(forecast.precipitationProbability, "%")}`,
+    compactWeatherUpdatedLabel(cachedForecast)
+  ].filter(Boolean).join(" · ");
 }
 
 function weatherLocationTitle(location) {
@@ -1962,6 +1988,13 @@ function weatherUpdatedLabel(forecast) {
   const updated = new Date(forecast.fetchedAt);
   if (Number.isNaN(updated.getTime())) return "已使用上次成功抓取的資料";
   return `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · Source: ${forecast.source || "Open-Meteo MeteoSwiss"}`;
+}
+
+function compactWeatherUpdatedLabel(forecast) {
+  if (!forecast?.fetchedAt) return "";
+  const updated = new Date(forecast.fetchedAt);
+  if (Number.isNaN(updated.getTime())) return "";
+  return updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function weatherCodeLabel(code) {
@@ -4369,6 +4402,18 @@ weatherPanel?.addEventListener("submit", (event) => {
 });
 
 weatherPanel?.addEventListener("click", (event) => {
+  const toggleButton = event.target.closest("[data-toggle-weather-card]");
+  if (toggleButton) {
+    const cardKey = toggleButton.dataset.toggleWeatherCard;
+    if (state.expandedWeatherCards.has(cardKey)) {
+      state.expandedWeatherCards.delete(cardKey);
+    } else {
+      state.expandedWeatherCards.add(cardKey);
+    }
+    renderWeatherPanel();
+    return;
+  }
+
   const resultButton = event.target.closest("[data-select-weather-result]");
   if (resultButton) {
     selectWeatherSearchResult(Number(resultButton.dataset.selectWeatherResult));

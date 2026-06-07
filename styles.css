@@ -2074,11 +2074,11 @@ h2 {
   position: relative;
   overflow: hidden;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid rgba(24, 37, 33, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.7);
-  padding: 12px;
+  padding: 10px;
 }
 
 .weather-location-card::before,
@@ -2167,37 +2167,45 @@ h2 {
     rgba(255, 255, 255, 0.72);
 }
 
-.weather-location-card header {
+.weather-location-summary {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
 }
 
-.weather-location-card header div {
+.weather-location-summary div {
   display: grid;
   gap: 3px;
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.weather-location-card header strong {
+.weather-location-summary strong {
   color: var(--ink);
   font-size: 0.96rem;
   line-height: 1.25;
 }
 
-.weather-location-card header small {
+.weather-location-summary small {
   margin: 0;
   color: var(--muted);
   font-size: 0.74rem;
   font-weight: 850;
+  line-height: 1.35;
 }
 
-.weather-location-card header > span {
+.weather-location-summary > span {
   flex: 0 0 auto;
 }
 
-.weather-location-card header > span:not(.weather-icon) {
+.weather-location-summary > span:not(.weather-icon) {
   border-radius: 999px;
   background: #e7f0ed;
   color: var(--brand-dark);
@@ -2205,6 +2213,54 @@ h2 {
   font-weight: 950;
   line-height: 1;
   padding: 7px 9px;
+}
+
+.weather-expand-icon {
+  position: relative;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: rgba(231, 240, 237, 0.72);
+}
+
+.weather-expand-icon::before,
+.weather-expand-icon::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 10px;
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--brand-dark);
+}
+
+.weather-expand-icon::after {
+  transform: rotate(90deg);
+}
+
+.weather-location-card.is-expanded .weather-expand-icon::after {
+  transform: rotate(0deg);
+}
+
+.weather-location-detail {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(24, 37, 33, 0.08);
+}
+
+.weather-location-detail[hidden] {
+  display: none;
+}
+
+.weather-location-detail > small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
 }
 
 .weather-icon {
