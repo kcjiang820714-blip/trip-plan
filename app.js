@@ -843,6 +843,42 @@ function safeFileName(value) {
     .slice(0, 60);
 }
 
+function safeStorageSegment(value, fallback = "file", maxLength = 80) {
+  const safeValue = String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^\.+|\.+$/g, "")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, maxLength);
+
+  return safeValue && /[A-Za-z0-9]/.test(safeValue) ? safeValue : fallback;
+}
+
+function storageFileExtension(attachment) {
+  const type = String(attachment?.type || "").toLowerCase();
+  const mimeExtension = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp"
+  }[type];
+  const nameExtension = String(attachment?.name || "").split(".").pop();
+  const extension = mimeExtension || nameExtension || "file";
+
+  return safeStorageSegment(extension.toLowerCase().replace(/^jpeg$/, "jpg"), "file", 12);
+}
+
+function storageBaseName(attachment) {
+  const name = String(attachment?.name || "attachment").replace(/\.[^.]+$/, "");
+  return safeStorageSegment(name, "attachment", 48);
+}
+
+function isSafeStoragePath(path) {
+  return /^[A-Za-z0-9._/-]+$/.test(String(path || "")) && !String(path || "").includes("//");
+}
+
 function createId() {
   return `trip-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -1209,16 +1245,22 @@ function canSaveCloudTripShell(trip) {
 }
 
 function attachmentStoragePath(trip, ownerType, ownerId, attachment) {
-  const extension = attachment.type?.split("/")[1]?.replace("jpeg", "jpg") || attachment.name.split(".").pop() || "file";
-  const fileName = `${attachment.id}-${safeFileName(attachment.name || "attachment")}.${extension}`.replace(/\.+/g, ".");
-  return `${state.cloudUser.id}/${trip.id}/${ownerType}/${ownerId}/${fileName}`;
+  const extension = storageFileExtension(attachment);
+  const fileName = `${safeStorageSegment(attachment.id || createId(), "attachment")}-${storageBaseName(attachment)}.${extension}`;
+  return [
+    safeStorageSegment(state.cloudUser.id, "user"),
+    safeStorageSegment(trip.id, "trip"),
+    safeStorageSegment(ownerType, "owner"),
+    safeStorageSegment(ownerId, "item"),
+    fileName
+  ].join("/");
 }
 
 async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment) {
   if (attachment.publicUrl || !attachment.dataUrl) return;
 
   const blob = dataUrlToBlob(attachment.dataUrl);
-  const storagePath = attachment.storagePath || attachmentStoragePath(trip, ownerType, ownerId, attachment);
+  const storagePath = isSafeStoragePath(attachment.storagePath) ? attachment.storagePath : attachmentStoragePath(trip, ownerType, ownerId, attachment);
   const { error } = await client.storage.from(SUPABASE_ATTACHMENT_BUCKET).upload(storagePath, blob, {
     cacheControl: "3600",
     contentType: attachment.type || blob.type || "application/octet-stream",
