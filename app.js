@@ -106,6 +106,7 @@ const activeDate = document.querySelector("#activeDate");
 const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
+const travelDayPanel = document.querySelector("#travelDayPanel");
 const timeline = document.querySelector("#timeline");
 const quickTicketPanel = document.querySelector("#quickTicketPanel");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
@@ -1342,6 +1343,7 @@ function renderTrip() {
   activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}`;
   activeDayTitle.textContent = day.title;
   renderBookings();
+  renderTravelDayPanel();
   renderQuickTickets();
   renderTodos();
   renderExpenses();
@@ -1392,11 +1394,67 @@ function renderTrip() {
     .join("");
 }
 
+function renderTravelDayPanel() {
+  if (!travelDayPanel) return;
+
+  const trip = currentTrip();
+  const day = currentDay();
+  const dayDate = getActiveDayDateValue(trip);
+  const nextItem = getNextTravelItem(day, dayDate);
+  const passedCount = countPassedItems(day, dayDate);
+  const totalCount = day.items.length;
+  const bookings = getBookingsForDay(trip, dayDate);
+  const reminders = getTravelRemindersForDay(trip, dayDate);
+  const progressText = totalCount ? `${Math.min(passedCount, totalCount)}/${totalCount} 已過` : "尚無行程";
+
+  travelDayPanel.innerHTML = `
+    <section class="travel-day-card">
+      <header class="travel-day-header">
+        <div>
+          <p class="eyebrow">今日旅程</p>
+          <h3>${escapeHtml(day.title || `Day ${state.activeDayIndex + 1}`)}</h3>
+        </div>
+        <span>${escapeHtml(progressText)}</span>
+      </header>
+      ${
+        nextItem
+          ? `
+            <article class="travel-next-stop">
+              <span class="travel-next-time">${escapeHtml(nextItem.time || "--:--")}</span>
+              <div>
+                <p>下一站</p>
+                <strong>${escapeHtml(getItemTitle(nextItem))}</strong>
+                <small>${escapeHtml(nextItem.type || "行程")}${nextItem.note ? ` · ${escapeHtml(nextItem.note)}` : ""}</small>
+              </div>
+            </article>
+            <div class="travel-day-actions">
+              <a class="primary-button" href="${googleMapsUrl(getMapQuery(nextItem))}" target="_blank" rel="noopener">下一站導航</a>
+              <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(nextItem.id || "")}">查看行程</button>
+            </div>
+          `
+          : `
+            <article class="travel-next-stop is-empty">
+              <div>
+                <p>下一站</p>
+                <strong>今天還沒有排定行程</strong>
+                <small>可以新增行程，或先把票券與待辦補上。</small>
+              </div>
+            </article>
+          `
+      }
+      <div class="travel-day-metrics" aria-label="今日摘要">
+        <span><strong>${bookings.length}</strong>票券</span>
+        <span><strong>${reminders.length}</strong>提醒</span>
+        <span><strong>${totalCount}</strong>行程</span>
+      </div>
+    </section>
+  `;
+}
+
 function renderQuickTickets() {
   const trip = currentTrip();
   const dayDate = getActiveDayDateValue(trip);
-  const bookings = (trip.bookings || [])
-    .filter((booking) => booking.date === dayDate || (booking.type === "住宿" && isDateInStayRange(dayDate, booking)))
+  const bookings = getBookingsForDay(trip, dayDate)
     .sort((a, b) => `${a.time || "99:99"} ${a.name}`.localeCompare(`${b.time || "99:99"} ${b.name}`));
 
   if (!quickTicketPanel) return;
@@ -1461,9 +1519,36 @@ function getActiveDayDateValue(trip) {
   return addDays(trip.startDate, state.activeDayIndex);
 }
 
+function getBookingsForDay(trip, dayDate) {
+  return (trip.bookings || []).filter((booking) => booking.date === dayDate || (booking.type === "住宿" && isDateInStayRange(dayDate, booking)));
+}
+
 function isDateInStayRange(dayDate, booking) {
   if (!dayDate || !booking.date || !booking.checkoutDate) return false;
   return booking.date <= dayDate && dayDate <= booking.checkoutDate;
+}
+
+function getTravelRemindersForDay(trip, dayDate) {
+  return (trip.todos || []).filter((todo) => todo.group === "旅途中提醒" && !todo.done && todo.date === dayDate);
+}
+
+function getNextTravelItem(day, dayDate) {
+  if (!day.items.length) return null;
+  if (dayDate !== todayString()) return day.items[0];
+
+  const currentTime = getCurrentTimeValue();
+  return day.items.find((item) => (item.time || "99:99") >= currentTime) || day.items[day.items.length - 1];
+}
+
+function countPassedItems(day, dayDate) {
+  if (dayDate !== todayString()) return 0;
+  const currentTime = getCurrentTimeValue();
+  return day.items.filter((item) => item.time && item.time < currentTime).length;
+}
+
+function getCurrentTimeValue() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function getPrimaryTicketAttachment(attachments = []) {
@@ -3509,7 +3594,19 @@ tripSectionTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeTripSection = button.dataset.tripSection;
   renderTripSectionTabs();
-  if (state.activeTripSection === "itinerary") renderQuickTickets();
+  if (state.activeTripSection === "itinerary") {
+    renderTravelDayPanel();
+    renderQuickTickets();
+  }
+});
+
+travelDayPanel?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-focus-next-item]");
+  if (!button) return;
+
+  state.expandedItemId = button.dataset.focusNextItem;
+  renderTrip();
+  document.querySelector(`#itemDetails${CSS.escape(state.expandedItemId)}`)?.closest(".item-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
 bookingSubTabs.addEventListener("click", (event) => {
