@@ -20,14 +20,32 @@ const DEFAULT_EXCHANGE_RATES = {
   CHF: 36
 };
 const WEATHER_LOCATIONS = [
-  { id: "zurich", name: "Zurich 蘇黎世", latitude: 47.3769, longitude: 8.5417, elevation: 408 },
-  { id: "lucerne", name: "Lucerne 琉森", latitude: 47.0502, longitude: 8.3093, elevation: 435 },
-  { id: "interlaken", name: "Interlaken 因特拉肯", latitude: 46.6863, longitude: 7.8632, elevation: 568 },
-  { id: "grindelwald", name: "Grindelwald 格林德瓦", latitude: 46.6242, longitude: 8.0414, elevation: 1034 },
-  { id: "jungfraujoch", name: "Jungfraujoch 少女峰", latitude: 46.5475, longitude: 7.9806, elevation: 3454 },
-  { id: "zermatt", name: "Zermatt 策馬特", latitude: 46.0207, longitude: 7.7491, elevation: 1608 },
-  { id: "bern", name: "Bern 伯恩", latitude: 46.948, longitude: 7.4474, elevation: 540 },
-  { id: "geneva", name: "Geneva 日內瓦", latitude: 46.2044, longitude: 6.1432, elevation: 375 }
+  { id: "taipei", group: "台灣", name: "Taipei 台北", latitude: 25.033, longitude: 121.5654, elevation: 10 },
+  { id: "taichung", group: "台灣", name: "Taichung 台中", latitude: 24.1477, longitude: 120.6736, elevation: 86 },
+  { id: "kaohsiung", group: "台灣", name: "Kaohsiung 高雄", latitude: 22.6273, longitude: 120.3014, elevation: 9 },
+  { id: "tokyo", group: "日本", name: "Tokyo 東京", latitude: 35.6762, longitude: 139.6503, elevation: 40 },
+  { id: "kyoto", group: "日本", name: "Kyoto 京都", latitude: 35.0116, longitude: 135.7681, elevation: 45 },
+  { id: "osaka", group: "日本", name: "Osaka 大阪", latitude: 34.6937, longitude: 135.5023, elevation: 5 },
+  { id: "sapporo", group: "日本", name: "Sapporo 札幌", latitude: 43.0618, longitude: 141.3545, elevation: 29 },
+  { id: "seoul", group: "韓國", name: "Seoul 首爾", latitude: 37.5665, longitude: 126.978, elevation: 38 },
+  { id: "busan", group: "韓國", name: "Busan 釜山", latitude: 35.1796, longitude: 129.0756, elevation: 10 },
+  { id: "bangkok", group: "亞洲", name: "Bangkok 曼谷", latitude: 13.7563, longitude: 100.5018, elevation: 5 },
+  { id: "singapore", group: "亞洲", name: "Singapore 新加坡", latitude: 1.3521, longitude: 103.8198, elevation: 15 },
+  { id: "hong-kong", group: "亞洲", name: "Hong Kong 香港", latitude: 22.3193, longitude: 114.1694, elevation: 20 },
+  { id: "paris", group: "歐洲", name: "Paris 巴黎", latitude: 48.8566, longitude: 2.3522, elevation: 35 },
+  { id: "london", group: "歐洲", name: "London 倫敦", latitude: 51.5072, longitude: -0.1276, elevation: 11 },
+  { id: "rome", group: "歐洲", name: "Rome 羅馬", latitude: 41.9028, longitude: 12.4964, elevation: 21 },
+  { id: "zurich", group: "瑞士", name: "Zurich 蘇黎世", latitude: 47.3769, longitude: 8.5417, elevation: 408, model: "meteoswiss_icon_ch2" },
+  { id: "lucerne", group: "瑞士", name: "Lucerne 琉森", latitude: 47.0502, longitude: 8.3093, elevation: 435, model: "meteoswiss_icon_ch2" },
+  { id: "interlaken", group: "瑞士", name: "Interlaken 因特拉肯", latitude: 46.6863, longitude: 7.8632, elevation: 568, model: "meteoswiss_icon_ch2" },
+  { id: "grindelwald", group: "瑞士", name: "Grindelwald 格林德瓦", latitude: 46.6242, longitude: 8.0414, elevation: 1034, model: "meteoswiss_icon_ch2" },
+  { id: "jungfraujoch", group: "瑞士", name: "Jungfraujoch 少女峰", latitude: 46.5475, longitude: 7.9806, elevation: 3454, model: "meteoswiss_icon_ch2" },
+  { id: "zermatt", group: "瑞士", name: "Zermatt 策馬特", latitude: 46.0207, longitude: 7.7491, elevation: 1608, model: "meteoswiss_icon_ch2" },
+  { id: "bern", group: "瑞士", name: "Bern 伯恩", latitude: 46.948, longitude: 7.4474, elevation: 540, model: "meteoswiss_icon_ch2" },
+  { id: "geneva", group: "瑞士", name: "Geneva 日內瓦", latitude: 46.2044, longitude: 6.1432, elevation: 375, model: "meteoswiss_icon_ch2" },
+  { id: "new-york", group: "美洲", name: "New York 紐約", latitude: 40.7128, longitude: -74.006, elevation: 10 },
+  { id: "los-angeles", group: "美洲", name: "Los Angeles 洛杉磯", latitude: 34.0522, longitude: -118.2437, elevation: 89 },
+  { id: "vancouver", group: "美洲", name: "Vancouver 溫哥華", latitude: 49.2827, longitude: -123.1207, elevation: 70 }
 ];
 const exchangeRateDrafts = new Map();
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
@@ -1521,14 +1539,14 @@ function renderWeatherPanel(statusText = "") {
       <header class="weather-header">
         <div>
           <p class="eyebrow">今日天氣</p>
-          <h3>${location ? escapeHtml(location.name) : "選擇瑞士地點"}</h3>
+          <h3>${location ? escapeHtml(location.name) : "選擇目的地"}</h3>
         </div>
         ${hasForecast ? `<span>${escapeHtml(weatherCodeLabel(forecast.weatherCode))}</span>` : ""}
       </header>
       <div class="weather-controls">
         <select data-weather-location aria-label="天氣地點">
-          <option value="">選擇地點</option>
-          ${WEATHER_LOCATIONS.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === locationId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+          <option value="">選擇目的地</option>
+          ${renderWeatherLocationOptions(locationId)}
         </select>
         <button class="secondary-action" type="button" data-refresh-weather ${location ? "" : "disabled"}>更新天氣</button>
       </div>
@@ -1550,13 +1568,30 @@ function renderWeatherPanel(statusText = "") {
 }
 
 function weatherEmptyMessage(location, cachedForecast) {
-  if (!location) return "選擇瑞士地點後，按「更新天氣」抓取 MeteoSwiss 預報。";
-  if (cachedForecast) return "目前沒有這一天的預報資料。MeteoSwiss 通常只提供接近旅程日期的短期預報，請出發前或旅途中再更新。";
-  return "按「更新天氣」抓取 MeteoSwiss 預報。";
+  if (!location) return "選擇目的地後，按「更新天氣」抓取預報。瑞士地點會優先使用 MeteoSwiss 模型。";
+  if (cachedForecast) return "目前沒有這一天的預報資料。多數天氣模型只提供短期預報，請出發前或旅途中再更新。";
+  return `按「更新天氣」抓取 ${weatherSourceName(location)} 預報。`;
 }
 
 function getWeatherLocation(locationId) {
   return WEATHER_LOCATIONS.find((location) => location.id === locationId) || null;
+}
+
+function renderWeatherLocationOptions(selectedId) {
+  const groups = [...new Set(WEATHER_LOCATIONS.map((location) => location.group || "其他"))];
+  return groups
+    .map((group) => {
+      const options = WEATHER_LOCATIONS
+        .filter((location) => (location.group || "其他") === group)
+        .map((location) => `<option value="${escapeHtml(location.id)}" ${location.id === selectedId ? "selected" : ""}>${escapeHtml(location.name)}</option>`)
+        .join("");
+      return `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`;
+    })
+    .join("");
+}
+
+function weatherSourceName(location) {
+  return location?.model === "meteoswiss_icon_ch2" ? "Open-Meteo MeteoSwiss" : "Open-Meteo";
 }
 
 function getForecastForDate(forecast, dayDate) {
@@ -1636,7 +1671,7 @@ async function fetchWeatherForActiveDay() {
   });
 
   try {
-    params.set("models", "meteoswiss_icon_ch2");
+    if (location.model) params.set("models", location.model);
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
@@ -1644,7 +1679,7 @@ async function fetchWeatherForActiveDay() {
       ...(trip.weatherForecasts || {}),
       [location.id]: {
         fetchedAt: new Date().toISOString(),
-        source: "Open-Meteo MeteoSwiss",
+        source: weatherSourceName(location),
         daily: data.daily || {}
       }
     });
