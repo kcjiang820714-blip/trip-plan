@@ -63,6 +63,8 @@ const TRADITIONAL_CHINESE_TERMS = [
   ["瑞士", "瑞士"],
   ["哥伦比亚", "哥倫比亞"],
   ["纽约", "紐約"],
+  ["东京", "東京"],
+  ["东京都", "東京都"],
   ["新泽西", "紐澤西"],
   ["密苏里", "密蘇里"],
   ["田纳西", "田納西"],
@@ -81,7 +83,7 @@ const TRADITIONAL_CHINESE_TERMS = [
   ["州", "州"]
 ];
 const SIMPLIFIED_TO_TRADITIONAL_CHARS = {
-  亚: "亞", 们: "們", 会: "會", 体: "體", 伦: "倫", 传: "傳", 伤: "傷", 伞: "傘", 伟: "偉", 备: "備",
+  东: "東", 亚: "亞", 们: "們", 会: "會", 体: "體", 伦: "倫", 传: "傳", 伤: "傷", 伞: "傘", 伟: "偉", 备: "備",
   儿: "兒", 党: "黨", 兰: "蘭", 关: "關", 兴: "興", 冈: "岡", 农: "農", 冲: "沖", 决: "決", 况: "況",
   净: "淨", 准: "準", 几: "幾", 划: "劃", 刘: "劉", 则: "則", 刚: "剛", 创: "創", 删: "刪", 别: "別",
   剂: "劑", 剧: "劇", 务: "務", 动: "動", 励: "勵", 势: "勢", 勋: "勳", 勒: "勒", 区: "區", 医: "醫",
@@ -1729,11 +1731,12 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
   const cachedForecast = trip.weatherForecasts?.[location.id] || null;
   const forecast = getForecastForDate(cachedForecast, dayDate);
   const hasForecast = Boolean(forecast);
-  const displayName = weatherDisplayText(location.name);
+  const displayName = weatherLocationTitle(location);
   const displayMeta = weatherDisplayText(weatherLocationMeta(location) || weatherSourceName(location));
+  const iconType = weatherIconType(hasForecast ? forecast.weatherCode : null);
 
   return `
-    <article class="weather-location-card ${hasForecast ? "" : "is-empty"}">
+    <article class="weather-location-card ${hasForecast ? "" : "is-empty"} is-${escapeHtml(iconType)}">
       <header>
         ${renderWeatherIcon(hasForecast ? forecast.weatherCode : null)}
         <div>
@@ -1761,6 +1764,17 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
 
 function weatherDisplayText(value) {
   return toTraditionalChineseText(value);
+}
+
+function weatherLocationTitle(location) {
+  const rawName = weatherDisplayText(location?.name || "");
+  const firstPart = rawName.split(",")[0]?.trim() || rawName;
+  const cleaned = firstPart
+    .replace(/市$/u, "")
+    .replace(/區$/u, "")
+    .replace(/縣$/u, "")
+    .trim();
+  return cleaned || firstPart;
 }
 
 function weatherEmptyMessage(location = null, cachedForecast = null) {
@@ -1799,7 +1813,7 @@ function renderWeatherSearchResults() {
       ${state.weatherSearchResults
         .map((location, index) => `
           <button type="button" data-select-weather-result="${index}" role="listitem">
-            <strong>${escapeHtml(weatherDisplayText(location.name))}</strong>
+            <strong>${escapeHtml(weatherLocationTitle(location))}</strong>
             <small>${escapeHtml(weatherDisplayText(weatherLocationMeta(location)))}</small>
           </button>
         `)
@@ -3876,8 +3890,8 @@ function renderTripWeatherEditor() {
                 ? locations
                     .map((location) => `
                       <span class="trip-weather-chip">
-                        ${escapeHtml(weatherDisplayText(location.name))}
-                        <button type="button" data-remove-trip-weather-location="${escapeHtml(location.id)}" data-weather-date="${escapeHtml(dateValue)}" aria-label="移除 ${escapeHtml(weatherDisplayText(location.name))}">×</button>
+                        ${escapeHtml(weatherLocationTitle(location))}
+                        <button type="button" data-remove-trip-weather-location="${escapeHtml(location.id)}" data-weather-date="${escapeHtml(dateValue)}" aria-label="移除 ${escapeHtml(weatherLocationTitle(location))}">×</button>
                       </span>
                     `)
                     .join("")
@@ -3903,7 +3917,7 @@ function renderTripWeatherSearchResults(dateValue, results) {
       ${results
         .map((location, index) => `
           <button type="button" data-add-trip-weather-result="${index}" data-weather-date="${escapeHtml(dateValue)}">
-            <strong>${escapeHtml(weatherDisplayText(location.name))}</strong>
+            <strong>${escapeHtml(weatherLocationTitle(location))}</strong>
             <small>${escapeHtml(weatherDisplayText(weatherLocationMeta(location)))}</small>
           </button>
         `)

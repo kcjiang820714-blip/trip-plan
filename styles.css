@@ -2071,12 +2071,100 @@ h2 {
 }
 
 .weather-location-card {
+  position: relative;
+  overflow: hidden;
   display: grid;
   gap: 10px;
   border: 1px solid rgba(24, 37, 33, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.7);
   padding: 12px;
+}
+
+.weather-location-card::before,
+.weather-location-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  color: var(--brand-dark);
+  opacity: 0.08;
+}
+
+.weather-location-card::before {
+  right: 18px;
+  top: 18px;
+  width: 126px;
+  height: 126px;
+}
+
+.weather-location-card::after {
+  right: 54px;
+  top: 78px;
+  width: 88px;
+  height: 76px;
+}
+
+.weather-location-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.weather-location-card.is-sun::before {
+  border: 10px solid currentColor;
+  border-radius: 999px;
+  box-shadow: 0 0 0 20px rgba(23, 91, 82, 0.08);
+}
+
+.weather-location-card.is-cloud::before,
+.weather-location-card.is-rain::before,
+.weather-location-card.is-snow::before,
+.weather-location-card.is-storm::before,
+.weather-location-card.is-unknown::before {
+  border: 10px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 999px 999px;
+  transform: translateY(32px);
+}
+
+.weather-location-card.is-cloud::after,
+.weather-location-card.is-rain::after,
+.weather-location-card.is-snow::after,
+.weather-location-card.is-storm::after,
+.weather-location-card.is-unknown::after {
+  width: 78px;
+  height: 78px;
+  right: 76px;
+  top: 30px;
+  border: 10px solid currentColor;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 999px;
+  transform: rotate(18deg);
+}
+
+.weather-location-card.is-rain {
+  background:
+    repeating-linear-gradient(115deg, transparent 0 18px, rgba(23, 91, 82, 0.045) 18px 22px, transparent 22px 36px),
+    rgba(255, 255, 255, 0.72);
+}
+
+.weather-location-card.is-sun {
+  background:
+    radial-gradient(circle at 88% 22%, rgba(199, 153, 54, 0.12), transparent 34%),
+    rgba(255, 255, 255, 0.72);
+}
+
+.weather-location-card.is-storm {
+  background:
+    linear-gradient(135deg, rgba(23, 91, 82, 0.07), transparent 42%),
+    rgba(255, 255, 255, 0.72);
+}
+
+.weather-location-card.is-snow {
+  background:
+    radial-gradient(circle at 86% 28%, rgba(23, 91, 82, 0.08) 0 4px, transparent 5px),
+    radial-gradient(circle at 74% 46%, rgba(23, 91, 82, 0.07) 0 3px, transparent 4px),
+    rgba(255, 255, 255, 0.72);
 }
 
 .weather-location-card header {
