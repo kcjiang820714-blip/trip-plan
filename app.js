@@ -169,43 +169,6 @@ const regionDisplayNames = "Intl" in window && Intl.DisplayNames
 const exchangeRateDrafts = new Map();
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
-const defaultTrip = {
-  id: createId(),
-  title: "京都三日散步",
-  startDate: "2026-10-12",
-  endDate: "2026-10-14",
-  dates: "2026/10/12 - 2026/10/14",
-  days: [
-    {
-      title: "抵達京都",
-      date: "10/12（一）",
-      items: [
-        { time: "10:30", place: "京都車站", type: "交通", note: "抵達後先寄放行李，確認 ICOCA 餘額。" },
-        { time: "12:00", place: "錦市場", type: "午餐", note: "先吃小份量，下午還有咖啡店。" },
-        { time: "15:00", place: "清水寺", type: "景點", note: "從二年坂慢慢走上去，預留拍照時間。" }
-      ]
-    },
-    {
-      title: "嵐山與河邊",
-      date: "10/13（二）",
-      items: [
-        { time: "09:00", place: "嵐山竹林", type: "景點", note: "早點到，人會少很多。" },
-        { time: "11:30", place: "渡月橋", type: "散步", note: "河邊休息，視天氣調整停留時間。" },
-        { time: "18:30", place: "祇園晚餐", type: "餐廳", note: "訂位資訊可以放在這裡。" }
-      ]
-    },
-    {
-      title: "伏見稻荷與返程",
-      date: "10/14（三）",
-      items: [
-        { time: "08:30", place: "伏見稻荷大社", type: "景點", note: "只走到中段鳥居，不硬攻山頂。" },
-        { time: "13:00", place: "京都車站伴手禮", type: "購物", note: "買完直接拿行李，避免回頭路。" },
-        { time: "16:10", place: "前往機場", type: "交通", note: "確認班次，至少提早 2 小時到機場。" }
-      ]
-    }
-  ]
-};
-
 const state = {
   library: loadLibrary(),
   cloudUser: null,
@@ -426,7 +389,7 @@ function loadLibrary() {
     }
   }
 
-  return normalizeLibrary({ trips: [structuredClone(defaultTrip)] });
+  return normalizeLibrary({ trips: [] });
 }
 
 function normalizeLibrary(library) {
@@ -1498,14 +1461,28 @@ function renderLanding() {
   const itemCount = state.library.trips.reduce((total, trip) => total + countItems(trip), 0);
   const today = new Date();
 
-  landingTripTitle.textContent = recentTrip?.title || "還沒有旅程";
-  landingTripMeta.textContent = recentTrip ? `${recentTrip.days.length} 天，${countItems(recentTrip)} 個行程` : "新增第一段旅程";
+  landingTripTitle.textContent = recentTrip?.title || "尚未建立旅程";
+  landingTripMeta.textContent = recentTrip ? `${recentTrip.days.length} 天，${countItems(recentTrip)} 個行程` : "建立第一趟旅程開始規劃";
   landingTripCount.textContent = tripCount;
   landingItemCount.textContent = itemCount;
   landingToday.textContent = `${today.getMonth() + 1}/${today.getDate()}`;
+  openRecentTripButton.disabled = !recentTrip;
+  openRecentTripButton.title = recentTrip ? "開啟最近旅程" : "尚未建立旅程";
+  openRecentTripButton.setAttribute("aria-label", recentTrip ? "開啟最近旅程" : "尚未建立旅程");
 }
 
 function renderHome() {
+  if (state.library.trips.length === 0) {
+    tripList.innerHTML = `
+      <section class="empty-state trip-empty-state">
+        <strong>尚未建立旅程</strong>
+        <p>建立第一趟旅程後，行程、住宿、票券、天氣和記帳都會集中在這裡。</p>
+        <button class="primary-button" type="button" data-create-first-trip>建立第一趟旅程</button>
+      </section>
+    `;
+    return;
+  }
+
   tripList.innerHTML = state.library.trips
     .map((trip) => {
       const itemCount = countItems(trip);
@@ -3380,6 +3357,12 @@ function showLanding() {
 }
 
 function showTrip(tripId) {
+  const trip = state.library.trips.find((item) => item.id === tripId);
+  if (!trip) {
+    showHome();
+    return;
+  }
+
   state.activeTripId = tripId;
   state.activeDayIndex = 0;
   state.activeExpenseDate = null;
@@ -4630,6 +4613,12 @@ attachmentViewer.addEventListener("cancel", (event) => {
 });
 
 tripList.addEventListener("click", (event) => {
+  const createButton = event.target.closest("[data-create-first-trip]");
+  if (createButton) {
+    openTripDialog();
+    return;
+  }
+
   const button = event.target.closest("[data-open-trip]");
   if (!button) return;
   showTrip(button.dataset.openTrip);
