@@ -789,6 +789,8 @@ h2 {
 }
 
 .day-tab {
+  position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   box-sizing: border-box;
@@ -806,6 +808,19 @@ h2 {
   font-weight: 950;
   line-height: 1.2;
   cursor: pointer;
+}
+
+.day-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--segment-strong, transparent);
+  opacity: 0;
+}
+
+.day-tab.has-segment::before {
+  opacity: 0.9;
 }
 
 .day-tab span {
@@ -839,11 +854,6 @@ h2 {
 .day-tab.has-segment {
   border-color: var(--segment-border, rgba(24, 37, 33, 0.12));
   background: var(--segment-soft, transparent);
-}
-
-.day-tab.is-active.has-segment {
-  background:
-    linear-gradient(135deg, var(--segment-strong, rgba(15, 63, 57, 0.98)), rgba(19, 111, 99, 0.9));
 }
 
 .segment-teal {
@@ -898,6 +908,18 @@ h2 {
   box-shadow: 0 10px 22px rgba(15, 107, 95, 0.18);
   opacity: 1;
   transform: translateY(1px);
+}
+
+.day-tab.is-active.has-segment {
+  border-color: var(--segment-border, transparent);
+  background:
+    linear-gradient(135deg, var(--segment-strong, rgba(15, 63, 57, 0.98)), color-mix(in srgb, var(--segment-strong, #136f63), white 16%));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--segment-strong, #136f63), transparent 72%);
+}
+
+.day-tab.is-active.has-segment::before {
+  width: 100%;
+  opacity: 0.12;
 }
 
 .day-tab.is-active span {
