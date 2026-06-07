@@ -112,7 +112,11 @@ const state = {
   travelRefreshTimer: null,
   weatherSearchQuery: "",
   weatherSearchResults: [],
-  weatherSearchStatus: ""
+  weatherSearchStatus: "",
+  editingWeatherLocations: {},
+  tripWeatherSearchQueries: {},
+  tripWeatherSearchResults: {},
+  tripWeatherSearchStatuses: {}
 };
 
 state.activeTripId = state.library.trips[0]?.id || null;
@@ -201,6 +205,7 @@ const tripStartInput = document.querySelector("#tripStartInput");
 const tripEndInput = document.querySelector("#tripEndInput");
 const tripDaysInput = document.querySelector("#tripDaysInput");
 const tripDayTitleEditor = document.querySelector("#tripDayTitleEditor");
+const tripWeatherEditor = document.querySelector("#tripWeatherEditor");
 const tripSharePanel = document.querySelector("#tripSharePanel");
 const tripInviteForm = document.querySelector("#tripInviteForm");
 const tripInviteEmailInput = document.querySelector("#tripInviteEmailInput");
@@ -337,9 +342,21 @@ function normalizeWeatherLocations(value) {
   if (!value || typeof value !== "object") return {};
   return Object.fromEntries(
     Object.entries(value)
-      .map(([date, location]) => [date, normalizeWeatherLocation(location)])
-      .filter(([, location]) => location)
+      .map(([date, locations]) => [date, normalizeWeatherLocationList(locations)])
+      .filter(([, locations]) => locations.length > 0)
   );
+}
+
+function normalizeWeatherLocationList(value) {
+  const source = Array.isArray(value) ? value : [value];
+  const seen = new Set();
+  return source
+    .map(normalizeWeatherLocation)
+    .filter((location) => {
+      if (!location || seen.has(location.id)) return false;
+      seen.add(location.id);
+      return true;
+    });
 }
 
 function normalizeWeatherForecasts(value) {
@@ -1565,33 +1582,44 @@ function renderWeatherPanel(statusText = "") {
 
   const trip = currentTrip();
   const dayDate = getActiveDayDateValue(trip);
-  const location = getWeatherLocation(trip.weatherLocations?.[dayDate]);
-  const cachedForecast = location ? trip.weatherForecasts?.[location.id] : null;
-  const forecast = location ? getForecastForDate(cachedForecast, dayDate) : null;
-  const hasForecast = Boolean(forecast);
-  const searchStatus = state.weatherSearchStatus || "";
+  const locations = getWeatherLocationsForDate(trip, dayDate);
+  const hasLocations = locations.length > 0;
 
   weatherPanel.innerHTML = `
-    <section class="weather-card ${hasForecast ? "" : "is-empty"}">
+    <section class="weather-card ${hasLocations ? "" : "is-empty"}">
       <header class="weather-header">
         <div>
           <p class="eyebrow">今日天氣</p>
-          <h3>${location ? escapeHtml(location.name) : "選擇目的地"}</h3>
+          <h3>${hasLocations ? `${locations.length} 個天氣地點` : "尚未設定天氣地點"}</h3>
+        </div>
+        ${hasLocations ? `<span>${escapeHtml(weatherSourceSummary(locations))}</span>` : ""}
+      </header>
+      <div class="weather-controls">
+        <button class="secondary-action" type="button" data-refresh-weather ${hasLocations ? "" : "disabled"}>更新天氣</button>
+      </div>
+      ${
+        hasLocations
+          ? `<div class="weather-location-list">${locations.map((location) => renderWeatherLocationForecast(trip, dayDate, location, statusText)).join("")}</div>`
+          : `<p class="weather-empty">${escapeHtml(statusText || weatherEmptyMessage())}</p>`
+      }
+    </section>
+  `;
+}
+
+function renderWeatherLocationForecast(trip, dayDate, location, statusText = "") {
+  const cachedForecast = trip.weatherForecasts?.[location.id] || null;
+  const forecast = getForecastForDate(cachedForecast, dayDate);
+  const hasForecast = Boolean(forecast);
+
+  return `
+    <article class="weather-location-card ${hasForecast ? "" : "is-empty"}">
+      <header>
+        <div>
+          <strong>${escapeHtml(location.name)}</strong>
+          <small>${escapeHtml(weatherLocationMeta(location) || weatherSourceName(location))}</small>
         </div>
         ${hasForecast ? `<span>${escapeHtml(weatherCodeLabel(forecast.weatherCode))}</span>` : ""}
       </header>
-      <form class="weather-search" data-weather-search-form>
-        <label>
-          <span>搜尋城市或地點</span>
-          <input type="search" name="weatherSearch" value="${escapeHtml(state.weatherSearchQuery)}" placeholder="例如 Milan、Lauterbrunnen、Florence" autocomplete="off" />
-        </label>
-        <button class="secondary-action" type="submit">搜尋</button>
-      </form>
-      ${renderWeatherSearchResults()}
-      ${searchStatus ? `<p class="weather-empty">${escapeHtml(searchStatus)}</p>` : ""}
-      <div class="weather-controls">
-        <button class="secondary-action" type="button" data-refresh-weather ${location ? "" : "disabled"}>更新天氣</button>
-      </div>
       ${
         hasForecast
           ? `
@@ -1601,22 +1629,26 @@ function renderWeatherPanel(statusText = "") {
               <span><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
             </div>
             <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
-            <small>${escapeHtml(weatherUpdatedLabel(trip.weatherForecasts?.[location.id]))}</small>
+            <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
           `
           : `<p class="weather-empty">${escapeHtml(statusText || weatherEmptyMessage(location, cachedForecast))}</p>`
       }
-    </section>
+    </article>
   `;
 }
 
-function weatherEmptyMessage(location, cachedForecast) {
-  if (!location) return "搜尋並選擇目的地後，按「更新天氣」抓取預報。瑞士地點會優先使用 MeteoSwiss 模型。";
+function weatherEmptyMessage(location = null, cachedForecast = null) {
+  if (!location) return "請先到「編輯旅程」設定這一天要看的天氣城市。";
   if (cachedForecast) return "目前沒有這一天的預報資料。多數天氣模型只提供短期預報，請出發前或旅途中再更新。";
   return `按「更新天氣」抓取 ${weatherSourceName(location)} 預報。`;
 }
 
 function getWeatherLocation(locationValue) {
   return normalizeWeatherLocation(locationValue);
+}
+
+function getWeatherLocationsForDate(trip, dayDate) {
+  return normalizeWeatherLocationList(trip?.weatherLocations?.[dayDate]);
 }
 
 function renderWeatherSearchResults() {
@@ -1646,6 +1678,10 @@ function formatCoordinates(location) {
 
 function weatherSourceName(location) {
   return location?.model === "meteoswiss_icon_ch2" ? "Open-Meteo MeteoSwiss" : "Open-Meteo";
+}
+
+function weatherSourceSummary(locations) {
+  return locations.some((location) => location.model === "meteoswiss_icon_ch2") ? "含 MeteoSwiss" : "Open-Meteo";
 }
 
 function createWeatherLocationId(location) {
@@ -1688,18 +1724,8 @@ async function searchWeatherLocations(query) {
   state.weatherSearchStatus = "正在搜尋地點...";
   renderWeatherPanel();
 
-  const params = new URLSearchParams({
-    name: trimmedQuery,
-    count: String(WEATHER_SEARCH_LIMIT),
-    language: "zh",
-    format: "json"
-  });
-
   try {
-    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    const results = Array.isArray(data.results) ? data.results.map(normalizeGeocodingResult).filter(Boolean) : [];
+    const results = await fetchWeatherLocationSearchResults(trimmedQuery);
     state.weatherSearchResults = results;
     state.weatherSearchStatus = results.length ? "請選擇最符合的地點。" : "找不到符合的地點，請試試英文城市名或加上國家。";
   } catch {
@@ -1707,6 +1733,19 @@ async function searchWeatherLocations(query) {
   }
 
   renderWeatherPanel();
+}
+
+async function fetchWeatherLocationSearchResults(query) {
+  const params = new URLSearchParams({
+    name: query,
+    count: String(WEATHER_SEARCH_LIMIT),
+    language: "zh",
+    format: "json"
+  });
+  const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  return Array.isArray(data.results) ? data.results.map(normalizeGeocodingResult).filter(Boolean) : [];
 }
 
 function selectWeatherSearchResult(index) {
@@ -1785,14 +1824,22 @@ function weatherAdvice(location, forecast) {
 async function fetchWeatherForActiveDay() {
   const trip = currentTrip();
   const dayDate = getActiveDayDateValue(trip);
-  const location = getWeatherLocation(trip.weatherLocations?.[dayDate]);
-  if (!location) {
-    renderWeatherPanel("請先選擇天氣地點。");
+  const locations = getWeatherLocationsForDate(trip, dayDate);
+  if (locations.length === 0) {
+    renderWeatherPanel("請先到「編輯旅程」設定這一天要看的天氣城市。");
     return;
   }
 
   renderWeatherPanel("正在更新天氣...");
 
+  const results = await Promise.allSettled(locations.map((location) => fetchWeatherForLocation(trip, location)));
+  const hasSuccess = results.some((result) => result.status === "fulfilled");
+  if (hasSuccess) saveLibrary();
+  const hasFailure = results.some((result) => result.status === "rejected");
+  renderWeatherPanel(hasFailure ? "部分天氣更新失敗，已顯示可用的上次資料。" : "");
+}
+
+async function fetchWeatherForLocation(trip, location) {
   const params = new URLSearchParams({
     latitude: String(location.latitude),
     longitude: String(location.longitude),
@@ -1802,25 +1849,18 @@ async function fetchWeatherForActiveDay() {
     wind_speed_unit: "kmh"
   });
 
-  try {
-    if (location.model) params.set("models", location.model);
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    trip.weatherForecasts = normalizeWeatherForecasts({
-      ...(trip.weatherForecasts || {}),
-      [location.id]: {
-        fetchedAt: new Date().toISOString(),
-        source: weatherSourceName(location),
-        daily: data.daily || {}
-      }
-    });
-    saveLibrary();
-    renderWeatherPanel();
-  } catch {
-    const cached = getForecastForDate(trip.weatherForecasts?.[location.id], dayDate);
-    renderWeatherPanel(cached ? "天氣更新失敗，已顯示上次成功抓取的資料。" : "天氣更新失敗。請確認網路後再試一次。");
-  }
+  if (location.model) params.set("models", location.model);
+  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  trip.weatherForecasts = normalizeWeatherForecasts({
+    ...(trip.weatherForecasts || {}),
+    [location.id]: {
+      fetchedAt: new Date().toISOString(),
+      source: weatherSourceName(location),
+      daily: data.daily || {}
+    }
+  });
 }
 
 function renderQuickTickets() {
@@ -3585,6 +3625,10 @@ function openTripDialog(tripId = null) {
   tripStartInput.value = trip?.startDate || todayString();
   tripEndInput.value = trip?.endDate || addDays(tripStartInput.value, 2);
   tripDaysInput.value = trip?.days.length || 3;
+  state.editingWeatherLocations = structuredClone(normalizeWeatherLocations(trip?.weatherLocations || {}));
+  state.tripWeatherSearchQueries = {};
+  state.tripWeatherSearchResults = {};
+  state.tripWeatherSearchStatuses = {};
   updateTripDayPreview();
   renderTripSharePanel(trip);
   openModal(tripDialog);
@@ -3614,6 +3658,7 @@ function updateTripDayPreview() {
   const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
   tripDaysInput.value = `${dayCount} 天`;
   renderTripDayTitleEditor();
+  renderTripWeatherEditor();
 }
 
 function renderTripDayTitleEditor() {
@@ -3647,6 +3692,128 @@ function collectTripDayTitles(dayCount) {
     const input = tripDayTitleEditor?.querySelector(`[data-trip-day-title="${index}"]`);
     return input?.value.trim() || `第 ${index + 1} 天`;
   });
+}
+
+function renderTripWeatherEditor() {
+  if (!tripWeatherEditor || !tripStartInput.value || !tripEndInput.value) return;
+
+  const dayCount = calculateDayCount(tripStartInput.value, tripEndInput.value);
+  tripWeatherEditor.innerHTML = `
+    <div class="trip-weather-heading">
+      <strong>每日天氣城市</strong>
+      <span>出發前先設定；移動日可加入多個城市。</span>
+    </div>
+    ${Array.from({ length: dayCount }, (_, index) => {
+      const dateValue = addDays(tripStartInput.value, index);
+      const dateLabel = formatShortDate(dateValue);
+      const locations = normalizeWeatherLocationList(state.editingWeatherLocations[dateValue]);
+      const query = state.tripWeatherSearchQueries[dateValue] || "";
+      const results = state.tripWeatherSearchResults[dateValue] || [];
+      const status = state.tripWeatherSearchStatuses[dateValue] || "";
+
+      return `
+        <article class="trip-weather-day" data-trip-weather-date="${escapeHtml(dateValue)}">
+          <header>
+            <div>
+              <strong>Day ${index + 1} · ${escapeHtml(dateLabel)}</strong>
+              <span>${locations.length ? `${locations.length} 個城市` : "尚未設定"}</span>
+            </div>
+          </header>
+          <div class="trip-weather-selected">
+            ${
+              locations.length
+                ? locations
+                    .map((location) => `
+                      <span class="trip-weather-chip">
+                        ${escapeHtml(location.name)}
+                        <button type="button" data-remove-trip-weather-location="${escapeHtml(location.id)}" data-weather-date="${escapeHtml(dateValue)}" aria-label="移除 ${escapeHtml(location.name)}">×</button>
+                      </span>
+                    `)
+                    .join("")
+                : `<p>這一天的天氣卡會提示尚未設定城市。</p>`
+            }
+          </div>
+          <div class="trip-weather-search" data-trip-weather-search-row data-weather-date="${escapeHtml(dateValue)}">
+            <input data-trip-weather-search-input type="search" value="${escapeHtml(query)}" placeholder="搜尋城市，例如 Milan、Zermatt" autocomplete="off" />
+            <button class="secondary-action" type="button" data-trip-weather-search-button>搜尋</button>
+          </div>
+          ${renderTripWeatherSearchResults(dateValue, results)}
+          ${status ? `<p class="trip-weather-status">${escapeHtml(status)}</p>` : ""}
+        </article>
+      `;
+    }).join("")}
+  `;
+}
+
+function renderTripWeatherSearchResults(dateValue, results) {
+  if (!results.length) return "";
+  return `
+    <div class="trip-weather-results">
+      ${results
+        .map((location, index) => `
+          <button type="button" data-add-trip-weather-result="${index}" data-weather-date="${escapeHtml(dateValue)}">
+            <strong>${escapeHtml(location.name)}</strong>
+            <small>${escapeHtml(weatherLocationMeta(location))}</small>
+          </button>
+        `)
+        .join("")}
+    </div>
+  `;
+}
+
+function collectTripWeatherLocations(dayCount) {
+  const entries = Array.from({ length: dayCount }, (_, index) => {
+    const dateValue = addDays(tripStartInput.value, index);
+    return [dateValue, normalizeWeatherLocationList(state.editingWeatherLocations[dateValue])];
+  });
+  return normalizeWeatherLocations(Object.fromEntries(entries));
+}
+
+async function searchTripWeatherLocations(dateValue, query) {
+  const trimmedQuery = query.trim();
+  state.tripWeatherSearchQueries[dateValue] = trimmedQuery;
+  state.tripWeatherSearchResults[dateValue] = [];
+
+  if (trimmedQuery.length < 2) {
+    state.tripWeatherSearchStatuses[dateValue] = "請至少輸入 2 個字再搜尋。";
+    renderTripWeatherEditor();
+    return;
+  }
+
+  state.tripWeatherSearchStatuses[dateValue] = "正在搜尋地點...";
+  renderTripWeatherEditor();
+
+  try {
+    const results = await fetchWeatherLocationSearchResults(trimmedQuery);
+    state.tripWeatherSearchResults[dateValue] = results;
+    state.tripWeatherSearchStatuses[dateValue] = results.length ? "請選擇要加入這一天的城市。" : "找不到符合的地點，請試試英文城市名或加上國家。";
+  } catch {
+    state.tripWeatherSearchStatuses[dateValue] = "地點搜尋失敗。請確認網路後再試一次。";
+  }
+
+  renderTripWeatherEditor();
+}
+
+function addTripWeatherSearchResult(dateValue, index) {
+  const location = state.tripWeatherSearchResults[dateValue]?.[index];
+  if (!location) return;
+
+  state.editingWeatherLocations = normalizeWeatherLocations({
+    ...state.editingWeatherLocations,
+    [dateValue]: [...normalizeWeatherLocationList(state.editingWeatherLocations[dateValue]), location]
+  });
+  state.tripWeatherSearchQueries[dateValue] = "";
+  state.tripWeatherSearchResults[dateValue] = [];
+  state.tripWeatherSearchStatuses[dateValue] = "";
+  renderTripWeatherEditor();
+}
+
+function removeTripWeatherLocation(dateValue, locationId) {
+  state.editingWeatherLocations = normalizeWeatherLocations({
+    ...state.editingWeatherLocations,
+    [dateValue]: normalizeWeatherLocationList(state.editingWeatherLocations[dateValue]).filter((location) => location.id !== locationId)
+  });
+  renderTripWeatherEditor();
 }
 
 function renderTripSharePanel(trip) {
@@ -3886,6 +4053,36 @@ tripMemberList?.addEventListener("click", async (event) => {
 
 tripStartInput.addEventListener("change", updateTripDayPreview);
 tripEndInput.addEventListener("change", updateTripDayPreview);
+
+tripWeatherEditor?.addEventListener("click", (event) => {
+  const searchButton = event.target.closest("[data-trip-weather-search-button]");
+  if (searchButton) {
+    const row = searchButton.closest("[data-trip-weather-search-row]");
+    const dateValue = row?.dataset.weatherDate || "";
+    const query = row?.querySelector("[data-trip-weather-search-input]")?.value || "";
+    searchTripWeatherLocations(dateValue, query);
+    return;
+  }
+
+  const addButton = event.target.closest("[data-add-trip-weather-result]");
+  if (addButton) {
+    addTripWeatherSearchResult(addButton.dataset.weatherDate, Number(addButton.dataset.addTripWeatherResult));
+    return;
+  }
+
+  const removeButton = event.target.closest("[data-remove-trip-weather-location]");
+  if (!removeButton) return;
+  removeTripWeatherLocation(removeButton.dataset.weatherDate, removeButton.dataset.removeTripWeatherLocation);
+});
+
+tripWeatherEditor?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  const input = event.target.closest("[data-trip-weather-search-input]");
+  if (!input) return;
+  event.preventDefault();
+  const row = input.closest("[data-trip-weather-search-row]");
+  searchTripWeatherLocations(row?.dataset.weatherDate || "", input.value || "");
+});
 todoGroupInput.addEventListener("change", syncTodoFields);
 bookingTypeInput.addEventListener("change", syncBookingStayFields);
 bookingDateInput.addEventListener("change", syncBookingStayFields);
@@ -4599,6 +4796,7 @@ tripForm.addEventListener("submit", (event) => {
   const endDate = tripEndInput.value;
   const dayCount = calculateDayCount(startDate, endDate);
   const dayTitles = collectTripDayTitles(dayCount);
+  const weatherLocations = collectTripWeatherLocations(dayCount);
   let trip = state.editingTripId
     ? state.library.trips.find((item) => item.id === state.editingTripId)
     : null;
@@ -4614,7 +4812,7 @@ tripForm.addEventListener("submit", (event) => {
       days: createBlankDays(dayCount, startDate).map((day, index) => ({ ...day, title: dayTitles[index] })),
       members: ["我"],
       exchangeRates: { ...DEFAULT_EXCHANGE_RATES },
-      weatherLocations: {},
+      weatherLocations,
       weatherForecasts: {},
       bookings: [],
       todos: [],
@@ -4629,6 +4827,7 @@ tripForm.addEventListener("submit", (event) => {
     resizeTripDays(trip, dayCount);
     syncTripDayDates(trip);
     trip.days = trip.days.map((day, index) => ({ ...day, title: dayTitles[index] || day.title }));
+    trip.weatherLocations = weatherLocations;
   }
 
   state.activeTripId = trip.id;
