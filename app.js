@@ -35,6 +35,7 @@ const WEATHER_LOCATIONS = [
   { id: "paris", group: "歐洲", name: "Paris 巴黎", latitude: 48.8566, longitude: 2.3522, elevation: 35 },
   { id: "london", group: "歐洲", name: "London 倫敦", latitude: 51.5072, longitude: -0.1276, elevation: 11 },
   { id: "rome", group: "歐洲", name: "Rome 羅馬", latitude: 41.9028, longitude: 12.4964, elevation: 21 },
+  { id: "milan", group: "歐洲", name: "Milan 米蘭", latitude: 45.4642, longitude: 9.19, elevation: 122 },
   { id: "zurich", group: "瑞士", name: "Zurich 蘇黎世", latitude: 47.3769, longitude: 8.5417, elevation: 408, model: "meteoswiss_icon_ch2" },
   { id: "lucerne", group: "瑞士", name: "Lucerne 琉森", latitude: 47.0502, longitude: 8.3093, elevation: 435, model: "meteoswiss_icon_ch2" },
   { id: "interlaken", group: "瑞士", name: "Interlaken 因特拉肯", latitude: 46.6863, longitude: 7.8632, elevation: 568, model: "meteoswiss_icon_ch2" },
