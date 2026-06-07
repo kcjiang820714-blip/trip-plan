@@ -80,6 +80,86 @@ const TRADITIONAL_CHINESE_TERMS = [
   ["塔斯馬尼亞", "塔斯馬尼亞"],
   ["州", "州"]
 ];
+const SIMPLIFIED_TO_TRADITIONAL_CHARS = {
+  亚: "亞", 们: "們", 会: "會", 体: "體", 伦: "倫", 传: "傳", 伤: "傷", 伞: "傘", 伟: "偉", 备: "備",
+  儿: "兒", 党: "黨", 兰: "蘭", 关: "關", 兴: "興", 冈: "岡", 农: "農", 冲: "沖", 决: "決", 况: "況",
+  净: "淨", 准: "準", 几: "幾", 划: "劃", 刘: "劉", 则: "則", 刚: "剛", 创: "創", 删: "刪", 别: "別",
+  剂: "劑", 剧: "劇", 务: "務", 动: "動", 励: "勵", 势: "勢", 勋: "勳", 勒: "勒", 区: "區", 医: "醫",
+  华: "華", 协: "協", 单: "單", 卖: "賣", 卢: "盧", 卫: "衛", 历: "歷", 压: "壓", 县: "縣", 参: "參",
+  双: "雙", 发: "發", 变: "變", 叠: "疊", 叶: "葉", 号: "號", 后: "後", 向: "向", 吗: "嗎", 启: "啟",
+  吴: "吳", 员: "員", 告: "告", 周: "週", 咨: "諮", 咸: "鹹", 响: "響", 哥: "哥", 哑: "啞", 喷: "噴",
+  团: "團", 园: "園", 国: "國", 图: "圖", 圆: "圓", 圣: "聖", 场: "場", 坏: "壞", 块: "塊", 坚: "堅",
+  坛: "壇", 坝: "壩", 垦: "墾", 埃: "埃", 城: "城", 域: "域", 塔: "塔", 墙: "牆", 声: "聲", 壳: "殼",
+  处: "處", 备: "備", 复: "複", 够: "夠", 头: "頭", 夹: "夾", 奖: "獎", 奥: "奧", 妇: "婦", 姆: "姆",
+  威: "威", 娱: "娛", 学: "學", 宁: "寧", 宝: "寶", 实: "實", 审: "審", 宾: "賓", 寻: "尋", 导: "導",
+  对: "對", 寿: "壽", 封: "封", 将: "將", 尔: "爾", 尘: "塵", 尝: "嘗", 层: "層", 屿: "嶼", 岁: "歲",
+  岛: "島", 岭: "嶺", 峡: "峽", 州: "州", 巡: "巡", 巢: "巢", 币: "幣", 师: "師", 帐: "帳", 带: "帶",
+  帮: "幫", 干: "乾", 并: "並", 广: "廣", 庆: "慶", 库: "庫", 应: "應", 庙: "廟", 废: "廢", 开: "開",
+  异: "異", 弃: "棄", 张: "張", 弥: "彌", 弯: "彎", 录: "錄", 归: "歸", 当: "當", 彻: "徹", 径: "徑",
+  徕: "徠", 征: "徵", 御: "禦", 忆: "憶", 忧: "憂", 怀: "懷", 态: "態", 总: "總", 恶: "惡", 恳: "懇",
+  惯: "慣", 惧: "懼", 惨: "慘", 惩: "懲", 愿: "願", 戏: "戲", 战: "戰", 户: "戶", 扩: "擴", 扫: "掃",
+  扬: "揚", 扰: "擾", 抚: "撫", 报: "報", 护: "護", 担: "擔", 拟: "擬", 拣: "揀", 拥: "擁", 拦: "攔",
+  拨: "撥", 择: "擇", 挂: "掛", 挥: "揮", 挣: "掙", 挤: "擠", 换: "換", 据: "據", 捷: "捷", 捣: "搗",
+  授: "授", 掷: "擲", 揽: "攬", 搀: "攙", 摄: "攝", 摆: "擺", 摇: "搖", 撑: "撐", 撒: "撒", 撰: "撰",
+  擦: "擦", 改: "改", 攻: "攻", 效: "效", 救: "救", 数: "數", 斋: "齋", 斓: "斕", 斗: "鬥", 断: "斷",
+  旧: "舊", 时: "時", 显: "顯", 晋: "晉", 晒: "曬", 晚: "晚", 暂: "暫", 暴: "暴", 术: "術", 机: "機",
+  杀: "殺", 杂: "雜", 权: "權", 条: "條", 来: "來", 杨: "楊", 杰: "傑", 极: "極", 构: "構", 枞: "樅",
+  枢: "樞", 枪: "槍", 柜: "櫃", 标: "標", 栋: "棟", 栏: "欄", 树: "樹", 栖: "棲", 样: "樣", 栾: "欒",
+  桥: "橋", 桨: "槳", 桩: "樁", 梦: "夢", 检: "檢", 楼: "樓", 概: "概", 榄: "欖", 榈: "櫚", 榜: "榜",
+  槛: "檻", 槟: "檳", 模: "模", 横: "橫", 樱: "櫻", 欣: "欣", 欧: "歐", 欲: "欲", 欢: "歡", 步: "步",
+  歼: "殲", 残: "殘", 殴: "毆", 毕: "畢", 气: "氣", 汇: "匯", 汉: "漢", 汤: "湯", 沟: "溝", 没: "沒",
+  沪: "滬", 沟: "溝", 沧: "滄", 河: "河", 治: "治", 泽: "澤", 洁: "潔", 洒: "灑", 洛: "洛", 津: "津",
+  洲: "洲", 测: "測", 济: "濟", 浏: "瀏", 浑: "渾", 浓: "濃", 浦: "浦", 浩: "浩", 浪: "浪", 海: "海",
+  涛: "濤", 润: "潤", 涧: "澗", 涨: "漲", 涩: "澀", 淀: "澱", 渊: "淵", 渐: "漸", 渔: "漁", 渖: "瀋",
+  温: "溫", 湾: "灣", 湿: "濕", 滑: "滑", 滚: "滾", 滞: "滯", 滨: "濱", 滩: "灘", 满: "滿", 滤: "濾",
+  滥: "濫", 滦: "灤", 滨: "濱", 潜: "潛", 潮: "潮", 澜: "瀾", 灾: "災", 灿: "燦", 炉: "爐", 点: "點",
+  炼: "煉", 炽: "熾", 烁: "爍", 烂: "爛", 烟: "煙", 热: "熱", 焕: "煥", 爱: "愛", 爷: "爺", 牵: "牽",
+  犹: "猶", 狀: "狀", 独: "獨", 狭: "狹", 猪: "豬", 猫: "貓", 献: "獻", 玛: "瑪", 环: "環", 现: "現",
+  玺: "璽", 珑: "瓏", 班: "班", 琐: "瑣", 瑶: "瑤", 瓶: "瓶", 画: "畫", 畅: "暢", 畴: "疇", 疗: "療",
+  疮: "瘡", 疯: "瘋", 症: "症", 痨: "癆", 痪: "瘓", 瘾: "癮", 皱: "皺", 盘: "盤", 监: "監", 盖: "蓋",
+  盗: "盜", 盘: "盤", 眦: "眥", 睁: "睜", 睐: "睞", 睛: "睛", 矾: "礬", 矿: "礦", 码: "碼", 砖: "磚",
+  砚: "硯", 砺: "礪", 砾: "礫", 础: "礎", 硕: "碩", 确: "確", 碍: "礙", 碱: "鹼", 礼: "禮", 祷: "禱",
+  离: "離", 秃: "禿", 秆: "稈", 种: "種", 积: "積", 称: "稱", 稳: "穩", 穷: "窮", 窃: "竊", 窍: "竅",
+  窑: "窯", 窜: "竄", 窝: "窩", 竞: "競", 笔: "筆", 笕: "筧", 笺: "箋", 筑: "築", 筛: "篩", 签: "簽",
+  简: "簡", 算: "算", 管: "管", 篮: "籃", 籁: "籟", 籍: "籍", 类: "類", 粤: "粵", 粮: "糧", 粪: "糞",
+  系: "系", 紧: "緊", 纠: "糾", 纪: "紀", 约: "約", 红: "紅", 纤: "纖", 级: "級", 纯: "純", 纲: "綱",
+  纳: "納", 纵: "縱", 纷: "紛", 纸: "紙", 纹: "紋", 纺: "紡", 纽: "紐", 线: "線", 练: "練", 组: "組",
+  细: "細", 织: "織", 终: "終", 绊: "絆", 绍: "紹", 经: "經", 结: "結", 给: "給", 络: "絡", 绝: "絕",
+  统: "統", 绘: "繪", 维: "維", 绪: "緒", 续: "續", 绳: "繩", 绿: "綠", 缆: "纜", 缩: "縮", 缺: "缺",
+  网: "網", 罗: "羅", 罚: "罰", 罢: "罷", 羁: "羈", 羊: "羊", 美: "美", 群: "群", 翁: "翁", 翻: "翻",
+  者: "者", 耸: "聳", 联: "聯", 聪: "聰", 肃: "肅", 肠: "腸", 肤: "膚", 肾: "腎", 胀: "脹", 胁: "脅",
+  胆: "膽", 胜: "勝", 胶: "膠", 脉: "脈", 脏: "髒", 脑: "腦", 脚: "腳", 脱: "脫", 脸: "臉", 腊: "臘",
+  腻: "膩", 腾: "騰", 致: "致", 舆: "輿", 舰: "艦", 艺: "藝", 节: "節", 芜: "蕪", 芦: "蘆", 苁: "蓯",
+  苹: "蘋", 范: "範", 茧: "繭", 荐: "薦", 荤: "葷", 药: "藥", 莅: "蒞", 莲: "蓮", 获: "獲", 莹: "瑩",
+  营: "營", 萧: "蕭", 萨: "薩", 葱: "蔥", 蒂: "蒂", 蒙: "蒙", 蓝: "藍", 蓟: "薊", 蔷: "薔", 蔺: "藺",
+  蕴: "蘊", 虑: "慮", 虚: "虛", 虫: "蟲", 虽: "雖", 蚀: "蝕", 蚁: "蟻", 蝇: "蠅", 蝉: "蟬", 衅: "釁",
+  补: "補", 表: "表", 袄: "襖", 装: "裝", 裤: "褲", 见: "見", 观: "觀", 规: "規", 视: "視", 览: "覽",
+  觉: "覺", 觅: "覓", 触: "觸", 订: "訂", 认: "認", 计: "計", 讯: "訊", 讨: "討", 让: "讓", 训: "訓",
+  议: "議", 记: "記", 讲: "講", 讳: "諱", 讶: "訝", 许: "許", 论: "論", 设: "設", 访: "訪", 证: "證",
+  评: "評", 识: "識", 诉: "訴", 诊: "診", 词: "詞", 译: "譯", 试: "試", 诚: "誠", 话: "話", 诞: "誕",
+  询: "詢", 该: "該", 详: "詳", 语: "語", 误: "誤", 说: "說", 请: "請", 诸: "諸", 读: "讀", 课: "課",
+  谁: "誰", 调: "調", 谈: "談", 谊: "誼", 谋: "謀", 谓: "謂", 谢: "謝", 谣: "謠", 谨: "謹", 谱: "譜",
+  贝: "貝", 负: "負", 贡: "貢", 财: "財", 责: "責", 贤: "賢", 败: "敗", 账: "帳", 货: "貨", 质: "質",
+  贩: "販", 购: "購", 贯: "貫", 贴: "貼", 贵: "貴", 贷: "貸", 费: "費", 贺: "賀", 赁: "賃", 资: "資",
+  赐: "賜", 赏: "賞", 赔: "賠", 赖: "賴", 赚: "賺", 赛: "賽", 赞: "讚", 赠: "贈", 赵: "趙", 赶: "趕",
+  趋: "趨", 跃: "躍", 践: "踐", 踪: "蹤", 蹑: "躡", 车: "車", 轨: "軌", 转: "轉", 轮: "輪", 软: "軟",
+  轰: "轟", 轴: "軸", 轻: "輕", 载: "載", 较: "較", 辅: "輔", 辆: "輛", 辈: "輩", 辉: "輝", 辑: "輯",
+  输: "輸", 辖: "轄", 辞: "辭", 辟: "闢", 边: "邊", 达: "達", 迁: "遷", 过: "過", 迈: "邁", 运: "運",
+  还: "還", 这: "這", 进: "進", 远: "遠", 违: "違", 连: "連", 迟: "遲", 适: "適", 选: "選", 逊: "遜",
+  递: "遞", 逻: "邏", 遗: "遺", 遥: "遙", 邓: "鄧", 邻: "鄰", 郁: "鬱", 邮: "郵", 郑: "鄭", 郸: "鄲",
+  酝: "醞", 酱: "醬", 释: "釋", 鉴: "鑑", 针: "針", 钟: "鐘", 钢: "鋼", 钥: "鑰", 钦: "欽",
+  钱: "錢", 钳: "鉗", 钻: "鑽", 铁: "鐵", 铃: "鈴", 铅: "鉛", 铜: "銅", 铝: "鋁", 铺: "鋪", 链: "鏈",
+  销: "銷", 锁: "鎖", 错: "錯", 锡: "錫", 锦: "錦", 键: "鍵", 锯: "鋸", 锲: "鍥", 锻: "鍛", 镜: "鏡",
+  长: "長", 门: "門", 闪: "閃", 闭: "閉", 问: "問", 闯: "闖", 闲: "閒", 间: "間", 闷: "悶", 闸: "閘",
+  闹: "鬧", 闺: "閨", 闻: "聞", 阅: "閱", 队: "隊", 阳: "陽", 阴: "陰", 阵: "陣", 阶: "階", 际: "際",
+  陆: "陸", 陈: "陳", 险: "險", 随: "隨", 隐: "隱", 隶: "隸", 难: "難", 雏: "雛", 雾: "霧", 霁: "霽",
+  霉: "黴", 静: "靜", 靠: "靠", 面: "面", 鞋: "鞋", 页: "頁", 顶: "頂", 项: "項", 顺: "順", 须: "須",
+  顽: "頑", 顾: "顧", 预: "預", 领: "領", 颇: "頗", 频: "頻", 题: "題", 颜: "顏", 额: "額", 风: "風",
+  飘: "飄", 飞: "飛", 饭: "飯", 饮: "飲", 饰: "飾", 饱: "飽", 馆: "館", 马: "馬", 驭: "馭", 驰: "馳",
+  驱: "驅", 驻: "駐", 驶: "駛", 驼: "駝", 验: "驗", 骑: "騎", 骗: "騙", 骚: "騷", 骤: "驟", 髅: "髏",
+  鱼: "魚", 鲜: "鮮", 鸟: "鳥", 鸡: "雞", 鸣: "鳴", 鸭: "鴨", 鹅: "鵝", 麦: "麥", 黄: "黃", 黎: "黎",
+  黑: "黑", 齐: "齊", 齿: "齒", 龙: "龍", 龟: "龜"
+};
 const regionDisplayNames = "Intl" in window && Intl.DisplayNames
   ? new Intl.DisplayNames(["zh-TW"], { type: "region" })
   : null;
@@ -437,7 +517,8 @@ function normalizeWeatherLocation(value) {
 }
 
 function toTraditionalChineseText(value) {
-  return TRADITIONAL_CHINESE_TERMS.reduce((text, [from, to]) => text.replaceAll(from, to), String(value || ""));
+  const termConverted = TRADITIONAL_CHINESE_TERMS.reduce((text, [from, to]) => text.replaceAll(from, to), String(value || ""));
+  return Array.from(termConverted).map((char) => SIMPLIFIED_TO_TRADITIONAL_CHARS[char] || char).join("");
 }
 
 function normalizeMembers(members) {
@@ -1648,14 +1729,16 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
   const cachedForecast = trip.weatherForecasts?.[location.id] || null;
   const forecast = getForecastForDate(cachedForecast, dayDate);
   const hasForecast = Boolean(forecast);
+  const displayName = weatherDisplayText(location.name);
+  const displayMeta = weatherDisplayText(weatherLocationMeta(location) || weatherSourceName(location));
 
   return `
     <article class="weather-location-card ${hasForecast ? "" : "is-empty"}">
       <header>
         ${renderWeatherIcon(hasForecast ? forecast.weatherCode : null)}
         <div>
-          <strong>${escapeHtml(location.name)}</strong>
-          <small>${escapeHtml(weatherLocationMeta(location) || weatherSourceName(location))}</small>
+          <strong>${escapeHtml(displayName)}</strong>
+          <small>${escapeHtml(displayMeta)}</small>
         </div>
         ${hasForecast ? `<span>${escapeHtml(weatherCodeLabel(forecast.weatherCode))}</span>` : ""}
       </header>
@@ -1670,10 +1753,14 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
             <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
             <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
           `
-          : `<p class="weather-empty">${escapeHtml(statusText || weatherEmptyMessage(location, cachedForecast))}</p>`
+          : `<p class="weather-empty">${escapeHtml(weatherDisplayText(statusText || weatherEmptyMessage(location, cachedForecast)))}</p>`
       }
     </article>
   `;
+}
+
+function weatherDisplayText(value) {
+  return toTraditionalChineseText(value);
 }
 
 function weatherEmptyMessage(location = null, cachedForecast = null) {
@@ -1712,8 +1799,8 @@ function renderWeatherSearchResults() {
       ${state.weatherSearchResults
         .map((location, index) => `
           <button type="button" data-select-weather-result="${index}" role="listitem">
-            <strong>${escapeHtml(location.name)}</strong>
-            <small>${escapeHtml(weatherLocationMeta(location))}</small>
+            <strong>${escapeHtml(weatherDisplayText(location.name))}</strong>
+            <small>${escapeHtml(weatherDisplayText(weatherLocationMeta(location)))}</small>
           </button>
         `)
         .join("")}
@@ -1722,7 +1809,7 @@ function renderWeatherSearchResults() {
 }
 
 function weatherLocationMeta(location) {
-  return [location.admin1, location.country, formatCoordinates(location)].filter(Boolean).join(" · ");
+  return [weatherDisplayText(location.admin1), weatherDisplayText(location.country), formatCoordinates(location)].filter(Boolean).join(" · ");
 }
 
 function formatCoordinates(location) {
@@ -3789,8 +3876,8 @@ function renderTripWeatherEditor() {
                 ? locations
                     .map((location) => `
                       <span class="trip-weather-chip">
-                        ${escapeHtml(location.name)}
-                        <button type="button" data-remove-trip-weather-location="${escapeHtml(location.id)}" data-weather-date="${escapeHtml(dateValue)}" aria-label="移除 ${escapeHtml(location.name)}">×</button>
+                        ${escapeHtml(weatherDisplayText(location.name))}
+                        <button type="button" data-remove-trip-weather-location="${escapeHtml(location.id)}" data-weather-date="${escapeHtml(dateValue)}" aria-label="移除 ${escapeHtml(weatherDisplayText(location.name))}">×</button>
                       </span>
                     `)
                     .join("")
@@ -3816,8 +3903,8 @@ function renderTripWeatherSearchResults(dateValue, results) {
       ${results
         .map((location, index) => `
           <button type="button" data-add-trip-weather-result="${index}" data-weather-date="${escapeHtml(dateValue)}">
-            <strong>${escapeHtml(location.name)}</strong>
-            <small>${escapeHtml(weatherLocationMeta(location))}</small>
+            <strong>${escapeHtml(weatherDisplayText(location.name))}</strong>
+            <small>${escapeHtml(weatherDisplayText(weatherLocationMeta(location)))}</small>
           </button>
         `)
         .join("")}
