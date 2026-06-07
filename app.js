@@ -1310,15 +1310,32 @@ function renderTrip() {
   tripSummary.textContent = `${trip.days.length} 天，${countItems(trip)} 個行程`;
   renderTripSectionTabs();
 
-  dayTabs.innerHTML = trip.days
-    .map(
-      (day, index) => `
-        <button class="day-tab ${index === state.activeDayIndex ? "is-active" : ""}" type="button" data-day="${index}">
-          ${escapeHtml(day.date)}
-        </button>
-      `
-    )
-    .join("");
+  const previousDay = trip.days[state.activeDayIndex - 1];
+  const nextDay = trip.days[state.activeDayIndex + 1];
+  dayTabs.innerHTML = `
+    <button class="day-nav-arrow" type="button" data-day-step="-1" ${previousDay ? "" : "disabled"} aria-label="前一天" title="前一天">‹</button>
+    ${
+      previousDay
+        ? `<button class="day-tab is-neighbor" type="button" data-day="${state.activeDayIndex - 1}">
+            <span>Day ${state.activeDayIndex}</span>
+            <strong>${escapeHtml(previousDay.date)}</strong>
+          </button>`
+        : `<span class="day-tab-placeholder" aria-hidden="true"></span>`
+    }
+    <button class="day-tab is-active" type="button" data-day="${state.activeDayIndex}" aria-current="date">
+      <span>Day ${state.activeDayIndex + 1}</span>
+      <strong>${escapeHtml(currentDay().date)}</strong>
+    </button>
+    ${
+      nextDay
+        ? `<button class="day-tab is-neighbor" type="button" data-day="${state.activeDayIndex + 1}">
+            <span>Day ${state.activeDayIndex + 2}</span>
+            <strong>${escapeHtml(nextDay.date)}</strong>
+          </button>`
+        : `<span class="day-tab-placeholder" aria-hidden="true"></span>`
+    }
+    <button class="day-nav-arrow" type="button" data-day-step="1" ${nextDay ? "" : "disabled"} aria-label="後一天" title="後一天">›</button>
+  `;
 
   const day = currentDay();
   activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}`;
@@ -3380,6 +3397,13 @@ tripList.addEventListener("click", (event) => {
 });
 
 dayTabs.addEventListener("click", (event) => {
+  const stepButton = event.target.closest("[data-day-step]");
+  if (stepButton) {
+    state.activeDayIndex = Math.max(0, Math.min(currentTrip().days.length - 1, state.activeDayIndex + Number(stepButton.dataset.dayStep)));
+    renderTrip();
+    return;
+  }
+
   const button = event.target.closest("[data-day]");
   if (!button) return;
   state.activeDayIndex = Number(button.dataset.day);

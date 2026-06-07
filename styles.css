@@ -698,16 +698,10 @@ h2 {
 
 .day-tabs {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 0;
-  scrollbar-width: none;
-}
-
-.day-tabs::-webkit-scrollbar {
-  display: none;
+  grid-template-columns: 38px minmax(58px, 0.72fr) minmax(108px, 1.4fr) minmax(58px, 0.72fr) 38px;
+  align-items: center;
+  gap: 6px;
+  min-height: 58px;
 }
 
 .trip-section-tabs {
@@ -795,28 +789,45 @@ h2 {
 }
 
 .day-tab {
-  display: inline-grid;
+  display: grid;
   place-items: center;
   box-sizing: border-box;
-  width: max-content;
-  min-width: 92px;
-  min-height: 46px;
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
   text-align: center;
-  padding: 8px 18px;
+  padding: 8px 7px;
   box-shadow: none;
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 950;
   line-height: 1.2;
-  white-space: nowrap;
   cursor: pointer;
 }
 
 .day-tab span {
-  display: none;
+  display: block;
+  color: inherit;
+  font-size: 0.68rem;
+  font-weight: 950;
+  opacity: 0.72;
+}
+
+.day-tab strong {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.day-tab.is-neighbor {
+  opacity: 0.42;
+}
+
+.day-tab.is-neighbor:hover {
+  opacity: 0.68;
 }
 
 .day-tab.is-active {
@@ -825,10 +836,39 @@ h2 {
     linear-gradient(135deg, rgba(15, 63, 57, 0.98), rgba(19, 111, 99, 0.92));
   color: white;
   box-shadow: 0 10px 22px rgba(15, 107, 95, 0.18);
+  opacity: 1;
+  transform: translateY(1px);
 }
 
 .day-tab.is-active span {
   color: rgba(255, 255, 255, 0.78);
+}
+
+.day-nav-arrow {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(15, 107, 95, 0.16);
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.88);
+  color: var(--brand-dark);
+  font-size: 1.5rem;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(24, 37, 33, 0.08);
+  cursor: pointer;
+}
+
+.day-nav-arrow:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.day-tab-placeholder {
+  display: block;
+  min-width: 0;
+  min-height: 52px;
 }
 
 .day-header {
