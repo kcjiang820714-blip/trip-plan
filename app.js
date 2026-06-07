@@ -48,6 +48,7 @@ const WEATHER_LOCATIONS = [
   { id: "los-angeles", group: "美洲", name: "Los Angeles 洛杉磯", latitude: 34.0522, longitude: -118.2437, elevation: 89 },
   { id: "vancouver", group: "美洲", name: "Vancouver 溫哥華", latitude: 49.2827, longitude: -123.1207, elevation: 70 }
 ];
+const WEATHER_SEARCH_LIMIT = 6;
 const exchangeRateDrafts = new Map();
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
@@ -108,7 +109,10 @@ const state = {
   editingTodoId: null,
   editingExpenseId: null,
   expandedItemId: null,
-  travelRefreshTimer: null
+  travelRefreshTimer: null,
+  weatherSearchQuery: "",
+  weatherSearchResults: [],
+  weatherSearchStatus: ""
 };
 
 state.activeTripId = state.library.trips[0]?.id || null;
@@ -332,7 +336,9 @@ function normalizeLibrary(library) {
 function normalizeWeatherLocations(value) {
   if (!value || typeof value !== "object") return {};
   return Object.fromEntries(
-    Object.entries(value).filter(([, locationId]) => WEATHER_LOCATIONS.some((location) => location.id === locationId))
+    Object.entries(value)
+      .map(([date, location]) => [date, normalizeWeatherLocation(location)])
+      .filter(([, location]) => location)
   );
 }
 
@@ -340,13 +346,43 @@ function normalizeWeatherForecasts(value) {
   if (!value || typeof value !== "object") return {};
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([locationId, forecast]) => WEATHER_LOCATIONS.some((location) => location.id === locationId) && forecast?.daily)
+      .filter(([, forecast]) => forecast?.daily)
       .map(([locationId, forecast]) => [locationId, {
         fetchedAt: forecast.fetchedAt || "",
         source: forecast.source || "Open-Meteo MeteoSwiss",
         daily: forecast.daily || {}
       }])
   );
+}
+
+function normalizeWeatherLocation(value) {
+  if (!value) return null;
+  if (typeof value === "string") return WEATHER_LOCATIONS.find((location) => location.id === value) || null;
+  if (typeof value !== "object") return null;
+
+  const latitude = Number(value.latitude);
+  const longitude = Number(value.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  const name = String(value.name || "").trim();
+  if (!name) return null;
+
+  const countryCode = String(value.countryCode || value.country_code || "").trim().toUpperCase();
+  const normalized = {
+    id: String(value.id || createWeatherLocationId({ name, latitude, longitude })).trim(),
+    group: String(value.group || value.country || "搜尋地點").trim(),
+    name,
+    latitude,
+    longitude,
+    elevation: Number.isFinite(Number(value.elevation)) ? Number(value.elevation) : 0
+  };
+  if (countryCode) normalized.countryCode = countryCode;
+  if (value.admin1) normalized.admin1 = String(value.admin1).trim();
+  if (value.country) normalized.country = String(value.country).trim();
+  if (value.model || countryCode === "CH" || normalized.country === "Switzerland" || normalized.country === "瑞士") {
+    normalized.model = value.model || "meteoswiss_icon_ch2";
+  }
+  return normalized;
 }
 
 function normalizeMembers(members) {
@@ -1529,11 +1565,11 @@ function renderWeatherPanel(statusText = "") {
 
   const trip = currentTrip();
   const dayDate = getActiveDayDateValue(trip);
-  const locationId = trip.weatherLocations?.[dayDate] || "";
-  const location = getWeatherLocation(locationId);
+  const location = getWeatherLocation(trip.weatherLocations?.[dayDate]);
   const cachedForecast = location ? trip.weatherForecasts?.[location.id] : null;
   const forecast = location ? getForecastForDate(cachedForecast, dayDate) : null;
   const hasForecast = Boolean(forecast);
+  const searchStatus = state.weatherSearchStatus || "";
 
   weatherPanel.innerHTML = `
     <section class="weather-card ${hasForecast ? "" : "is-empty"}">
@@ -1544,11 +1580,16 @@ function renderWeatherPanel(statusText = "") {
         </div>
         ${hasForecast ? `<span>${escapeHtml(weatherCodeLabel(forecast.weatherCode))}</span>` : ""}
       </header>
+      <form class="weather-search" data-weather-search-form>
+        <label>
+          <span>搜尋城市或地點</span>
+          <input type="search" name="weatherSearch" value="${escapeHtml(state.weatherSearchQuery)}" placeholder="例如 Milan、Lauterbrunnen、Florence" autocomplete="off" />
+        </label>
+        <button class="secondary-action" type="submit">搜尋</button>
+      </form>
+      ${renderWeatherSearchResults()}
+      ${searchStatus ? `<p class="weather-empty">${escapeHtml(searchStatus)}</p>` : ""}
       <div class="weather-controls">
-        <select data-weather-location aria-label="天氣地點">
-          <option value="">選擇目的地</option>
-          ${renderWeatherLocationOptions(locationId)}
-        </select>
         <button class="secondary-action" type="button" data-refresh-weather ${location ? "" : "disabled"}>更新天氣</button>
       </div>
       ${
@@ -1569,30 +1610,120 @@ function renderWeatherPanel(statusText = "") {
 }
 
 function weatherEmptyMessage(location, cachedForecast) {
-  if (!location) return "選擇目的地後，按「更新天氣」抓取預報。瑞士地點會優先使用 MeteoSwiss 模型。";
+  if (!location) return "搜尋並選擇目的地後，按「更新天氣」抓取預報。瑞士地點會優先使用 MeteoSwiss 模型。";
   if (cachedForecast) return "目前沒有這一天的預報資料。多數天氣模型只提供短期預報，請出發前或旅途中再更新。";
   return `按「更新天氣」抓取 ${weatherSourceName(location)} 預報。`;
 }
 
-function getWeatherLocation(locationId) {
-  return WEATHER_LOCATIONS.find((location) => location.id === locationId) || null;
+function getWeatherLocation(locationValue) {
+  return normalizeWeatherLocation(locationValue);
 }
 
-function renderWeatherLocationOptions(selectedId) {
-  const groups = [...new Set(WEATHER_LOCATIONS.map((location) => location.group || "其他"))];
-  return groups
-    .map((group) => {
-      const options = WEATHER_LOCATIONS
-        .filter((location) => (location.group || "其他") === group)
-        .map((location) => `<option value="${escapeHtml(location.id)}" ${location.id === selectedId ? "selected" : ""}>${escapeHtml(location.name)}</option>`)
-        .join("");
-      return `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`;
-    })
-    .join("");
+function renderWeatherSearchResults() {
+  if (state.weatherSearchResults.length === 0) return "";
+  return `
+    <div class="weather-search-results" role="list">
+      ${state.weatherSearchResults
+        .map((location, index) => `
+          <button type="button" data-select-weather-result="${index}" role="listitem">
+            <strong>${escapeHtml(location.name)}</strong>
+            <small>${escapeHtml(weatherLocationMeta(location))}</small>
+          </button>
+        `)
+        .join("")}
+    </div>
+  `;
+}
+
+function weatherLocationMeta(location) {
+  return [location.admin1, location.country, formatCoordinates(location)].filter(Boolean).join(" · ");
+}
+
+function formatCoordinates(location) {
+  if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) return "";
+  return `${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)}`;
 }
 
 function weatherSourceName(location) {
   return location?.model === "meteoswiss_icon_ch2" ? "Open-Meteo MeteoSwiss" : "Open-Meteo";
+}
+
+function createWeatherLocationId(location) {
+  const name = String(location.name || "place").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
+  const coordinateKey = Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? `${latitude.toFixed(4)},${longitude.toFixed(4)}`
+    : createId();
+  return `geo-${name || "place"}-${coordinateKey}`.replace(/[^a-z0-9.,-]+/g, "-");
+}
+
+function normalizeGeocodingResult(result) {
+  const countryCode = String(result.country_code || "").trim().toUpperCase();
+  return normalizeWeatherLocation({
+    id: result.id ? `geo-${result.id}` : "",
+    group: result.country || "搜尋地點",
+    name: [result.name, result.admin1, result.country].filter(Boolean).join(", "),
+    latitude: result.latitude,
+    longitude: result.longitude,
+    elevation: result.elevation,
+    admin1: result.admin1 || "",
+    country: result.country || "",
+    countryCode,
+    model: countryCode === "CH" ? "meteoswiss_icon_ch2" : ""
+  });
+}
+
+async function searchWeatherLocations(query) {
+  const trimmedQuery = query.trim();
+  state.weatherSearchQuery = trimmedQuery;
+  state.weatherSearchResults = [];
+
+  if (trimmedQuery.length < 2) {
+    state.weatherSearchStatus = "請至少輸入 2 個字再搜尋。";
+    renderWeatherPanel();
+    return;
+  }
+
+  state.weatherSearchStatus = "正在搜尋地點...";
+  renderWeatherPanel();
+
+  const params = new URLSearchParams({
+    name: trimmedQuery,
+    count: String(WEATHER_SEARCH_LIMIT),
+    language: "zh",
+    format: "json"
+  });
+
+  try {
+    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const results = Array.isArray(data.results) ? data.results.map(normalizeGeocodingResult).filter(Boolean) : [];
+    state.weatherSearchResults = results;
+    state.weatherSearchStatus = results.length ? "請選擇最符合的地點。" : "找不到符合的地點，請試試英文城市名或加上國家。";
+  } catch {
+    state.weatherSearchStatus = "地點搜尋失敗。請確認網路後再試一次。";
+  }
+
+  renderWeatherPanel();
+}
+
+function selectWeatherSearchResult(index) {
+  const location = state.weatherSearchResults[index];
+  if (!location) return;
+
+  const trip = currentTrip();
+  const dayDate = getActiveDayDateValue(trip);
+  trip.weatherLocations = normalizeWeatherLocations({
+    ...(trip.weatherLocations || {}),
+    [dayDate]: location
+  });
+  state.weatherSearchQuery = "";
+  state.weatherSearchResults = [];
+  state.weatherSearchStatus = "";
+  saveLibrary();
+  renderWeatherPanel();
 }
 
 function getForecastForDate(forecast, dayDate) {
@@ -3867,20 +3998,21 @@ travelDayPanel?.addEventListener("click", (event) => {
   document.querySelector(`#itemDetails${CSS.escape(state.expandedItemId)}`)?.closest(".item-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
-weatherPanel?.addEventListener("change", (event) => {
-  const select = event.target.closest("[data-weather-location]");
-  if (!select) return;
-  const trip = currentTrip();
-  const dayDate = getActiveDayDateValue(trip);
-  trip.weatherLocations = normalizeWeatherLocations({
-    ...(trip.weatherLocations || {}),
-    [dayDate]: select.value
-  });
-  saveLibrary();
-  renderWeatherPanel();
+weatherPanel?.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-weather-search-form]");
+  if (!form) return;
+  event.preventDefault();
+  const query = new FormData(form).get("weatherSearch")?.toString() || "";
+  searchWeatherLocations(query);
 });
 
 weatherPanel?.addEventListener("click", (event) => {
+  const resultButton = event.target.closest("[data-select-weather-result]");
+  if (resultButton) {
+    selectWeatherSearchResult(Number(resultButton.dataset.selectWeatherResult));
+    return;
+  }
+
   const button = event.target.closest("[data-refresh-weather]");
   if (!button) return;
   fetchWeatherForActiveDay();
