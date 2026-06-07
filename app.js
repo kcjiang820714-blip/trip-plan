@@ -3419,7 +3419,7 @@ function closeModal(dialog) {
 
 function closeAttachmentViewer() {
   closeModal(attachmentViewer);
-  attachmentViewer.classList.remove("is-text-viewer");
+  attachmentViewer.classList.remove("is-text-viewer", "is-pdf-viewer");
   attachmentViewerBody.innerHTML = "";
 
   if (activeAttachmentUrl) {
@@ -3587,9 +3587,19 @@ function openAttachment(ownerType, ownerId, attachmentId) {
 
     const viewerUrl = activeAttachmentUrl || attachmentSource;
     attachmentViewerTitle.textContent = attachment.name || "附件預覽";
+    attachmentViewer.classList.remove("is-text-viewer", "is-pdf-viewer");
 
     if (attachment.type.startsWith("image/")) {
       attachmentViewerBody.innerHTML = `<img class="attachment-viewer-image" src="${escapeHtml(viewerUrl)}" alt="${escapeHtml(attachment.name)}" />`;
+    } else if (attachment.type === "application/pdf" || /\.pdf($|\?)/i.test(attachment.name || attachmentSource)) {
+      attachmentViewer.classList.add("is-pdf-viewer");
+      attachmentViewerBody.innerHTML = `
+        <div class="pdf-viewer-actions">
+          <a class="secondary-action" href="${escapeHtml(viewerUrl)}" target="_blank" rel="noopener">開啟完整 PDF</a>
+          <a class="secondary-action" href="${escapeHtml(viewerUrl)}" download="${escapeHtml(attachment.name || "trip-attachment.pdf")}">下載</a>
+        </div>
+        <iframe class="attachment-viewer-frame" src="${escapeHtml(viewerUrl)}#toolbar=1&navpanes=0" title="${escapeHtml(attachment.name || "附件預覽")}"></iframe>
+      `;
     } else {
       attachmentViewerBody.innerHTML = `<iframe class="attachment-viewer-frame" src="${escapeHtml(viewerUrl)}" title="${escapeHtml(attachment.name || "附件預覽")}"></iframe>`;
     }
