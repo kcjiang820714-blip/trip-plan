@@ -1980,41 +1980,107 @@ h2 {
   line-height: 1;
 }
 
-.travel-alert-controls {
+.weather-panel {
+  margin: 0 0 16px;
+}
+
+.weather-card {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  align-items: center;
-}
-
-.travel-alert-toggle {
-  min-height: 38px;
-  border: 1px solid rgba(24, 37, 33, 0.12);
+  gap: 12px;
+  border: 1px solid rgba(24, 37, 33, 0.09);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.76);
-  color: var(--brand-dark);
-  font: inherit;
-  font-size: 0.84rem;
-  font-weight: 950;
-  cursor: pointer;
+  background:
+    linear-gradient(145deg, rgba(210, 229, 235, 0.58), rgba(255, 255, 255, 0.78) 48%),
+    #fffdf8;
+  padding: 15px;
+  box-shadow: 0 12px 26px rgba(24, 37, 33, 0.08);
 }
 
-.travel-alert-toggle.is-active {
-  border-color: rgba(19, 111, 99, 0.28);
+.weather-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.weather-header h3 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.weather-header > span {
+  flex: 0 0 auto;
+  border-radius: 999px;
   background: #e7f0ed;
+  color: var(--brand-dark);
+  font-size: 0.78rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 8px 10px;
 }
 
-.travel-alert-toggle:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
+.weather-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
 }
 
-.travel-alert-controls small {
-  grid-column: 1 / -1;
+.weather-controls select {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgba(24, 37, 33, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 850;
+  padding: 0 10px;
+}
+
+.weather-controls .secondary-action {
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.weather-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.weather-metrics span {
+  display: grid;
+  gap: 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 850;
-  line-height: 1.35;
+  padding: 10px;
+  text-align: center;
+}
+
+.weather-metrics strong {
+  color: var(--ink);
+  font-size: 0.96rem;
+  line-height: 1.15;
+}
+
+.weather-advice,
+.weather-empty,
+.weather-card small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.weather-advice {
+  color: var(--ink);
 }
 
 .quick-ticket-panel {
@@ -3223,6 +3289,20 @@ h2 {
 
   .travel-day-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .weather-header,
+  .weather-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weather-header > span {
+    justify-self: start;
+  }
+
+  .weather-metrics {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .quick-ticket-card {

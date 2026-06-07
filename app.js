@@ -1,6 +1,5 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
-const TRAVEL_MODE_SETTINGS_KEY = "trip-notebook-travel-mode-settings-v1";
 const TRAVEL_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 const MAX_IMAGE_ATTACHMENT_SIZE = 950 * 1024;
@@ -20,6 +19,16 @@ const DEFAULT_EXCHANGE_RATES = {
   EUR: 35,
   CHF: 36
 };
+const WEATHER_LOCATIONS = [
+  { id: "zurich", name: "Zurich 蘇黎世", latitude: 47.3769, longitude: 8.5417, elevation: 408 },
+  { id: "lucerne", name: "Lucerne 琉森", latitude: 47.0502, longitude: 8.3093, elevation: 435 },
+  { id: "interlaken", name: "Interlaken 因特拉肯", latitude: 46.6863, longitude: 7.8632, elevation: 568 },
+  { id: "grindelwald", name: "Grindelwald 格林德瓦", latitude: 46.6242, longitude: 8.0414, elevation: 1034 },
+  { id: "jungfraujoch", name: "Jungfraujoch 少女峰", latitude: 46.5475, longitude: 7.9806, elevation: 3454 },
+  { id: "zermatt", name: "Zermatt 策馬特", latitude: 46.0207, longitude: 7.7491, elevation: 1608 },
+  { id: "bern", name: "Bern 伯恩", latitude: 46.948, longitude: 7.4474, elevation: 540 },
+  { id: "geneva", name: "Geneva 日內瓦", latitude: 46.2044, longitude: 6.1432, elevation: 375 }
+];
 const exchangeRateDrafts = new Map();
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
@@ -80,9 +89,6 @@ const state = {
   editingTodoId: null,
   editingExpenseId: null,
   expandedItemId: null,
-  travelModeSettings: loadTravelModeSettings(),
-  travelSignalKey: "",
-  travelSignalReady: false,
   travelRefreshTimer: null
 };
 
@@ -113,6 +119,7 @@ const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const travelDayPanel = document.querySelector("#travelDayPanel");
+const weatherPanel = document.querySelector("#weatherPanel");
 const timeline = document.querySelector("#timeline");
 const quickTicketPanel = document.querySelector("#quickTicketPanel");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
@@ -274,23 +281,6 @@ function loadLibrary() {
   return normalizeLibrary({ trips: [structuredClone(defaultTrip)] });
 }
 
-function loadTravelModeSettings() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(TRAVEL_MODE_SETTINGS_KEY) || "{}");
-    return {
-      notify: Boolean(parsed.notify),
-      vibrate: Boolean(parsed.vibrate)
-    };
-  } catch {
-    localStorage.removeItem(TRAVEL_MODE_SETTINGS_KEY);
-    return { notify: false, vibrate: false };
-  }
-}
-
-function saveTravelModeSettings() {
-  localStorage.setItem(TRAVEL_MODE_SETTINGS_KEY, JSON.stringify(state.travelModeSettings));
-}
-
 function normalizeLibrary(library) {
   return {
     trips: library.trips.map((trip) => {
@@ -310,12 +300,34 @@ function normalizeLibrary(library) {
         sharedMembers: normalizeSharedMembers(trip.sharedMembers),
         members: normalizeMembers(trip.members),
         exchangeRates: normalizeExchangeRates(trip.exchangeRates),
+        weatherLocations: normalizeWeatherLocations(trip.weatherLocations),
+        weatherForecasts: normalizeWeatherForecasts(trip.weatherForecasts),
         bookings: Array.isArray(trip.bookings) ? trip.bookings.map(normalizeBooking) : [],
         todos: Array.isArray(trip.todos) ? trip.todos.map(normalizeTodo) : [],
         expenses: Array.isArray(trip.expenses) ? trip.expenses.map(normalizeExpense) : []
       };
     })
   };
+}
+
+function normalizeWeatherLocations(value) {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, locationId]) => WEATHER_LOCATIONS.some((location) => location.id === locationId))
+  );
+}
+
+function normalizeWeatherForecasts(value) {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([locationId, forecast]) => WEATHER_LOCATIONS.some((location) => location.id === locationId) && forecast?.daily)
+      .map(([locationId, forecast]) => [locationId, {
+        fetchedAt: forecast.fetchedAt || "",
+        source: forecast.source || "Open-Meteo MeteoSwiss",
+        daily: forecast.daily || {}
+      }])
+  );
 }
 
 function normalizeMembers(members) {
@@ -1367,6 +1379,7 @@ function renderTrip() {
   activeDayTitle.textContent = day.title;
   renderBookings();
   renderTravelDayPanel();
+  renderWeatherPanel();
   renderQuickTickets();
   renderTodos();
   renderExpenses();
@@ -1429,8 +1442,6 @@ function renderTravelDayPanel() {
   const bookings = getBookingsForDay(trip, dayDate);
   const reminders = getTravelRemindersForDay(trip, dayDate);
   const progressText = totalCount ? `${Math.min(passedCount, totalCount)}/${totalCount} 已過` : "尚無行程";
-  const notificationLabel = notificationPermissionLabel();
-  const supportsVibration = "vibrate" in navigator;
 
   travelDayPanel.innerHTML = `
     <section class="travel-day-card">
@@ -1441,15 +1452,6 @@ function renderTravelDayPanel() {
         </div>
         <span>${escapeHtml(progressText)}</span>
       </header>
-      <div class="travel-alert-controls" aria-label="即時提醒設定">
-        <button class="travel-alert-toggle ${state.travelModeSettings.notify ? "is-active" : ""}" type="button" data-toggle-travel-notify>
-          通知 ${state.travelModeSettings.notify ? "開" : "關"}
-        </button>
-        <button class="travel-alert-toggle ${state.travelModeSettings.vibrate ? "is-active" : ""}" type="button" data-toggle-travel-vibrate ${supportsVibration ? "" : "disabled"}>
-          震動 ${state.travelModeSettings.vibrate ? "開" : "關"}
-        </button>
-        <small>${escapeHtml(notificationLabel)} · 每分鐘自動更新</small>
-      </div>
       <div class="travel-day-metrics" aria-label="今日摘要">
         <span><strong>${bookings.length}</strong>票券</span>
         <span><strong>${reminders.length}</strong>提醒</span>
@@ -1484,8 +1486,6 @@ function renderTravelDayPanel() {
       }
     </section>
   `;
-
-  updateTravelSignal(travelStatus, dayDate);
 }
 
 function renderTravelStopBlock(label, item, kind) {
@@ -1503,6 +1503,157 @@ function renderTravelStopBlock(label, item, kind) {
       <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(item.id || "")}">查看行程</button>
     </div>
   `;
+}
+
+function renderWeatherPanel(statusText = "") {
+  if (!weatherPanel) return;
+
+  const trip = currentTrip();
+  const dayDate = getActiveDayDateValue(trip);
+  const locationId = trip.weatherLocations?.[dayDate] || "";
+  const location = getWeatherLocation(locationId);
+  const cachedForecast = location ? trip.weatherForecasts?.[location.id] : null;
+  const forecast = location ? getForecastForDate(cachedForecast, dayDate) : null;
+  const hasForecast = Boolean(forecast);
+
+  weatherPanel.innerHTML = `
+    <section class="weather-card ${hasForecast ? "" : "is-empty"}">
+      <header class="weather-header">
+        <div>
+          <p class="eyebrow">今日天氣</p>
+          <h3>${location ? escapeHtml(location.name) : "選擇瑞士地點"}</h3>
+        </div>
+        ${hasForecast ? `<span>${escapeHtml(weatherCodeLabel(forecast.weatherCode))}</span>` : ""}
+      </header>
+      <div class="weather-controls">
+        <select data-weather-location aria-label="天氣地點">
+          <option value="">選擇地點</option>
+          ${WEATHER_LOCATIONS.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === locationId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+        </select>
+        <button class="secondary-action" type="button" data-refresh-weather ${location ? "" : "disabled"}>更新天氣</button>
+      </div>
+      ${
+        hasForecast
+          ? `
+            <div class="weather-metrics">
+              <span><strong>${formatTemperatureRange(forecast)}</strong>高低溫</span>
+              <span><strong>${formatWeatherNumber(forecast.precipitationProbability, "%")}</strong>降雨機率</span>
+              <span><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
+            </div>
+            <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
+            <small>${escapeHtml(weatherUpdatedLabel(trip.weatherForecasts?.[location.id]))}</small>
+          `
+          : `<p class="weather-empty">${escapeHtml(statusText || weatherEmptyMessage(location, cachedForecast))}</p>`
+      }
+    </section>
+  `;
+}
+
+function weatherEmptyMessage(location, cachedForecast) {
+  if (!location) return "選擇瑞士地點後，按「更新天氣」抓取 MeteoSwiss 預報。";
+  if (cachedForecast) return "目前沒有這一天的預報資料。MeteoSwiss 通常只提供接近旅程日期的短期預報，請出發前或旅途中再更新。";
+  return "按「更新天氣」抓取 MeteoSwiss 預報。";
+}
+
+function getWeatherLocation(locationId) {
+  return WEATHER_LOCATIONS.find((location) => location.id === locationId) || null;
+}
+
+function getForecastForDate(forecast, dayDate) {
+  const index = forecast?.daily?.time?.indexOf(dayDate) ?? -1;
+  if (index < 0) return null;
+  return {
+    date: dayDate,
+    weatherCode: weatherNumber(forecast.daily.weather_code?.[index]),
+    tempMax: weatherNumber(forecast.daily.temperature_2m_max?.[index]),
+    tempMin: weatherNumber(forecast.daily.temperature_2m_min?.[index]),
+    precipitationProbability: weatherNumber(forecast.daily.precipitation_probability_max?.[index]),
+    windSpeed: weatherNumber(forecast.daily.wind_speed_10m_max?.[index])
+  };
+}
+
+function weatherNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function formatTemperatureRange(forecast) {
+  if (forecast.tempMin === null || forecast.tempMax === null) return "--";
+  return `${Math.round(forecast.tempMin)}-${Math.round(forecast.tempMax)}°C`;
+}
+
+function formatWeatherNumber(value, unit) {
+  return value === null ? "--" : `${Math.round(value)}${unit}`;
+}
+
+function weatherUpdatedLabel(forecast) {
+  if (!forecast?.fetchedAt) return "尚未更新";
+  const updated = new Date(forecast.fetchedAt);
+  if (Number.isNaN(updated.getTime())) return "已使用上次成功抓取的資料";
+  return `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · Source: ${forecast.source || "Open-Meteo MeteoSwiss"}`;
+}
+
+function weatherCodeLabel(code) {
+  if (code === null) return "暫無";
+  if ([0].includes(code)) return "晴";
+  if ([1, 2, 3].includes(code)) return "多雲";
+  if ([45, 48].includes(code)) return "霧";
+  if ([51, 53, 55, 56, 57].includes(code)) return "毛毛雨";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "降雨";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "降雪";
+  if ([95, 96, 99].includes(code)) return "雷雨";
+  return "天氣";
+}
+
+function weatherAdvice(location, forecast) {
+  const advice = [];
+  if (location?.elevation >= 1000) advice.push("山區天氣變化快，請多帶一層保暖衣物。");
+  if (forecast.precipitationProbability !== null && forecast.precipitationProbability >= 60) advice.push("降雨機率偏高，建議帶雨具並預留室內備案。");
+  if (forecast.windSpeed !== null && forecast.windSpeed >= 35) advice.push("風速偏強，山區纜車或觀景台可能受影響。");
+  if (forecast.tempMin !== null && forecast.tempMin <= 5) advice.push("低溫明顯，早晚與高海拔地點要注意保暖。");
+  if (advice.length === 0) advice.push("天氣風險不高，仍建議出門前再更新一次。");
+  return advice.join(" ");
+}
+
+async function fetchWeatherForActiveDay() {
+  const trip = currentTrip();
+  const dayDate = getActiveDayDateValue(trip);
+  const location = getWeatherLocation(trip.weatherLocations?.[dayDate]);
+  if (!location) {
+    renderWeatherPanel("請先選擇天氣地點。");
+    return;
+  }
+
+  renderWeatherPanel("正在更新天氣...");
+
+  const params = new URLSearchParams({
+    latitude: String(location.latitude),
+    longitude: String(location.longitude),
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
+    timezone: "auto",
+    forecast_days: "7",
+    wind_speed_unit: "kmh"
+  });
+
+  try {
+    params.set("models", "meteoswiss_icon_ch2");
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    trip.weatherForecasts = normalizeWeatherForecasts({
+      ...(trip.weatherForecasts || {}),
+      [location.id]: {
+        fetchedAt: new Date().toISOString(),
+        source: "Open-Meteo MeteoSwiss",
+        daily: data.daily || {}
+      }
+    });
+    saveLibrary();
+    renderWeatherPanel();
+  } catch {
+    const cached = getForecastForDate(trip.weatherForecasts?.[location.id], dayDate);
+    renderWeatherPanel(cached ? "天氣更新失敗，已顯示上次成功抓取的資料。" : "天氣更新失敗。請確認網路後再試一次。");
+  }
 }
 
 function renderQuickTickets() {
@@ -1608,84 +1759,6 @@ function countPassedItems(day, dayDate) {
 function getCurrentTimeValue() {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-}
-
-function notificationPermissionLabel() {
-  if (!("Notification" in window)) return "這個瀏覽器不支援通知";
-  if (Notification.permission === "granted") return "通知權限已允許";
-  if (Notification.permission === "denied") return "通知權限已被封鎖";
-  return "通知需先按開啟並允許權限";
-}
-
-function updateTravelSignal(travelStatus, dayDate) {
-  const signalKey = [
-    state.activeTripId,
-    dayDate,
-    travelStatus.currentItem?.id || "none",
-    travelStatus.nextItem?.id || "none"
-  ].join(":");
-
-  if (!state.travelSignalReady) {
-    state.travelSignalReady = true;
-    state.travelSignalKey = signalKey;
-    return;
-  }
-
-  if (state.travelSignalKey === signalKey) return;
-  state.travelSignalKey = signalKey;
-  if (dayDate !== todayString()) return;
-  sendTravelSignal(travelStatus);
-}
-
-function sendTravelSignal(travelStatus) {
-  const title = travelStatus.currentItem ? `目前：${getItemTitle(travelStatus.currentItem)}` : "旅程已更新";
-  const body = travelStatus.nextItem ? `下一站 ${travelStatus.nextItem.time || ""} ${getItemTitle(travelStatus.nextItem)}`.trim() : "今天後面沒有更多行程。";
-
-  if (state.travelModeSettings.vibrate && "vibrate" in navigator) {
-    navigator.vibrate([180, 80, 180]);
-  }
-
-  if (state.travelModeSettings.notify && "Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body, tag: "trip-notebook-travel-mode" });
-  }
-}
-
-async function toggleTravelNotification() {
-  if (!("Notification" in window)) {
-    window.alert("這個瀏覽器不支援通知。");
-    return;
-  }
-
-  if (!state.travelModeSettings.notify && Notification.permission === "default") {
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      state.travelModeSettings.notify = false;
-      saveTravelModeSettings();
-      renderTravelDayPanel();
-      return;
-    }
-  }
-
-  if (!state.travelModeSettings.notify && Notification.permission === "denied") {
-    window.alert("通知權限已被瀏覽器封鎖。請到瀏覽器網站設定中手動允許通知。");
-    return;
-  }
-
-  state.travelModeSettings.notify = !state.travelModeSettings.notify;
-  saveTravelModeSettings();
-  renderTravelDayPanel();
-}
-
-function toggleTravelVibration() {
-  if (!("vibrate" in navigator)) {
-    window.alert("這個裝置或瀏覽器不支援震動。");
-    return;
-  }
-
-  state.travelModeSettings.vibrate = !state.travelModeSettings.vibrate;
-  saveTravelModeSettings();
-  if (state.travelModeSettings.vibrate) navigator.vibrate(80);
-  renderTravelDayPanel();
 }
 
 function refreshTravelModeNow() {
@@ -3744,29 +3817,37 @@ tripSectionTabs.addEventListener("click", (event) => {
   renderTripSectionTabs();
   if (state.activeTripSection === "itinerary") {
     renderTravelDayPanel();
+    renderWeatherPanel();
     renderQuickTickets();
   }
 });
 
 travelDayPanel?.addEventListener("click", (event) => {
-  const notifyButton = event.target.closest("[data-toggle-travel-notify]");
-  if (notifyButton) {
-    toggleTravelNotification();
-    return;
-  }
-
-  const vibrateButton = event.target.closest("[data-toggle-travel-vibrate]");
-  if (vibrateButton) {
-    toggleTravelVibration();
-    return;
-  }
-
   const button = event.target.closest("[data-focus-next-item]");
   if (!button) return;
 
   state.expandedItemId = button.dataset.focusNextItem;
   renderTrip();
   document.querySelector(`#itemDetails${CSS.escape(state.expandedItemId)}`)?.closest(".item-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+weatherPanel?.addEventListener("change", (event) => {
+  const select = event.target.closest("[data-weather-location]");
+  if (!select) return;
+  const trip = currentTrip();
+  const dayDate = getActiveDayDateValue(trip);
+  trip.weatherLocations = normalizeWeatherLocations({
+    ...(trip.weatherLocations || {}),
+    [dayDate]: select.value
+  });
+  saveLibrary();
+  renderWeatherPanel();
+});
+
+weatherPanel?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-refresh-weather]");
+  if (!button) return;
+  fetchWeatherForActiveDay();
 });
 
 bookingSubTabs.addEventListener("click", (event) => {
@@ -4365,6 +4446,8 @@ tripForm.addEventListener("submit", (event) => {
       days: createBlankDays(dayCount, startDate).map((day, index) => ({ ...day, title: dayTitles[index] })),
       members: ["我"],
       exchangeRates: { ...DEFAULT_EXCHANGE_RATES },
+      weatherLocations: {},
+      weatherForecasts: {},
       bookings: [],
       todos: [],
       expenses: []
