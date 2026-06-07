@@ -1880,7 +1880,7 @@ h2 {
   padding: 8px 10px;
 }
 
-.travel-next-stop {
+.travel-stop-card {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
@@ -1890,11 +1890,16 @@ h2 {
   padding: 12px;
 }
 
-.travel-next-stop.is-empty {
+.travel-stop-card.is-current {
+  border: 1px solid rgba(19, 111, 99, 0.18);
+  background: rgba(231, 240, 237, 0.82);
+}
+
+.travel-stop-card.is-empty {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.travel-next-time {
+.travel-stop-time {
   display: grid;
   place-items: center;
   min-height: 48px;
@@ -1905,26 +1910,31 @@ h2 {
   font-weight: 950;
 }
 
-.travel-next-stop p,
-.travel-next-stop strong,
-.travel-next-stop small {
+.travel-stop-card.is-current .travel-stop-time {
+  background: var(--brand-dark);
+  color: #fff;
+}
+
+.travel-stop-card p,
+.travel-stop-card strong,
+.travel-stop-card small {
   display: block;
 }
 
-.travel-next-stop p {
+.travel-stop-card p {
   margin: 0 0 4px;
   color: var(--brand-dark);
   font-size: 0.76rem;
   font-weight: 950;
 }
 
-.travel-next-stop strong {
+.travel-stop-card strong {
   color: var(--ink);
   font-size: 1.08rem;
   line-height: 1.28;
 }
 
-.travel-next-stop small {
+.travel-stop-card small {
   margin-top: 5px;
   color: var(--muted);
   font-size: 0.82rem;
@@ -1968,6 +1978,43 @@ h2 {
   color: var(--ink);
   font-size: 1.05rem;
   line-height: 1;
+}
+
+.travel-alert-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.travel-alert-toggle {
+  min-height: 38px;
+  border: 1px solid rgba(24, 37, 33, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--brand-dark);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.travel-alert-toggle.is-active {
+  border-color: rgba(19, 111, 99, 0.28);
+  background: #e7f0ed;
+}
+
+.travel-alert-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.travel-alert-controls small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1.35;
 }
 
 .quick-ticket-panel {
@@ -3154,8 +3201,7 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .travel-day-header,
-  .travel-day-actions {
+  .travel-day-header {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3167,7 +3213,11 @@ h2 {
     justify-self: start;
   }
 
-  .travel-next-stop {
+  .travel-day-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .travel-stop-card {
     grid-template-columns: 58px minmax(0, 1fr);
   }
 

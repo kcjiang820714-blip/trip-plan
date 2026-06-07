@@ -1,5 +1,7 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
+const TRAVEL_MODE_SETTINGS_KEY = "trip-notebook-travel-mode-settings-v1";
+const TRAVEL_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 const MAX_IMAGE_ATTACHMENT_SIZE = 950 * 1024;
 const IMAGE_COMPRESSION_STEPS = [
@@ -77,7 +79,11 @@ const state = {
   editingBookingId: null,
   editingTodoId: null,
   editingExpenseId: null,
-  expandedItemId: null
+  expandedItemId: null,
+  travelModeSettings: loadTravelModeSettings(),
+  travelSignalKey: "",
+  travelSignalReady: false,
+  travelRefreshTimer: null
 };
 
 state.activeTripId = state.library.trips[0]?.id || null;
@@ -266,6 +272,23 @@ function loadLibrary() {
   }
 
   return normalizeLibrary({ trips: [structuredClone(defaultTrip)] });
+}
+
+function loadTravelModeSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TRAVEL_MODE_SETTINGS_KEY) || "{}");
+    return {
+      notify: Boolean(parsed.notify),
+      vibrate: Boolean(parsed.vibrate)
+    };
+  } catch {
+    localStorage.removeItem(TRAVEL_MODE_SETTINGS_KEY);
+    return { notify: false, vibrate: false };
+  }
+}
+
+function saveTravelModeSettings() {
+  localStorage.setItem(TRAVEL_MODE_SETTINGS_KEY, JSON.stringify(state.travelModeSettings));
 }
 
 function normalizeLibrary(library) {
@@ -1400,12 +1423,14 @@ function renderTravelDayPanel() {
   const trip = currentTrip();
   const day = currentDay();
   const dayDate = getActiveDayDateValue(trip);
-  const nextItem = getNextTravelItem(day, dayDate);
+  const travelStatus = getTravelStatus(day, dayDate);
   const passedCount = countPassedItems(day, dayDate);
   const totalCount = day.items.length;
   const bookings = getBookingsForDay(trip, dayDate);
   const reminders = getTravelRemindersForDay(trip, dayDate);
   const progressText = totalCount ? `${Math.min(passedCount, totalCount)}/${totalCount} 已過` : "尚無行程";
+  const notificationLabel = notificationPermissionLabel();
+  const supportsVibration = "vibrate" in navigator;
 
   travelDayPanel.innerHTML = `
     <section class="travel-day-card">
@@ -1416,38 +1441,67 @@ function renderTravelDayPanel() {
         </div>
         <span>${escapeHtml(progressText)}</span>
       </header>
-      ${
-        nextItem
-          ? `
-            <article class="travel-next-stop">
-              <span class="travel-next-time">${escapeHtml(nextItem.time || "--:--")}</span>
-              <div>
-                <p>下一站</p>
-                <strong>${escapeHtml(getItemTitle(nextItem))}</strong>
-                <small>${escapeHtml(nextItem.type || "行程")}${nextItem.note ? ` · ${escapeHtml(nextItem.note)}` : ""}</small>
-              </div>
-            </article>
-            <div class="travel-day-actions">
-              <a class="primary-button" href="${googleMapsUrl(getMapQuery(nextItem))}" target="_blank" rel="noopener">下一站導航</a>
-              <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(nextItem.id || "")}">查看行程</button>
-            </div>
-          `
-          : `
-            <article class="travel-next-stop is-empty">
-              <div>
-                <p>下一站</p>
-                <strong>今天還沒有排定行程</strong>
-                <small>可以新增行程，或先把票券與待辦補上。</small>
-              </div>
-            </article>
-          `
-      }
+      <div class="travel-alert-controls" aria-label="即時提醒設定">
+        <button class="travel-alert-toggle ${state.travelModeSettings.notify ? "is-active" : ""}" type="button" data-toggle-travel-notify>
+          通知 ${state.travelModeSettings.notify ? "開" : "關"}
+        </button>
+        <button class="travel-alert-toggle ${state.travelModeSettings.vibrate ? "is-active" : ""}" type="button" data-toggle-travel-vibrate ${supportsVibration ? "" : "disabled"}>
+          震動 ${state.travelModeSettings.vibrate ? "開" : "關"}
+        </button>
+        <small>${escapeHtml(notificationLabel)} · 每分鐘自動更新</small>
+      </div>
       <div class="travel-day-metrics" aria-label="今日摘要">
         <span><strong>${bookings.length}</strong>票券</span>
         <span><strong>${reminders.length}</strong>提醒</span>
         <span><strong>${totalCount}</strong>行程</span>
       </div>
+      ${
+        travelStatus.currentItem
+          ? `
+            <article class="travel-stop-card is-current">
+              <span class="travel-stop-time">${escapeHtml(travelStatus.currentItem.time || "--:--")}</span>
+              <div>
+                <p>目前正在進行</p>
+                <strong>${escapeHtml(getItemTitle(travelStatus.currentItem))}</strong>
+                <small>${escapeHtml(travelStatus.currentItem.type || "行程")}${travelStatus.currentItem.note ? ` · ${escapeHtml(travelStatus.currentItem.note)}` : ""}</small>
+              </div>
+            </article>
+          `
+          : ""
+      }
+      ${
+        travelStatus.nextItem
+          ? renderTravelStopBlock("下一站", travelStatus.nextItem, "next")
+          : `
+            <article class="travel-stop-card is-empty">
+              <div>
+                <p>下一站</p>
+                <strong>${totalCount ? "今天後面沒有更多行程" : "今天還沒有排定行程"}</strong>
+                <small>${totalCount ? "可以休息、記帳，或查看明天的行程。" : "可以新增行程，或先把票券與待辦補上。"}</small>
+              </div>
+            </article>
+          `
+      }
     </section>
+  `;
+
+  updateTravelSignal(travelStatus, dayDate);
+}
+
+function renderTravelStopBlock(label, item, kind) {
+  return `
+    <article class="travel-stop-card is-${escapeHtml(kind)}">
+      <span class="travel-stop-time">${escapeHtml(item.time || "--:--")}</span>
+      <div>
+        <p>${escapeHtml(label)}</p>
+        <strong>${escapeHtml(getItemTitle(item))}</strong>
+        <small>${escapeHtml(item.type || "行程")}${item.note ? ` · ${escapeHtml(item.note)}` : ""}</small>
+      </div>
+    </article>
+    <div class="travel-day-actions">
+      <a class="primary-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">下一站導航</a>
+      <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(item.id || "")}">查看行程</button>
+    </div>
   `;
 }
 
@@ -1532,12 +1586,17 @@ function getTravelRemindersForDay(trip, dayDate) {
   return (trip.todos || []).filter((todo) => todo.group === "旅途中提醒" && !todo.done && todo.date === dayDate);
 }
 
-function getNextTravelItem(day, dayDate) {
-  if (!day.items.length) return null;
-  if (dayDate !== todayString()) return day.items[0];
+function getTravelStatus(day, dayDate) {
+  const items = day.items || [];
+  if (!items.length) return { currentItem: null, nextItem: null };
+  if (dayDate !== todayString()) return { currentItem: null, nextItem: items[0] };
 
   const currentTime = getCurrentTimeValue();
-  return day.items.find((item) => (item.time || "99:99") >= currentTime) || day.items[day.items.length - 1];
+  const passedItems = items.filter((item) => item.time && item.time <= currentTime);
+  const currentItem = passedItems[passedItems.length - 1] || null;
+  const nextItem = items.find((item) => !item.time || item.time > currentTime) || null;
+
+  return { currentItem, nextItem };
 }
 
 function countPassedItems(day, dayDate) {
@@ -1549,6 +1608,95 @@ function countPassedItems(day, dayDate) {
 function getCurrentTimeValue() {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function notificationPermissionLabel() {
+  if (!("Notification" in window)) return "這個瀏覽器不支援通知";
+  if (Notification.permission === "granted") return "通知權限已允許";
+  if (Notification.permission === "denied") return "通知權限已被封鎖";
+  return "通知需先按開啟並允許權限";
+}
+
+function updateTravelSignal(travelStatus, dayDate) {
+  const signalKey = [
+    state.activeTripId,
+    dayDate,
+    travelStatus.currentItem?.id || "none",
+    travelStatus.nextItem?.id || "none"
+  ].join(":");
+
+  if (!state.travelSignalReady) {
+    state.travelSignalReady = true;
+    state.travelSignalKey = signalKey;
+    return;
+  }
+
+  if (state.travelSignalKey === signalKey) return;
+  state.travelSignalKey = signalKey;
+  if (dayDate !== todayString()) return;
+  sendTravelSignal(travelStatus);
+}
+
+function sendTravelSignal(travelStatus) {
+  const title = travelStatus.currentItem ? `目前：${getItemTitle(travelStatus.currentItem)}` : "旅程已更新";
+  const body = travelStatus.nextItem ? `下一站 ${travelStatus.nextItem.time || ""} ${getItemTitle(travelStatus.nextItem)}`.trim() : "今天後面沒有更多行程。";
+
+  if (state.travelModeSettings.vibrate && "vibrate" in navigator) {
+    navigator.vibrate([180, 80, 180]);
+  }
+
+  if (state.travelModeSettings.notify && "Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body, tag: "trip-notebook-travel-mode" });
+  }
+}
+
+async function toggleTravelNotification() {
+  if (!("Notification" in window)) {
+    window.alert("這個瀏覽器不支援通知。");
+    return;
+  }
+
+  if (!state.travelModeSettings.notify && Notification.permission === "default") {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      state.travelModeSettings.notify = false;
+      saveTravelModeSettings();
+      renderTravelDayPanel();
+      return;
+    }
+  }
+
+  if (!state.travelModeSettings.notify && Notification.permission === "denied") {
+    window.alert("通知權限已被瀏覽器封鎖。請到瀏覽器網站設定中手動允許通知。");
+    return;
+  }
+
+  state.travelModeSettings.notify = !state.travelModeSettings.notify;
+  saveTravelModeSettings();
+  renderTravelDayPanel();
+}
+
+function toggleTravelVibration() {
+  if (!("vibrate" in navigator)) {
+    window.alert("這個裝置或瀏覽器不支援震動。");
+    return;
+  }
+
+  state.travelModeSettings.vibrate = !state.travelModeSettings.vibrate;
+  saveTravelModeSettings();
+  if (state.travelModeSettings.vibrate) navigator.vibrate(80);
+  renderTravelDayPanel();
+}
+
+function refreshTravelModeNow() {
+  if (!tripView.hidden && state.activeTripSection === "itinerary") {
+    renderTravelDayPanel();
+  }
+}
+
+function startTravelModeTimer() {
+  if (state.travelRefreshTimer) return;
+  state.travelRefreshTimer = window.setInterval(refreshTravelModeNow, TRAVEL_REFRESH_INTERVAL_MS);
 }
 
 function getPrimaryTicketAttachment(attachments = []) {
@@ -3601,6 +3749,18 @@ tripSectionTabs.addEventListener("click", (event) => {
 });
 
 travelDayPanel?.addEventListener("click", (event) => {
+  const notifyButton = event.target.closest("[data-toggle-travel-notify]");
+  if (notifyButton) {
+    toggleTravelNotification();
+    return;
+  }
+
+  const vibrateButton = event.target.closest("[data-toggle-travel-vibrate]");
+  if (vibrateButton) {
+    toggleTravelVibration();
+    return;
+  }
+
   const button = event.target.closest("[data-focus-next-item]");
   if (!button) return;
 
@@ -4252,4 +4412,5 @@ saveLibrary();
 render();
 renderReadonlyMode();
 initCloudSync();
+startTravelModeTimer();
 showLanding();
