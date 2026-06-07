@@ -1,5 +1,6 @@
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
+const VIEW_STATE_KEY = "trip-notebook-view-state-v1";
 const TRAVEL_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 const MAX_IMAGE_ATTACHMENT_SIZE = 950 * 1024;
@@ -858,8 +859,27 @@ function captureViewState() {
     isTrip: !tripView.hidden,
     activeTripId: state.activeTripId,
     activeDayIndex: state.activeDayIndex,
-    activeTripSection: state.activeTripSection
+    activeTripSection: state.activeTripSection,
+    activeBookingGroup: state.activeBookingGroup,
+    activeTodoGroup: state.activeTodoGroup,
+    activeExpenseDate: state.activeExpenseDate
   };
+}
+
+function rememberViewState(viewState = captureViewState()) {
+  try {
+    sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(viewState));
+  } catch {
+    // Session storage can be unavailable in strict privacy modes; navigation still works without restore.
+  }
+}
+
+function readRememberedViewState() {
+  try {
+    return JSON.parse(sessionStorage.getItem(VIEW_STATE_KEY) || "null");
+  } catch {
+    return null;
+  }
 }
 
 function restoreViewState(viewState) {
@@ -868,13 +888,26 @@ function restoreViewState(viewState) {
   if (viewState.isTrip && trip) {
     showTrip(trip.id, {
       dayIndex: Math.min(viewState.activeDayIndex, trip.days.length - 1),
-      section: viewState.activeTripSection
+      section: viewState.activeTripSection,
+      bookingGroup: viewState.activeBookingGroup,
+      todoGroup: viewState.activeTodoGroup,
+      expenseDate: viewState.activeExpenseDate
     });
     return;
   }
 
   if (viewState.isHome) {
     showHome();
+    return;
+  }
+
+  showLanding();
+}
+
+function restoreInitialViewState() {
+  const viewState = readRememberedViewState();
+  if (viewState) {
+    restoreViewState(viewState);
     return;
   }
 
@@ -1213,6 +1246,9 @@ async function loadCloudLibrary() {
       state.activeTripId = activeTrip?.id || state.library.trips[0]?.id || null;
       state.activeDayIndex = activeTrip ? Math.min(viewState.activeDayIndex, activeTrip.days.length - 1) : 0;
       state.activeTripSection = viewState.activeTripSection;
+      state.activeBookingGroup = viewState.activeBookingGroup || state.activeBookingGroup;
+      state.activeTodoGroup = viewState.activeTodoGroup || state.activeTodoGroup;
+      state.activeExpenseDate = viewState.activeExpenseDate || state.activeExpenseDate;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
       render();
       restoreViewState(viewState);
@@ -3383,6 +3419,7 @@ function showHome() {
   homeView.hidden = false;
   tripView.hidden = true;
   renderHome();
+  rememberViewState(captureViewState());
 }
 
 function showLanding() {
@@ -3390,6 +3427,7 @@ function showLanding() {
   homeView.hidden = true;
   tripView.hidden = true;
   renderLanding();
+  rememberViewState(captureViewState());
 }
 
 function showTrip(tripId, options = {}) {
@@ -3401,12 +3439,15 @@ function showTrip(tripId, options = {}) {
 
   state.activeTripId = tripId;
   state.activeDayIndex = Math.max(0, Math.min(options.dayIndex ?? 0, trip.days.length - 1));
-  state.activeExpenseDate = null;
   state.activeTripSection = options.section || "itinerary";
+  state.activeBookingGroup = options.bookingGroup || state.activeBookingGroup;
+  state.activeTodoGroup = options.todoGroup || state.activeTodoGroup;
+  state.activeExpenseDate = options.expenseDate || null;
   landingView.hidden = true;
   homeView.hidden = true;
   tripView.hidden = false;
   renderTrip();
+  rememberViewState(captureViewState());
 }
 
 function escapeHtml(value) {
@@ -4665,6 +4706,7 @@ dayTabs.addEventListener("click", (event) => {
   if (stepButton) {
     state.activeDayIndex = Math.max(0, Math.min(currentTrip().days.length - 1, state.activeDayIndex + Number(stepButton.dataset.dayStep)));
     renderTrip();
+    rememberViewState(captureViewState());
     return;
   }
 
@@ -4672,6 +4714,7 @@ dayTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeDayIndex = Number(button.dataset.day);
   renderTrip();
+  rememberViewState(captureViewState());
 });
 
 tripSectionTabs.addEventListener("click", (event) => {
@@ -4679,6 +4722,7 @@ tripSectionTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeTripSection = button.dataset.tripSection;
   renderTripSectionTabs();
+  rememberViewState(captureViewState());
   if (state.activeTripSection === "itinerary") {
     renderTravelDayPanel();
     renderWeatherPanel();
@@ -4732,6 +4776,7 @@ bookingSubTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeBookingGroup = button.dataset.bookingGroup;
   renderBookings();
+  rememberViewState(captureViewState());
 });
 
 bookingList.addEventListener("click", (event) => {
@@ -4758,6 +4803,7 @@ todoSubTabs.addEventListener("click", (event) => {
   if (!button) return;
   state.activeTodoGroup = button.dataset.todoGroup;
   renderTodos();
+  rememberViewState(captureViewState());
 });
 
 expenseList.addEventListener("click", (event) => {
@@ -4771,6 +4817,7 @@ expenseList.addEventListener("click", (event) => {
   if (!button) return;
   state.activeExpenseDate = button.dataset.expenseDate;
   renderExpenses();
+  rememberViewState(captureViewState());
 });
 
 expenseDashboard.addEventListener("click", (event) => {
@@ -5376,6 +5423,6 @@ populateTimeOptions();
 saveLibrary();
 render();
 renderReadonlyMode();
+restoreInitialViewState();
 initCloudSync();
 startTravelModeTimer();
-showLanding();
