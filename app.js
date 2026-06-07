@@ -49,6 +49,40 @@ const WEATHER_LOCATIONS = [
   { id: "vancouver", group: "美洲", name: "Vancouver 溫哥華", latitude: 49.2827, longitude: -123.1207, elevation: 70 }
 ];
 const WEATHER_SEARCH_LIMIT = 6;
+const TRADITIONAL_CHINESE_TERMS = [
+  ["意大利", "義大利"],
+  ["美国", "美國"],
+  ["英国", "英國"],
+  ["德国", "德國"],
+  ["法国", "法國"],
+  ["西班牙", "西班牙"],
+  ["澳大利亚", "澳洲"],
+  ["加拿大", "加拿大"],
+  ["韩国", "韓國"],
+  ["日本", "日本"],
+  ["瑞士", "瑞士"],
+  ["哥伦比亚", "哥倫比亞"],
+  ["纽约", "紐約"],
+  ["新泽西", "紐澤西"],
+  ["密苏里", "密蘇里"],
+  ["田纳西", "田納西"],
+  ["密歇根", "密西根"],
+  ["俄亥俄", "俄亥俄"],
+  ["加州", "加州"],
+  ["麻薩諸塞", "麻薩諸塞"],
+  ["伯恩州", "伯恩州"],
+  ["伦巴第", "倫巴第"],
+  ["米兰", "米蘭"],
+  ["苏黎世", "蘇黎世"],
+  ["日内瓦", "日內瓦"],
+  ["卢塞恩", "琉森"],
+  ["因特拉肯", "因特拉肯"],
+  ["塔斯馬尼亞", "塔斯馬尼亞"],
+  ["州", "州"]
+];
+const regionDisplayNames = "Intl" in window && Intl.DisplayNames
+  ? new Intl.DisplayNames(["zh-TW"], { type: "region" })
+  : null;
 const exchangeRateDrafts = new Map();
 const isReadonly = new URLSearchParams(window.location.search).get("view") === "readonly";
 
@@ -381,25 +415,29 @@ function normalizeWeatherLocation(value) {
   const longitude = Number(value.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
 
-  const name = String(value.name || "").trim();
+  const name = toTraditionalChineseText(String(value.name || "").trim());
   if (!name) return null;
 
   const countryCode = String(value.countryCode || value.country_code || "").trim().toUpperCase();
   const normalized = {
     id: String(value.id || createWeatherLocationId({ name, latitude, longitude })).trim(),
-    group: String(value.group || value.country || "搜尋地點").trim(),
+    group: toTraditionalChineseText(String(value.group || value.country || "搜尋地點").trim()),
     name,
     latitude,
     longitude,
     elevation: Number.isFinite(Number(value.elevation)) ? Number(value.elevation) : 0
   };
   if (countryCode) normalized.countryCode = countryCode;
-  if (value.admin1) normalized.admin1 = String(value.admin1).trim();
-  if (value.country) normalized.country = String(value.country).trim();
+  if (value.admin1) normalized.admin1 = toTraditionalChineseText(String(value.admin1).trim());
+  if (value.country) normalized.country = toTraditionalChineseText(String(value.country).trim());
   if (value.model || countryCode === "CH" || normalized.country === "Switzerland" || normalized.country === "瑞士") {
     normalized.model = value.model || "meteoswiss_icon_ch2";
   }
   return normalized;
+}
+
+function toTraditionalChineseText(value) {
+  return TRADITIONAL_CHINESE_TERMS.reduce((text, [from, to]) => text.replaceAll(from, to), String(value || ""));
 }
 
 function normalizeMembers(members) {
@@ -1614,6 +1652,7 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
   return `
     <article class="weather-location-card ${hasForecast ? "" : "is-empty"}">
       <header>
+        ${renderWeatherIcon(hasForecast ? forecast.weatherCode : null)}
         <div>
           <strong>${escapeHtml(location.name)}</strong>
           <small>${escapeHtml(weatherLocationMeta(location) || weatherSourceName(location))}</small>
@@ -1624,9 +1663,9 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
         hasForecast
           ? `
             <div class="weather-metrics">
-              <span><strong>${formatTemperatureRange(forecast)}</strong>高低溫</span>
-              <span><strong>${formatWeatherNumber(forecast.precipitationProbability, "%")}</strong>降雨機率</span>
-              <span><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
+              <span><i class="weather-metric-icon is-temp" aria-hidden="true"></i><strong>${formatTemperatureRange(forecast)}</strong>高低溫</span>
+              <span><i class="weather-metric-icon is-rain" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.precipitationProbability, "%")}</strong>降雨機率</span>
+              <span><i class="weather-metric-icon is-wind" aria-hidden="true"></i><strong>${formatWeatherNumber(forecast.windSpeed, " km/h")}</strong>最大風速</span>
             </div>
             <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
             <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
@@ -1641,6 +1680,21 @@ function weatherEmptyMessage(location = null, cachedForecast = null) {
   if (!location) return "請先到「編輯旅程」設定這一天要看的天氣城市。";
   if (cachedForecast) return "目前沒有這一天的預報資料。多數天氣模型只提供短期預報，請出發前或旅途中再更新。";
   return `按「更新天氣」抓取 ${weatherSourceName(location)} 預報。`;
+}
+
+function renderWeatherIcon(code) {
+  const type = weatherIconType(code);
+  return `<span class="weather-icon is-${escapeHtml(type)}" aria-hidden="true"><span></span></span>`;
+}
+
+function weatherIconType(code) {
+  if (code === null) return "unknown";
+  if ([0].includes(code)) return "sun";
+  if ([1, 2, 3, 45, 48].includes(code)) return "cloud";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "snow";
+  if ([95, 96, 99].includes(code)) return "storm";
+  return "unknown";
 }
 
 function getWeatherLocation(locationValue) {
@@ -1696,18 +1750,28 @@ function createWeatherLocationId(location) {
 
 function normalizeGeocodingResult(result) {
   const countryCode = String(result.country_code || "").trim().toUpperCase();
+  const country = getTraditionalRegionName(countryCode) || result.country || "";
   return normalizeWeatherLocation({
     id: result.id ? `geo-${result.id}` : "",
-    group: result.country || "搜尋地點",
-    name: [result.name, result.admin1, result.country].filter(Boolean).join(", "),
+    group: country || "搜尋地點",
+    name: [result.name, result.admin1, country].filter(Boolean).join(", "),
     latitude: result.latitude,
     longitude: result.longitude,
     elevation: result.elevation,
     admin1: result.admin1 || "",
-    country: result.country || "",
+    country,
     countryCode,
     model: countryCode === "CH" ? "meteoswiss_icon_ch2" : ""
   });
+}
+
+function getTraditionalRegionName(countryCode) {
+  if (!countryCode || !regionDisplayNames) return "";
+  try {
+    return regionDisplayNames.of(countryCode) || "";
+  } catch {
+    return "";
+  }
 }
 
 async function searchWeatherLocations(query) {
