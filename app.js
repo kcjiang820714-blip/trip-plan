@@ -851,6 +851,36 @@ function saveLibrary() {
   scheduleCloudSave();
 }
 
+function captureViewState() {
+  return {
+    isLanding: !landingView.hidden,
+    isHome: !homeView.hidden,
+    isTrip: !tripView.hidden,
+    activeTripId: state.activeTripId,
+    activeDayIndex: state.activeDayIndex,
+    activeTripSection: state.activeTripSection
+  };
+}
+
+function restoreViewState(viewState) {
+  const trip = state.library.trips.find((item) => item.id === viewState.activeTripId);
+
+  if (viewState.isTrip && trip) {
+    showTrip(trip.id, {
+      dayIndex: Math.min(viewState.activeDayIndex, trip.days.length - 1),
+      section: viewState.activeTripSection
+    });
+    return;
+  }
+
+  if (viewState.isHome) {
+    showHome();
+    return;
+  }
+
+  showLanding();
+}
+
 function setLibrary(library) {
   const nextLibrary = normalizeLibrary(library);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextLibrary));
@@ -907,10 +937,13 @@ async function initCloudSync() {
     if (error) throw error;
     state.cloudUser = data.session?.user || null;
 
-    client.auth.onAuthStateChange((_event, session) => {
-      state.cloudUser = session?.user || null;
+    client.auth.onAuthStateChange((event, session) => {
+      const previousUserId = state.cloudUser?.id || null;
+      const nextUser = session?.user || null;
+      const nextUserId = nextUser?.id || null;
+      state.cloudUser = nextUser;
       renderCloudStatus();
-      if (state.cloudUser) loadCloudLibrary();
+      if (state.cloudUser && event === "SIGNED_IN" && nextUserId !== previousUserId) loadCloudLibrary();
     });
 
     renderCloudStatus();
@@ -1163,6 +1196,7 @@ async function loadCloudLibrary() {
   if (!state.cloudUser) return;
 
   try {
+    const viewState = captureViewState();
     state.cloudSyncing = true;
     renderCloudStatus();
     const client = await getSupabaseClient();
@@ -1175,11 +1209,13 @@ async function loadCloudLibrary() {
     if (Array.isArray(data) && data.length > 0) {
       state.library = { trips: data.map(fromCloudTrip) };
       await loadCloudCollaborativeData(client, state.library.trips);
-      state.activeTripId = state.library.trips[0]?.id || null;
-      state.activeDayIndex = 0;
+      const activeTrip = state.library.trips.find((trip) => trip.id === viewState.activeTripId);
+      state.activeTripId = activeTrip?.id || state.library.trips[0]?.id || null;
+      state.activeDayIndex = activeTrip ? Math.min(viewState.activeDayIndex, activeTrip.days.length - 1) : 0;
+      state.activeTripSection = viewState.activeTripSection;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
       render();
-      showHome();
+      restoreViewState(viewState);
     } else {
       state.cloudSyncing = false;
       await saveCloudLibrary();
@@ -3356,7 +3392,7 @@ function showLanding() {
   renderLanding();
 }
 
-function showTrip(tripId) {
+function showTrip(tripId, options = {}) {
   const trip = state.library.trips.find((item) => item.id === tripId);
   if (!trip) {
     showHome();
@@ -3364,9 +3400,9 @@ function showTrip(tripId) {
   }
 
   state.activeTripId = tripId;
-  state.activeDayIndex = 0;
+  state.activeDayIndex = Math.max(0, Math.min(options.dayIndex ?? 0, trip.days.length - 1));
   state.activeExpenseDate = null;
-  state.activeTripSection = "itinerary";
+  state.activeTripSection = options.section || "itinerary";
   landingView.hidden = true;
   homeView.hidden = true;
   tripView.hidden = false;
