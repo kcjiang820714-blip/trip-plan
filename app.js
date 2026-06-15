@@ -2626,9 +2626,9 @@ function renderTodos() {
                     ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
                   </span>
                 </label>
-                <span class="todo-cell">${escapeHtml(todoSecondColumnValue(todo))}</span>
-                <span class="todo-cell">${escapeHtml(todoThirdColumnValue(todo))}</span>
-                <span class="todo-cell">
+                <span class="todo-cell todo-detail-cell todo-second-cell">${escapeHtml(todoSecondColumnValue(todo))}</span>
+                <span class="todo-cell todo-detail-cell todo-third-cell">${escapeHtml(todoThirdColumnValue(todo))}</span>
+                <span class="todo-cell todo-status-cell">
                   <span class="todo-status ${todo.done ? "is-complete" : ""}">${todo.done ? "完成" : "未完成"}</span>
                 </span>
                 <span class="todo-cell todo-action-cell">

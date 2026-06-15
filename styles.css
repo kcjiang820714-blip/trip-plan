@@ -2878,6 +2878,7 @@ h2 {
 }
 
 .todo-table {
+  container-type: inline-size;
   display: grid;
   overflow: hidden;
   border: 1px solid rgba(24, 37, 33, 0.09);
@@ -2888,7 +2889,7 @@ h2 {
 
 .todo-table-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.35fr) minmax(110px, 1fr) minmax(100px, 0.95fr) 78px 54px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 0.95fr) max-content max-content;
   gap: 10px;
   align-items: center;
   border-top: 1px solid rgba(24, 37, 33, 0.08);
@@ -2917,7 +2918,8 @@ h2 {
   font-size: 0.82rem;
   font-weight: 850;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .todo-main-cell {
@@ -2943,6 +2945,14 @@ h2 {
   line-height: 1.35;
 }
 
+.todo-second-cell {
+  white-space: nowrap;
+}
+
+.todo-third-cell {
+  overflow-wrap: break-word;
+}
+
 .todo-status {
   display: inline-grid;
   place-items: center;
@@ -2962,6 +2972,66 @@ h2 {
 
 .todo-action-cell {
   text-align: right;
+}
+
+@container (max-width: 520px) {
+  .todo-table-row {
+    grid-template-columns: minmax(0, 1fr) minmax(92px, 0.62fr);
+    align-items: start;
+    gap: 14px 12px;
+    padding: 14px 12px;
+  }
+
+  .todo-table-head {
+    display: none;
+  }
+
+  .todo-main-cell {
+    grid-column: 1 / -1;
+  }
+
+  .todo-detail-cell {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    white-space: normal;
+  }
+
+  .todo-detail-cell:empty {
+    display: none;
+  }
+
+  .todo-second-cell {
+    color: var(--muted);
+    font-size: 0.94rem;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+
+  .todo-third-cell {
+    justify-self: end;
+    max-width: 100%;
+    color: var(--muted);
+    display: -webkit-box;
+    font-size: 0.94rem;
+    font-weight: 950;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    overflow-wrap: break-word;
+  }
+
+  .todo-status-cell {
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .todo-action-cell {
+    justify-self: end;
+    text-align: right;
+  }
 }
 
 .todo-detail-fields {
@@ -4077,7 +4147,10 @@ h2 {
   }
 
   .todo-table-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(92px, 0.62fr);
+    align-items: start;
+    gap: 14px 12px;
+    padding: 14px 12px;
   }
 
   .todo-table-head {
@@ -4088,8 +4161,47 @@ h2 {
     grid-column: 1 / -1;
   }
 
+  .todo-detail-cell {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    white-space: normal;
+  }
+
+  .todo-detail-cell:empty {
+    display: none;
+  }
+
+  .todo-second-cell {
+    color: var(--muted);
+    font-size: 0.94rem;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+
+  .todo-third-cell {
+    justify-self: end;
+    max-width: 100%;
+    color: var(--muted);
+    display: -webkit-box;
+    font-size: 0.94rem;
+    font-weight: 950;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    overflow-wrap: break-word;
+  }
+
+  .todo-status-cell {
+    display: flex;
+    justify-content: flex-start;
+  }
+
   .todo-action-cell {
-    text-align: left;
+    justify-self: end;
+    text-align: right;
   }
 
   .booking-stay-fields {
