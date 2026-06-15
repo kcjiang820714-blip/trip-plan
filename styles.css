@@ -2976,9 +2976,9 @@ h2 {
 
 @container (max-width: 520px) {
   .todo-table-row {
-    grid-template-columns: minmax(0, 1fr) minmax(92px, 0.62fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
-    gap: 14px 12px;
+    gap: 12px 10px;
     padding: 14px 12px;
   }
 
@@ -3009,17 +3009,15 @@ h2 {
   }
 
   .todo-third-cell {
-    justify-self: end;
+    grid-column: 1 / -1;
+    justify-self: stretch;
     max-width: 100%;
     color: var(--muted);
-    display: -webkit-box;
+    display: block;
     font-size: 0.94rem;
     font-weight: 950;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: right;
+    overflow: visible;
+    text-align: left;
     overflow-wrap: break-word;
   }
 
@@ -4147,9 +4145,9 @@ h2 {
   }
 
   .todo-table-row {
-    grid-template-columns: minmax(0, 1fr) minmax(92px, 0.62fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
-    gap: 14px 12px;
+    gap: 12px 10px;
     padding: 14px 12px;
   }
 
@@ -4180,17 +4178,15 @@ h2 {
   }
 
   .todo-third-cell {
-    justify-self: end;
+    grid-column: 1 / -1;
+    justify-self: stretch;
     max-width: 100%;
     color: var(--muted);
-    display: -webkit-box;
+    display: block;
     font-size: 0.94rem;
     font-weight: 950;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: right;
+    overflow: visible;
+    text-align: left;
     overflow-wrap: break-word;
   }
 
