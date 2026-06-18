@@ -228,9 +228,6 @@ const activeDate = document.querySelector("#activeDate");
 const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
-const pdfPreviewStage = document.querySelector("#pdfPreviewStage");
-const printPdfPreviewButton = document.querySelector("#printPdfPreviewButton");
-const pdfExportStatus = document.querySelector("#pdfExportStatus");
 const travelDayPanel = document.querySelector("#travelDayPanel");
 const weatherPanel = document.querySelector("#weatherPanel");
 const timeline = document.querySelector("#timeline");
@@ -1705,7 +1702,6 @@ function renderTrip() {
   renderTravelDayPanel();
   renderWeatherPanel();
   renderQuickTickets();
-  renderPdfPreview();
   renderTodos();
   renderExpenses();
 
@@ -2406,7 +2402,6 @@ function renderTripSectionTabs() {
     addButton.hidden =
       (state.activeTripSection === "itinerary" && !canManage) ||
       (state.activeTripSection === "bookings" && !canManage) ||
-      state.activeTripSection === "pdf" ||
       ((state.activeTripSection === "todos" || state.activeTripSection === "expenses") && !canUseTools);
   }
 
@@ -2588,293 +2583,6 @@ function getBookingGroup(booking) {
   if (booking.type === "餐廳") return "餐廳";
   if (booking.type === "住宿") return "住宿";
   return "票券";
-}
-
-function renderPdfPreview() {
-  if (!pdfPreviewStage) return;
-  const trip = currentTrip();
-  if (!trip) {
-    pdfPreviewStage.innerHTML = `<div class="empty-state">尚未選擇旅程。</div>`;
-    return;
-  }
-
-  const images = collectTripImages(trip);
-  const coverImage = images[0] || null;
-  const highlights = buildPdfHighlights(trip, images);
-  const exportedAt = new Date().toLocaleDateString("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  });
-
-  pdfPreviewStage.innerHTML = `
-    <article class="pdf-sheet pdf-cover-sheet">
-      <section class="pdf-hero">
-        ${renderPdfImage(coverImage, "pdf-hero-image", trip.title, "旅程主圖")}
-        <div class="pdf-hero-title">
-          <p>旅行社圖文行程表</p>
-          <h1>${escapeHtml(trip.title)}</h1>
-          <span>${escapeHtml(trip.dates)}｜${escapeHtml(String(trip.days.length))} 天｜${escapeHtml(String(countItems(trip)))} 個行程</span>
-        </div>
-      </section>
-      <section class="pdf-overview-grid">
-        <div>
-          <p class="pdf-kicker">行程亮點</p>
-          <h2>把重要景點、交通與住宿整理成可分享的圖文版型</h2>
-        </div>
-        <dl class="pdf-trip-facts">
-          <div><dt>旅行天數</dt><dd>${escapeHtml(String(trip.days.length))} 天</dd></div>
-          <div><dt>行程數</dt><dd>${escapeHtml(String(countItems(trip)))} 個</dd></div>
-          <div><dt>匯出日期</dt><dd>${escapeHtml(exportedAt)}</dd></div>
-        </dl>
-      </section>
-      <section class="pdf-highlight-grid">
-        ${highlights.map(renderPdfHighlightCard).join("")}
-      </section>
-    </article>
-    ${trip.days.map((day, index) => renderPdfDaySheet(trip, day, index, images)).join("")}
-  `;
-}
-
-function handlePrintPdfPreview() {
-  state.activeTripSection = "pdf";
-  renderTripSectionTabs();
-  renderPdfPreview();
-
-  if (pdfExportStatus) {
-    pdfExportStatus.textContent = "正在開啟列印視窗。若沒有跳出視窗，請重新整理頁面後再按一次，或使用瀏覽器選單的「列印」。";
-  }
-
-  if (typeof window.print !== "function") {
-    window.alert("這個瀏覽器不支援直接開啟列印視窗。請使用瀏覽器選單的「分享 / 列印」，再選擇儲存為 PDF。");
-    return;
-  }
-
-  window.focus();
-  window.print();
-}
-
-function collectTripImages(trip) {
-  const images = [];
-
-  trip.days.forEach((day) => {
-    day.items.forEach((item) => {
-      (item.attachments || []).forEach((attachment) => {
-        const source = getAttachmentSource(attachment);
-        if (!attachment.type.startsWith("image/") || !source) return;
-        images.push({
-          src: source,
-          title: getItemTitle(item) || item.place || item.type || attachment.name,
-          description: item.attractionIntro || item.content || item.note || item.type || "使用上傳圖片"
-        });
-      });
-    });
-  });
-
-  (trip.bookings || []).forEach((booking) => {
-    (booking.attachments || []).forEach((attachment) => {
-      const source = getAttachmentSource(attachment);
-      if (!attachment.type.startsWith("image/") || !source) return;
-      images.push({
-        src: source,
-        title: booking.name || booking.type || attachment.name,
-        description: booking.place || booking.note || booking.type || "使用上傳圖片"
-      });
-    });
-  });
-
-  return images;
-}
-
-function buildPdfHighlights(trip, images) {
-  const imageHighlights = images.slice(0, 3).map((image) => ({
-    title: image.title,
-    description: image.description,
-    image
-  }));
-
-  if (imageHighlights.length >= 3) return imageHighlights;
-
-  const fallbackItems = trip.days
-    .flatMap((day) => day.items)
-    .filter((item) => getItemTitle(item) || item.content || item.note)
-    .slice(0, 3 - imageHighlights.length)
-    .map((item) => ({
-      title: getItemTitle(item) || item.type || "行程亮點",
-      description: item.attractionIntro || item.content || item.note || item.type || "已安排在行程中",
-      image: null
-    }));
-
-  const defaults = [
-    { title: "每日時間軸", description: "依照時間整理景點、交通與提醒", image: null },
-    { title: "上傳圖片", description: "自動帶入你原本儲存在行程裡的照片", image: null },
-    { title: "適合分享", description: "版面接近旅行社圖文行程表", image: null }
-  ];
-
-  return [...imageHighlights, ...fallbackItems, ...defaults].slice(0, 3);
-}
-
-function renderPdfHighlightCard(highlight) {
-  return `
-    <article class="pdf-highlight-card">
-      ${renderPdfImage(highlight.image, "pdf-highlight-image", highlight.title, "亮點圖片")}
-      <div>
-        <h3>${escapeHtml(highlight.title)}</h3>
-        <p>${escapeHtml(shortText(highlight.description, 46))}</p>
-      </div>
-    </article>
-  `;
-}
-
-function renderPdfDaySheet(trip, day, index, images) {
-  const dayImage = getPdfDayImage(day) || images[index + 1] || images[0] || null;
-  const dayIsoDate = getTripDayIsoDate(trip, index);
-  const accommodation = getAccommodationForDate(trip, dayIsoDate);
-  const transports = getDayTransportLabels(day);
-  const reminders = getPdfReminders(trip, dayIsoDate);
-
-  return `
-    <article class="pdf-sheet pdf-day-sheet">
-      <header class="pdf-day-header">
-        <div>
-          <p class="pdf-kicker">Day ${index + 1}｜${escapeHtml(day.date)}</p>
-          <h2>${escapeHtml(day.title)}</h2>
-        </div>
-        <span>${escapeHtml(trip.title)}</span>
-      </header>
-      <section class="pdf-day-layout">
-        <div class="pdf-day-main">
-          ${renderPdfImage(dayImage, "pdf-day-image", day.title, "當日主圖")}
-          <section class="pdf-timeline">
-            ${
-              day.items.length
-                ? day.items.map(renderPdfTimelineItem).join("")
-                : `<div class="pdf-empty-block">這一天尚未新增行程。</div>`
-            }
-          </section>
-        </div>
-        <aside class="pdf-info-panel">
-          <section>
-            <p>今日住宿</p>
-            <strong>${escapeHtml(accommodation?.name || "尚未填寫")}</strong>
-            ${accommodation?.place ? `<span>${escapeHtml(accommodation.place)}</span>` : ""}
-          </section>
-          <section>
-            <p>交通方式</p>
-            <strong>${escapeHtml(transports.length ? transports.join("、") : "依行程安排")}</strong>
-          </section>
-          <section>
-            <p>今日提醒</p>
-            ${
-              reminders.length
-                ? `<ul>${reminders.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-                : `<span>確認證件、票券與交通時間</span>`
-            }
-          </section>
-        </aside>
-      </section>
-    </article>
-  `;
-}
-
-function getPdfDayImage(day) {
-  for (const item of day.items) {
-    const attachment = getPrimaryImageAttachment(item.attachments || []);
-    if (attachment) {
-      return {
-        src: getAttachmentSource(attachment),
-        title: getItemTitle(item) || item.place || item.type,
-        description: item.attractionIntro || item.content || item.note || "使用上傳圖片"
-      };
-    }
-  }
-
-  return null;
-}
-
-function renderPdfTimelineItem(item) {
-  const title = getItemTitle(item) || item.content || item.type || "未命名行程";
-  const summary = item.attractionIntro || item.content || item.note || renderPdfTransportSummary(item) || "依現場狀況彈性安排";
-
-  return `
-    <article class="pdf-timeline-item">
-      <time>${escapeHtml(item.time || item.departureTime || "彈性")}</time>
-      <div>
-        <span>${escapeHtml(item.type || "行程")}</span>
-        <h3>${escapeHtml(title)}</h3>
-        <p>${escapeHtml(shortText(summary, 72))}</p>
-      </div>
-    </article>
-  `;
-}
-
-function renderPdfTransportSummary(item) {
-  if (item.type !== "交通" || !item.transportSegments.length) return "";
-  return item.transportSegments
-    .map((segment) => [segment.departureStation, segment.arrivalStation].filter(Boolean).join(" → "))
-    .filter(Boolean)
-    .join("，");
-}
-
-function getTripDayIsoDate(trip, index) {
-  const dates = normalizeTripDates(trip);
-  return addDays(dates.startDate, index);
-}
-
-function getAccommodationForDate(trip, dayIsoDate) {
-  return (trip.bookings || [])
-    .filter((booking) => booking.type === "住宿")
-    .find((booking) => bookingCoversDate(booking, dayIsoDate));
-}
-
-function bookingCoversDate(booking, dayIsoDate) {
-  if (!dayIsoDate) return false;
-  const start = booking.date || "";
-  const end = booking.checkoutDate || booking.date || "";
-  return start <= dayIsoDate && dayIsoDate <= end;
-}
-
-function getDayTransportLabels(day) {
-  return [
-    ...new Set(
-      day.items
-        .filter((item) => item.type === "交通" || item.transportMode)
-        .map((item) => item.transportMode || item.type)
-        .filter(Boolean)
-    )
-  ].slice(0, 3);
-}
-
-function getPdfReminders(trip, dayIsoDate) {
-  return (trip.todos || [])
-    .filter((todo) => !todo.done)
-    .filter((todo) => !todo.date || todo.date === dayIsoDate || todo.group === "旅途中提醒")
-    .map((todo) => todo.text || todo.note)
-    .filter(Boolean)
-    .slice(0, 3);
-}
-
-function renderPdfImage(image, className, alt, fallbackLabel) {
-  if (image?.src) {
-    return `
-      <figure class="${className} pdf-image-frame">
-        <img src="${escapeHtml(image.src)}" alt="${escapeHtml(alt || image.title || fallbackLabel)}" loading="lazy" />
-        <figcaption>使用上傳圖片</figcaption>
-      </figure>
-    `;
-  }
-
-  return `
-    <figure class="${className} pdf-image-frame is-empty">
-      <span>${escapeHtml(fallbackLabel)}</span>
-    </figure>
-  `;
-}
-
-function shortText(value, maxLength) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength - 1)}…`;
 }
 
 function renderTodos() {
@@ -4674,7 +4382,6 @@ document.querySelector("#addTripButton").addEventListener("click", () => openTri
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
-printPdfPreviewButton?.addEventListener("click", handlePrintPdfPreview);
 document.querySelector("#addBookingButton")?.addEventListener("click", () => openBookingDialog());
 document.querySelector("[data-trip-section-add]")?.addEventListener("click", () => {
   if (state.activeTripSection === "bookings") {
@@ -5725,7 +5432,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js");
 }
 
 populateTimeOptions();
