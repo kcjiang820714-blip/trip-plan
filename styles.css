@@ -776,6 +776,85 @@ h2 {
   line-height: 1.5;
 }
 
+.pdf-image-controls {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(24, 37, 33, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.9);
+  padding: 14px;
+}
+
+.pdf-image-controls-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.pdf-image-controls-heading h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.pdf-image-controls-heading > span {
+  color: var(--brand-dark);
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.pdf-image-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pdf-image-control-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(24, 37, 33, 0.09);
+  border-radius: 8px;
+  background: white;
+  padding: 12px;
+}
+
+.pdf-image-control-card strong,
+.pdf-image-control-card span {
+  display: block;
+}
+
+.pdf-image-control-card strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.pdf-image-control-card span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.pdf-image-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-image-control-actions .secondary-action {
+  display: inline-grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
 .pdf-preview-stage {
   display: grid;
   gap: 18px;
@@ -1318,6 +1397,41 @@ h2 {
 #itineraryPanel .day-header .primary-button {
   align-self: center;
   min-height: 46px;
+}
+
+.day-swap-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: min(100%, 360px);
+}
+
+.day-swap-control label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.day-swap-control select {
+  width: min(48vw, 220px);
+  min-height: 44px;
+  border: 1px solid rgba(15, 107, 95, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.92);
+  color: var(--ink);
+  font-weight: 850;
+  padding: 0 10px;
+}
+
+.day-swap-control .secondary-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 #expensesPanel .day-header {
@@ -4379,6 +4493,17 @@ h2 {
     width: 100%;
   }
 
+  .pdf-image-controls-heading,
+  .pdf-image-control-grid,
+  .pdf-image-control-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pdf-image-control-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
   .pdf-sheet {
     min-height: auto;
   }
@@ -4469,6 +4594,7 @@ h2 {
   .trip-section-tabs,
   .pdf-preview-heading,
   .pdf-preview-toolbar,
+  .pdf-image-controls,
   [data-section-panel]:not(#pdfPreviewPanel) {
     display: none !important;
   }
@@ -4535,6 +4661,24 @@ h2 {
   .topbar-actions .primary-button,
   .topbar-actions .secondary-action {
     min-height: 40px;
+  }
+
+  #itineraryPanel .day-header {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .day-swap-control {
+    justify-content: stretch;
+    min-width: 0;
+  }
+
+  .day-swap-control label {
+    flex: 1 1 auto;
+  }
+
+  .day-swap-control select {
+    width: 100%;
   }
 
   .trip-card {

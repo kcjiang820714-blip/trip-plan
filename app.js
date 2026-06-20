@@ -224,11 +224,13 @@ const landingToday = document.querySelector("#landingToday");
 const tripTitle = document.querySelector("#tripTitle");
 const tripDates = document.querySelector("#tripDates");
 const tripSummary = document.querySelector("#tripSummary");
+const itineraryPanel = document.querySelector("#itineraryPanel");
 const activeDate = document.querySelector("#activeDate");
 const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const pdfPreviewStage = document.querySelector("#pdfPreviewStage");
+const pdfImageControls = document.querySelector("#pdfImageControls");
 const printPdfPreviewButton = document.querySelector("#printPdfPreviewButton");
 const pdfExportStatus = document.querySelector("#pdfExportStatus");
 const travelDayPanel = document.querySelector("#travelDayPanel");
@@ -413,6 +415,7 @@ function normalizeLibrary(library) {
         dates: dateRange.label,
         days,
         segments: normalizeTripSegments(trip.segments, days.length),
+        pdfImages: normalizePdfImages(trip.pdfImages, days.length),
         sharedMembers: normalizeSharedMembers(trip.sharedMembers),
         members: normalizeMembers(trip.members),
         exchangeRates: normalizeExchangeRates(trip.exchangeRates),
@@ -423,6 +426,16 @@ function normalizeLibrary(library) {
         expenses: Array.isArray(trip.expenses) ? trip.expenses.map(normalizeExpense) : []
       };
     })
+  };
+}
+
+function normalizePdfImages(value, dayCount = 1) {
+  const cover = normalizeAttachment(value?.cover);
+  const days = Array.from({ length: dayCount }, (_, index) => normalizeAttachment(value?.days?.[index]));
+
+  return {
+    cover,
+    days
   };
 }
 
@@ -1013,6 +1026,7 @@ function stripAttachmentsForCloudTrip(trip) {
   const { ownerId, role, sharedMembers, ...baseTrip } = trip;
   return {
     ...baseTrip,
+    pdfImages: stripPdfImagesForCloud(trip.pdfImages),
     days: (trip.days || []).map((day) => ({
       ...day,
       items: (day.items || []).map((item) => ({
@@ -1024,6 +1038,13 @@ function stripAttachmentsForCloudTrip(trip) {
       ...booking,
       attachments: (booking.attachments || []).map(toCloudAttachment).filter(Boolean)
     }))
+  };
+}
+
+function stripPdfImagesForCloud(pdfImages) {
+  return {
+    cover: toCloudAttachment(pdfImages?.cover),
+    days: (pdfImages?.days || []).map(toCloudAttachment)
   };
 }
 
@@ -1669,6 +1690,65 @@ function renderDayTab(trip, dayIndex, className, isActive = false) {
   `;
 }
 
+function canSwapTripDays(trip = currentTrip()) {
+  return canManageTrip(trip) && (trip?.days?.length || 0) >= 2;
+}
+
+function renderDaySwapControl(trip) {
+  const header = activeDayTitle?.closest(".day-header");
+  const existingControl = header?.querySelector("[data-day-swap-control]");
+  existingControl?.remove();
+
+  if (!header || !canSwapTripDays(trip)) return;
+
+  const targetOptions = trip.days
+    .map((day, index) => {
+      if (index === state.activeDayIndex) return "";
+      const labelParts = [`Day ${index + 1}`, day.date, day.title].filter(Boolean);
+      return `<option value="${index}">${escapeHtml(labelParts.join(" · "))}</option>`;
+    })
+    .join("");
+
+  const control = document.createElement("div");
+  control.className = "day-swap-control";
+  control.dataset.daySwapControl = "";
+  control.innerHTML = `
+    <label>
+      <span>與</span>
+      <select data-day-swap-target aria-label="選擇要互換的 Day">
+        ${targetOptions}
+      </select>
+    </label>
+    <button class="secondary-button" type="button" data-swap-day>交換 Day</button>
+  `;
+  header.append(control);
+}
+
+function swapTripDays(targetDayIndex) {
+  const trip = currentTrip();
+  const currentDayIndex = state.activeDayIndex;
+
+  if (!canSwapTripDays(trip)) return;
+  if (!Number.isInteger(targetDayIndex) || targetDayIndex < 0 || targetDayIndex >= trip.days.length) return;
+  if (targetDayIndex === currentDayIndex) return;
+
+  const current = trip.days[currentDayIndex];
+  const target = trip.days[targetDayIndex];
+  const currentItems = current.items;
+  const currentTitle = current.title;
+
+  current.items = target.items;
+  current.title = target.title;
+  target.items = currentItems;
+  target.title = currentTitle;
+  state.activeDayIndex = currentDayIndex;
+
+  saveLibrary();
+  scheduleCloudSave();
+  render();
+  rememberViewState(captureViewState());
+}
+
 function renderTrip() {
   const trip = currentTrip();
   if (!trip) return;
@@ -1701,6 +1781,7 @@ function renderTrip() {
   const activeSegment = tripSegmentForDay(trip, state.activeDayIndex);
   activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}${activeSegment ? ` · ${activeSegment.title}` : ""}`;
   activeDayTitle.textContent = day.title;
+  renderDaySwapControl(trip);
   renderBookings();
   renderTravelDayPanel();
   renderWeatherPanel();
@@ -2599,7 +2680,8 @@ function renderPdfPreview() {
   }
 
   const images = collectTripImages(trip);
-  const coverImage = images[0] || null;
+  renderPdfImageControls(trip, images);
+  const coverImage = getPdfOverrideImage(trip.pdfImages?.cover, "自訂封面") || images[0] || null;
   const highlights = buildPdfHighlights(trip, images);
   const exportedAt = new Date().toLocaleDateString("zh-TW", {
     year: "numeric",
@@ -2636,6 +2718,67 @@ function renderPdfPreview() {
   `;
 }
 
+function renderPdfImageControls(trip, images) {
+  if (!pdfImageControls) return;
+  const coverOverride = Boolean(getAttachmentSource(trip.pdfImages?.cover));
+  const autoImageCount = images.length;
+
+  pdfImageControls.innerHTML = `
+    <div class="pdf-image-controls-heading">
+      <div>
+        <p class="eyebrow">圖片設定</p>
+        <h3>預設抓取已上傳照片，也可以替換 PDF 用圖</h3>
+      </div>
+      <span>${escapeHtml(String(autoImageCount))} 張已上傳照片可自動帶入</span>
+    </div>
+    <div class="pdf-image-control-grid">
+      ${renderPdfImageControlCard({
+        label: "封面照片",
+        target: "cover",
+        index: "",
+        isCustom: coverOverride,
+        fallback: images[0]?.title || "自動帶入第一張上傳照片"
+      })}
+      ${trip.days
+        .map((day, index) =>
+          renderPdfImageControlCard({
+            label: `Day ${index + 1} 主圖`,
+            target: "day",
+            index,
+            isCustom: Boolean(getAttachmentSource(trip.pdfImages?.days?.[index])),
+            fallback: getPdfDayImage(day)?.title || images[index + 1]?.title || images[0]?.title || "自動帶入行程照片"
+          })
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderPdfImageControlCard({ label, target, index, isCustom, fallback }) {
+  const inputId = `pdfImageInput${target}${index}`;
+
+  return `
+    <article class="pdf-image-control-card">
+      <div>
+        <strong>${escapeHtml(label)}</strong>
+        <span>${isCustom ? "已自訂圖片" : `預設：${escapeHtml(shortText(fallback, 24))}`}</span>
+      </div>
+      <div class="pdf-image-control-actions">
+        <label class="secondary-action" for="${escapeHtml(inputId)}">更換</label>
+        <input
+          id="${escapeHtml(inputId)}"
+          type="file"
+          accept="image/*"
+          data-pdf-image-target="${escapeHtml(target)}"
+          ${target === "day" ? `data-pdf-image-index="${escapeHtml(String(index))}"` : ""}
+          hidden
+        />
+        ${isCustom ? `<button class="text-button" type="button" data-reset-pdf-image="${escapeHtml(target)}" ${target === "day" ? `data-pdf-image-index="${escapeHtml(String(index))}"` : ""}>恢復預設</button>` : ""}
+      </div>
+    </article>
+  `;
+}
+
 function handlePrintPdfPreview() {
   state.activeTripSection = "pdf";
   renderTripSectionTabs();
@@ -2652,6 +2795,54 @@ function handlePrintPdfPreview() {
 
   window.focus();
   window.print();
+}
+
+async function handlePdfImageControlChange(event) {
+  const input = event.target.closest("[data-pdf-image-target]");
+  if (!input?.files?.length) return;
+
+  const trip = currentTrip();
+  if (!trip) return;
+
+  try {
+    const attachment = await compressImageAttachment(input.files[0]);
+    applyPdfImageOverride(trip, input.dataset.pdfImageTarget, input.dataset.pdfImageIndex, attachment);
+    saveLibrary();
+    renderPdfPreview();
+    if (pdfExportStatus) pdfExportStatus.textContent = "已更新 PDF 預覽圖片。按「匯出 PDF」即可輸出新版。";
+  } catch (error) {
+    window.alert(error.message || "圖片更新失敗，請改用較小的圖片。");
+  } finally {
+    input.value = "";
+  }
+}
+
+function handlePdfImageControlClick(event) {
+  const button = event.target.closest("[data-reset-pdf-image]");
+  if (!button) return;
+
+  const trip = currentTrip();
+  if (!trip) return;
+
+  applyPdfImageOverride(trip, button.dataset.resetPdfImage, button.dataset.pdfImageIndex, null);
+  saveLibrary();
+  renderPdfPreview();
+  if (pdfExportStatus) pdfExportStatus.textContent = "已恢復預設圖片來源。";
+}
+
+function applyPdfImageOverride(trip, target, index, attachment) {
+  trip.pdfImages = normalizePdfImages(trip.pdfImages, trip.days.length);
+
+  if (target === "cover") {
+    trip.pdfImages.cover = attachment;
+    return;
+  }
+
+  if (target === "day") {
+    const dayIndex = Number(index);
+    if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= trip.days.length) return;
+    trip.pdfImages.days[dayIndex] = attachment;
+  }
 }
 
 function collectTripImages(trip) {
@@ -2727,7 +2918,7 @@ function renderPdfHighlightCard(highlight) {
 }
 
 function renderPdfDaySheet(trip, day, index, images) {
-  const dayImage = getPdfDayImage(day) || images[index + 1] || images[0] || null;
+  const dayImage = getPdfOverrideImage(trip.pdfImages?.days?.[index], `Day ${index + 1} 自訂主圖`) || getPdfDayImage(day) || images[index + 1] || images[0] || null;
   const dayIsoDate = getTripDayIsoDate(trip, index);
   const accommodation = getAccommodationForDate(trip, dayIsoDate);
   const transports = getDayTransportLabels(day);
@@ -2775,6 +2966,17 @@ function renderPdfDaySheet(trip, day, index, images) {
       </section>
     </article>
   `;
+}
+
+function getPdfOverrideImage(attachment, title) {
+  const source = getAttachmentSource(attachment);
+  if (!source || !attachment?.type?.startsWith("image/")) return null;
+
+  return {
+    src: source,
+    title: title || attachment.name || "自訂圖片",
+    description: "PDF 預覽頁自訂圖片"
+  };
 }
 
 function getPdfDayImage(day) {
@@ -4675,6 +4877,8 @@ document.querySelector("#backToTripsButton").addEventListener("click", showHome)
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
 printPdfPreviewButton?.addEventListener("click", handlePrintPdfPreview);
+pdfImageControls?.addEventListener("change", handlePdfImageControlChange);
+pdfImageControls?.addEventListener("click", handlePdfImageControlClick);
 document.querySelector("#addBookingButton")?.addEventListener("click", () => openBookingDialog());
 document.querySelector("[data-trip-section-add]")?.addEventListener("click", () => {
   if (state.activeTripSection === "bookings") {
@@ -5024,6 +5228,14 @@ dayTabs.addEventListener("click", (event) => {
   state.activeDayIndex = Number(button.dataset.day);
   renderTrip();
   rememberViewState(captureViewState());
+});
+
+itineraryPanel?.addEventListener("click", (event) => {
+  const swapButton = event.target.closest("[data-swap-day]");
+  if (!swapButton) return;
+
+  const targetSelect = itineraryPanel.querySelector("[data-day-swap-target]");
+  swapTripDays(Number(targetSelect?.value));
 });
 
 tripSectionTabs.addEventListener("click", (event) => {
