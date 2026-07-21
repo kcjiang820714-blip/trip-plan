@@ -1825,7 +1825,8 @@ function renderTrip() {
             ${renderTransportInfo(item)}
             ${renderAttractionIntro(item)}
             ${renderAttachmentGallery(item.attachments, "item", item.id)}
-            <p class="note">${escapeHtml(item.note || "沒有備註")}</p>
+            ${item.content ? `<p class="item-detail-content">${escapeHtml(item.content)}</p>` : ""}
+            ${item.note ? `<p class="item-detail-note">${escapeHtml(item.note)}</p>` : ""}
             <div class="card-actions">
               <a class="text-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">地圖</a>
               ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit="${index}">編輯</button>` : ""}

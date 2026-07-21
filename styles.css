@@ -3775,6 +3775,20 @@ h2 {
   box-shadow: 0 14px 28px rgba(24, 37, 33, 0.07);
 }
 
+.item-detail-content,
+.item-detail-note {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 720;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.item-detail-note {
+  color: var(--muted);
+}
+
 .note {
   color: var(--muted);
   line-height: 1.5;
