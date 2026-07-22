@@ -338,6 +338,8 @@ const bookingArrivalPlaceInput = document.querySelector("#bookingArrivalPlaceInp
 const bookingPassengerNameInput = document.querySelector("#bookingPassengerNameInput");
 const bookingSeatInput = document.querySelector("#bookingSeatInput");
 const transportTicketFields = document.querySelector("#transportTicketFields");
+const personalTicketEditors = document.querySelector("#personalTicketEditors");
+const addPersonalTicketButton = document.querySelector("#addPersonalTicketButton");
 const bookingTicketHolderField = document.querySelector("#bookingTicketHolderField");
 const bookingTicketHolderInput = document.querySelector("#bookingTicketHolderInput");
 const bookingTicketHolderHint = document.querySelector("#bookingTicketHolderHint");
@@ -611,6 +613,18 @@ function normalizeExchangeRates(rates) {
 }
 
 function normalizeBooking(booking) {
+  const legacyPersonalTicket = isPersonalTicketBooking(booking.type) && (
+    normalizeTicketUrl(booking.ticketUrl) || (booking.attachments || []).some((attachment) => getAttachmentSource(attachment))
+  )
+    ? normalizePersonalTicket({
+        id: `legacy-${booking.id || "ticket"}`,
+        ticketHolderUserId: booking.ticketHolderUserId,
+        ticketHolderName: booking.ticketHolderName,
+        ticketUrl: normalizeTicketUrl(booking.ticketUrl),
+        attachments: Array.isArray(booking.attachments) ? booking.attachments : []
+      })
+    : null;
+
   return {
     id: booking.id || createId(),
     type: booking.type || "其他",
@@ -639,8 +653,40 @@ function normalizeBooking(booking) {
     ticketHolderUserId: booking.ticketHolderUserId || "",
     ticketHolderName: booking.ticketHolderName || "",
     ticketUrl: normalizeTicketUrl(booking.ticketUrl),
-    attachments: Array.isArray(booking.attachments) ? booking.attachments.map(normalizeAttachment).filter(Boolean) : []
+    personalTickets: Array.isArray(booking.personalTickets) && booking.personalTickets.length
+      ? booking.personalTickets.map(normalizePersonalTicket).filter(hasPersonalTicketContent)
+      : legacyPersonalTicket
+      ? [legacyPersonalTicket]
+      : [],
+    attachments: legacyPersonalTicket && (!Array.isArray(booking.personalTickets) || booking.personalTickets.length === 0)
+      ? []
+      : Array.isArray(booking.attachments)
+      ? booking.attachments
+          .map(normalizeAttachment)
+          .filter(Boolean)
+          .filter((attachment) => !booking.personalTickets?.some((ticket) =>
+            ticket.attachments?.some((ticketAttachment) => ticketAttachment.id === attachment.id)
+          ))
+      : []
   };
+}
+
+function isPersonalTicketBooking(type) {
+  return ["交通", "景點票券", "活動"].includes(type);
+}
+
+function normalizePersonalTicket(ticket = {}) {
+  return {
+    id: ticket.id || createId(),
+    ticketHolderUserId: ticket.ticketHolderUserId || ticket.holderUserId || "",
+    ticketHolderName: ticket.ticketHolderName || ticket.holderName || "",
+    ticketUrl: normalizeTicketUrl(ticket.ticketUrl),
+    attachments: Array.isArray(ticket.attachments) ? ticket.attachments.map(normalizeAttachment).filter(Boolean) : []
+  };
+}
+
+function hasPersonalTicketContent(ticket) {
+  return Boolean(ticket.ticketHolderUserId || ticket.ticketHolderName || ticket.ticketUrl || ticket.attachments?.length);
 }
 
 function normalizeTicketUrl(value) {
@@ -1081,7 +1127,11 @@ function stripAttachmentsForCloudTrip(trip) {
     })),
     bookings: (trip.bookings || []).map((booking) => ({
       ...booking,
-      attachments: (booking.attachments || []).map(toCloudAttachment).filter(Boolean)
+      attachments: (booking.attachments || []).map(toCloudAttachment).filter(Boolean),
+      personalTickets: (booking.personalTickets || []).map((ticket) => ({
+        ...ticket,
+        attachments: (ticket.attachments || []).map(toCloudAttachment).filter(Boolean)
+      }))
     }))
   };
 }
@@ -1393,6 +1443,11 @@ async function uploadTripAttachments(client, trip) {
     for (const attachment of booking.attachments || []) {
       await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment);
     }
+    for (const ticket of booking.personalTickets || []) {
+      for (const attachment of ticket.attachments || []) {
+        await uploadAttachmentToCloud(client, trip, "personal-ticket", ticket.id || "ticket", attachment);
+      }
+    }
   }
 }
 
@@ -1576,12 +1631,26 @@ function canManageTrip(trip = currentTrip()) {
 
 function canViewBookingTicket(booking, trip) {
   if (booking.type !== "交通") return true;
-  const hasElectronicTicket = Boolean(normalizeTicketUrl(booking.ticketUrl) || (booking.attachments || []).some((attachment) => getAttachmentSource(attachment)));
+  const hasElectronicTicket = Boolean(
+    normalizeTicketUrl(booking.ticketUrl) ||
+    (booking.attachments || []).some((attachment) => getAttachmentSource(attachment)) ||
+    (booking.personalTickets || []).some(hasPersonalTicketContent)
+  );
   if (!hasElectronicTicket) return true;
   if (trip?.ownerId && !state.cloudUser) return false;
   if (trip?.role && !state.cloudUser) return false;
   if (canManageTrip(trip)) return true;
+  // 多張個人票券時仍保留共同的路線與班次；卡片內再逐張篩選票券。
+  if (booking.personalTickets?.length) return true;
   return Boolean(state.cloudUser && booking.ticketHolderUserId === state.cloudUser.id);
+}
+
+function canViewPersonalTicket(ticket, booking, trip) {
+  if (!hasPersonalTicketContent(ticket)) return false;
+  if (trip?.ownerId && !state.cloudUser) return false;
+  if (trip?.role && !state.cloudUser) return false;
+  if (canManageTrip(trip)) return true;
+  return Boolean(state.cloudUser && ticket.ticketHolderUserId === state.cloudUser.id);
 }
 
 function ticketHolderOwnerName(trip) {
@@ -1641,6 +1710,69 @@ function renderTicketHolderOptions(trip, selectedUserId = "") {
 
 function getSelectedTicketHolder(trip, userId) {
   return getTicketHolderCandidates(trip).find((candidate) => candidate.userId === userId) || null;
+}
+
+function createBlankPersonalTicket() {
+  return { id: createId(), ticketHolderUserId: "", ticketHolderName: "", ticketUrl: "", attachments: [] };
+}
+
+function renderPersonalTicketEditors(tickets = []) {
+  const editorTickets = tickets.length ? tickets.map(normalizePersonalTicket) : [createBlankPersonalTicket()];
+  const candidates = getTicketHolderCandidates(currentTrip());
+  personalTicketEditors.innerHTML = editorTickets.map((ticket, index) => renderPersonalTicketEditor(ticket, index, editorTickets.length, candidates)).join("");
+  editorTickets.forEach((ticket) => renderExistingAttachmentsEditor(personalTicketEditors.querySelector(`[data-personal-ticket-existing="${ticket.id}"]`), ticket.attachments));
+}
+
+function renderPersonalTicketEditor(ticket, index, ticketCount, candidates = getTicketHolderCandidates(currentTrip())) {
+  return `
+    <article class="personal-ticket-editor" data-personal-ticket-editor data-personal-ticket-id="${escapeHtml(ticket.id)}">
+      <header><strong>第 ${index + 1} 張票券</strong>${ticketCount > 1 ? `<button class="text-button danger-text" type="button" data-remove-personal-ticket>移除</button>` : ""}</header>
+      <label>票券持有人
+        <select class="personal-ticket-holder" ${state.cloudUser ? "" : "disabled"}>
+          <option value="">尚未指定（僅旅程建立者可見）</option>
+          ${candidates.map((candidate) => `<option value="${escapeHtml(candidate.userId)}" ${candidate.userId === ticket.ticketHolderUserId ? "selected" : ""}>${escapeHtml([candidate.displayName, candidate.email].filter(Boolean).join(" · "))}</option>`).join("")}
+        </select>
+      </label>
+      <div class="transport-ticket-mode personal-ticket-mode" role="radiogroup" aria-label="個人電子票券提供方式">
+        <label class="checkbox-row"><input class="personal-ticket-mode" type="radio" name="personalTicketMode-${escapeHtml(ticket.id)}" value="link" ${ticket.ticketUrl || !ticket.attachments.length ? "checked" : ""} /><span>連結網址</span></label>
+        <label class="checkbox-row"><input class="personal-ticket-mode" type="radio" name="personalTicketMode-${escapeHtml(ticket.id)}" value="file" ${!ticket.ticketUrl && ticket.attachments.length ? "checked" : ""} /><span>上傳檔案</span></label>
+      </div>
+      <label class="personal-ticket-url-field" ${ticket.ticketUrl || !ticket.attachments.length ? "" : "hidden"}>電子票券網址
+        <input class="personal-ticket-url" type="url" inputmode="url" value="${escapeHtml(ticket.ticketUrl)}" placeholder="https://..." />
+      </label>
+      <label class="personal-ticket-file-field" ${ticket.ticketUrl || !ticket.attachments.length ? "hidden" : ""}>電子票券檔案
+        <input class="personal-ticket-file" type="file" accept="image/*,application/pdf" multiple />
+      </label>
+      <section class="existing-attachments personal-ticket-existing" data-personal-ticket-existing="${escapeHtml(ticket.id)}" hidden></section>
+    </article>
+  `;
+}
+
+function syncPersonalTicketEditor(editor) {
+  const mode = editor.querySelector(".personal-ticket-mode:checked")?.value || "link";
+  editor.querySelector(".personal-ticket-url-field").hidden = mode !== "link";
+  editor.querySelector(".personal-ticket-file-field").hidden = mode !== "file";
+}
+
+async function collectPersonalTickets(existingTickets = []) {
+  const editors = Array.from(personalTicketEditors.querySelectorAll("[data-personal-ticket-editor]"));
+  const tickets = await Promise.all(editors.map(async (editor) => {
+    const existingTicket = existingTickets.find((ticket) => ticket.id === editor.dataset.personalTicketId) || createBlankPersonalTicket();
+    const holderInput = editor.querySelector(".personal-ticket-holder");
+    const selectedTicketHolder = getSelectedTicketHolder(currentTrip(), holderInput.value);
+    const mode = editor.querySelector(".personal-ticket-mode:checked")?.value || "link";
+    const ticketUrlInput = editor.querySelector(".personal-ticket-url");
+    const fileInput = editor.querySelector(".personal-ticket-file");
+    const existingAttachments = editor.querySelector(`[data-personal-ticket-existing="${existingTicket.id}"]`);
+    const keptAttachments = getKeptAttachments(existingAttachments, existingTicket.attachments || []);
+    const ticketUrl = mode === "link" ? normalizeTicketUrl(ticketUrlInput.value) : "";
+    if (mode === "link" && ticketUrlInput.value.trim() && !ticketUrl) throw new Error("電子票券網址只支援 http 或 https 開頭的完整網址。");
+    const files = mode === "file" ? Array.from(fileInput.files || []) : [];
+    files.forEach((file) => validateTransportTicketFile(file));
+    const attachments = mode === "file" ? [...keptAttachments, ...await Promise.all(files.map(readBookingAttachment))] : [];
+    return normalizePersonalTicket({ id: existingTicket.id, ticketHolderUserId: selectedTicketHolder?.userId || "", ticketHolderName: selectedTicketHolder?.displayName || "", ticketUrl, attachments });
+  }));
+  return tickets.filter(hasPersonalTicketContent);
 }
 
 function canUseCollaborativeTools(trip = currentTrip()) {
@@ -2490,6 +2622,7 @@ function renderQuickTickets() {
 }
 
 function renderQuickTicketCard(booking) {
+  const tickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, currentTrip()));
   const primaryAttachment = getPrimaryTicketAttachment(booking.attachments);
   const ticketUrl = normalizeTicketUrl(booking.ticketUrl);
   const isTransport = booking.type === "交通";
@@ -2501,7 +2634,7 @@ function renderQuickTicketCard(booking) {
     : "";
   const timeLabel = booking.type === "住宿" ? renderStayQuickTime(booking) : transportTime || booking.time || "未填時間";
   const navigationPlace = isTransport ? booking.transport.departurePlace || booking.place : booking.place;
-  const offlineLabel = getBookingOfflineLabel(booking);
+  const offlineLabel = getBookingOfflineLabel(booking, tickets);
 
   return `
     <article class="quick-ticket-card">
@@ -2519,7 +2652,15 @@ function renderQuickTicketCard(booking) {
       </div>
       <div class="quick-ticket-actions">
         ${
-          ticketUrl
+          tickets.map((ticket) => {
+            const ticketAttachment = getPrimaryTicketAttachment(ticket.attachments);
+            const holderLabel = canManageTrip(currentTrip()) ? `<small>${escapeHtml(ticket.ticketHolderName || "未指定")}</small>` : "";
+            return ticket.ticketUrl
+              ? `${holderLabel}<button class="primary-button quick-ticket-open" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示票券</button>`
+              : ticketAttachment
+              ? `${holderLabel}<button class="primary-button quick-ticket-open" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(ticketAttachment.id)}">開票券</button>`
+              : "";
+          }).join("") || (!booking.personalTickets?.length && (ticketUrl
             ? `<button
                 class="primary-button quick-ticket-open"
                 type="button"
@@ -2534,6 +2675,7 @@ function renderQuickTicketCard(booking) {
                 data-attachment-id="${escapeHtml(primaryAttachment.id)}"
               >開票券</button>`
             : ""
+          ))
         }
         ${navigationPlace ? `<a class="secondary-action" href="${googleMapsUrl(navigationPlace)}" target="_blank" rel="noopener">導航</a>` : ""}
       </div>
@@ -2613,7 +2755,12 @@ function renderStayQuickTime(booking) {
   return parts.length ? parts.join(" / ") : "住宿期間";
 }
 
-function getBookingOfflineLabel(booking) {
+function getBookingOfflineLabel(booking, visiblePersonalTickets = booking.personalTickets || []) {
+  const personalTickets = visiblePersonalTickets;
+  if (personalTickets.some((ticket) => normalizeTicketUrl(ticket.ticketUrl))) return "電子票券需連線開啟";
+  if (personalTickets.some((ticket) => ticket.attachments?.some((attachment) => attachment.dataUrl))) return "票券已保存在此裝置，離線可開";
+  if (personalTickets.some((ticket) => ticket.attachments?.length)) return "票券附件在雲端，離線時可能無法開啟";
+  if (booking.personalTickets?.length) return "目前沒有可出示的票券";
   if (normalizeTicketUrl(booking.ticketUrl)) return "電子票券需連線開啟";
   if (!booking.attachments?.length) return "尚未加入票券附件";
   if (booking.attachments.some((attachment) => attachment.dataUrl)) return "已保存在此裝置，離線可開";
@@ -2662,6 +2809,7 @@ function renderBookings() {
     .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
     .map((booking) => {
       const coverImage = getPrimaryImageAttachment(booking.attachments);
+      const tickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
 
       return `
         <article class="utility-card booking-card ${coverImage ? "has-cover" : ""}">
@@ -2671,12 +2819,20 @@ function renderBookings() {
               <h3>${escapeHtml(booking.name)}</h3>
             </header>
             ${renderBookingMeta(booking)}
-            ${canManageTrip(trip) && booking.type === "交通" ? `<p class="booking-card-line ticket-holder-label"><span>持有人</span>${escapeHtml(booking.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
+            ${tickets.map((ticket) => `
+              <section class="personal-ticket-card">
+                ${canManageTrip(trip) ? `<p class="booking-card-line ticket-holder-label"><span>持有人</span>${escapeHtml(ticket.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
+                <div class="card-actions">
+                  ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>` : ""}
+                  ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "票券")}</button>`).join("") : ""}
+                </div>
+              </section>
+            `).join("")}
             ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
-            ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
+            ${!isPersonalTicketBooking(booking.type) ? renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id) : ""}
             <div class="card-actions">
-              ${normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
+              ${tickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
               ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
             </div>
           </div>
@@ -4317,9 +4473,16 @@ function dataUrlToBlob(dataUrl) {
 }
 
 function findAttachment(ownerType, ownerId, attachmentId) {
+  if (ownerType === "personal-ticket") {
+    const ticket = currentTrip().bookings
+      .flatMap((booking) => booking.personalTickets || [])
+      .find((item) => item.id === ownerId);
+    return ticket?.attachments.find((attachment) => attachment.id === attachmentId) || null;
+  }
+
   if (ownerType === "booking") {
     const booking = currentTrip().bookings.find((item) => item.id === ownerId);
-    return booking?.attachments.find((item) => item.id === attachmentId);
+    return booking?.attachments.find((item) => item.id === attachmentId) || null;
   }
 
   if (ownerType === "item") {
@@ -4390,7 +4553,7 @@ function openTicketUrl(ticketUrl) {
 function syncBookingStayFields() {
   const isStay = bookingTypeInput.value === "住宿";
   const isTransport = bookingTypeInput.value === "交通";
-  const ticketMode = bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value || "link";
+  const isPersonalTicketBooking = ["交通", "景點票券", "活動"].includes(bookingTypeInput.value);
   bookingDateLabel.firstChild.textContent = isStay ? "入住日期" : isTransport ? "出發日期" : "日期";
   bookingTimeLabel.firstChild.textContent = isStay ? "check-in 時間" : isTransport ? "出發時間" : "時間";
   bookingStayFields.hidden = !isStay;
@@ -4401,12 +4564,12 @@ function syncBookingStayFields() {
   bookingTransportFields.hidden = !isTransport;
   bookingTransportModeInput.required = isTransport;
   bookingPlaceInput.closest("label").hidden = isTransport;
-  transportTicketFields.hidden = !isTransport;
-  bookingTicketHolderField.hidden = !isTransport;
-  transportTicketUrlField.hidden = !isTransport || ticketMode !== "link";
-  bookingAttachmentField.hidden = isTransport && ticketMode === "link";
-  bookingTicketUrlInput.required = isTransport && ticketMode === "link";
-  bookingAttachmentInput.required = isTransport && ticketMode === "file" && !bookingExistingAttachments.querySelector("[data-existing-attachment-id]");
+  transportTicketFields.hidden = !isPersonalTicketBooking;
+  bookingTicketHolderField.hidden = true;
+  transportTicketUrlField.hidden = true;
+  bookingAttachmentField.hidden = isPersonalTicketBooking;
+  bookingTicketUrlInput.required = false;
+  bookingAttachmentInput.required = false;
 
   if (isStay && bookingDateInput.value && !bookingCheckoutDateInput.value) {
     bookingCheckoutDateInput.value = addDays(bookingDateInput.value, 1);
@@ -4452,6 +4615,7 @@ function openBookingDialog(bookingId = null) {
   bookingForm.querySelector(`input[name="transportTicketMode"][value="${ticketMode}"]`).checked = true;
   bookingAttachmentInput.value = "";
   renderExistingAttachmentsEditor(bookingExistingAttachments, booking?.attachments || []);
+  renderPersonalTicketEditors(booking?.personalTickets || []);
   syncBookingStayFields();
   openModal(bookingDialog);
 }
@@ -5369,9 +5533,46 @@ tripWeatherEditor?.addEventListener("keydown", (event) => {
   searchTripWeatherLocations(row?.dataset.weatherDate || "", input.value || "");
 });
 todoGroupInput.addEventListener("change", syncTodoFields);
-bookingTypeInput.addEventListener("change", syncBookingStayFields);
+bookingTypeInput.addEventListener("change", () => {
+  syncBookingStayFields();
+  if (isPersonalTicketBooking(bookingTypeInput.value) && !personalTicketEditors.querySelector("[data-personal-ticket-editor]")) {
+    renderPersonalTicketEditors();
+  }
+});
 bookingForm.querySelectorAll('input[name="transportTicketMode"]').forEach((input) => input.addEventListener("change", syncBookingStayFields));
 bookingDateInput.addEventListener("change", syncBookingStayFields);
+addPersonalTicketButton.addEventListener("click", () => {
+  const candidates = getTicketHolderCandidates(currentTrip());
+  const index = personalTicketEditors.querySelectorAll("[data-personal-ticket-editor]").length;
+  personalTicketEditors.insertAdjacentHTML("beforeend", renderPersonalTicketEditor(createBlankPersonalTicket(), index, index + 1, candidates));
+  personalTicketEditors.querySelectorAll("[data-personal-ticket-editor]").forEach((editor, editorIndex) => {
+    const heading = editor.querySelector("header strong");
+    if (heading) heading.textContent = `第 ${editorIndex + 1} 張票券`;
+    if (!editor.querySelector("[data-remove-personal-ticket]")) editor.querySelector("header").insertAdjacentHTML("beforeend", '<button class="text-button danger-text" type="button" data-remove-personal-ticket>移除</button>');
+  });
+});
+personalTicketEditors.addEventListener("change", (event) => {
+  if (!event.target.matches(".personal-ticket-mode")) return;
+  syncPersonalTicketEditor(event.target.closest("[data-personal-ticket-editor]"));
+});
+personalTicketEditors.addEventListener("click", (event) => {
+  const removeAttachmentButton = event.target.closest("[data-remove-existing-attachment]");
+  if (removeAttachmentButton) {
+    const container = removeAttachmentButton.closest("[data-personal-ticket-existing]");
+    removeAttachmentButton.closest("[data-existing-attachment-id]")?.remove();
+    if (container) container.hidden = !container.querySelector("[data-existing-attachment-id]");
+    return;
+  }
+  const removeTicketButton = event.target.closest("[data-remove-personal-ticket]");
+  if (!removeTicketButton) return;
+  const editors = personalTicketEditors.querySelectorAll("[data-personal-ticket-editor]");
+  if (editors.length === 1) return;
+  removeTicketButton.closest("[data-personal-ticket-editor]")?.remove();
+  personalTicketEditors.querySelectorAll("[data-personal-ticket-editor]").forEach((editor, index) => {
+    const heading = editor.querySelector("header strong");
+    if (heading) heading.textContent = `第 ${index + 1} 張票券`;
+  });
+});
 typeInput.addEventListener("change", () => {
   syncFlightFields();
   syncTransportFields();
@@ -5712,31 +5913,28 @@ bookingForm.addEventListener("submit", async (event) => {
   syncHiddenTimeInput(bookingTimeInput, bookingHourInput, bookingMinuteInput);
   syncHiddenTimeInput(bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput);
 
-  const transportTicketMode = bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value;
-  const isTransportLink = bookingTypeInput.value === "交通" && transportTicketMode === "link";
-  const isTransportTicketFile = bookingTypeInput.value === "交通" && transportTicketMode === "file";
-  if (isTransportLink && !normalizeTicketUrl(bookingTicketUrlInput.value)) {
-    alert("電子票券網址只支援 http 或 https 開頭的完整網址。");
-    return;
-  }
-
-  let attachments = [];
-  try {
-    attachments = await readBookingAttachments(isTransportTicketFile);
-  } catch (error) {
-    alert(error.message);
-    return;
-  }
-
   const editingIndex = state.editingBookingId
     ? currentTrip().bookings.findIndex((booking) => booking.id === state.editingBookingId)
     : -1;
   const existingBooking = editingIndex >= 0 ? currentTrip().bookings[editingIndex] : null;
-  const selectedTicketHolder = bookingTypeInput.value === "交通"
-    ? getSelectedTicketHolder(currentTrip(), bookingTicketHolderInput.value)
-    : null;
-  const keptBookingAttachments = existingBooking ? getKeptAttachments(bookingExistingAttachments, existingBooking.attachments || []) : [];
+  const isPersonalTicketBooking = ["交通", "景點票券", "活動"].includes(bookingTypeInput.value);
+  const keptBookingAttachments = !isPersonalTicketBooking && existingBooking
+    ? getKeptAttachments(bookingExistingAttachments, existingBooking.attachments || [])
+    : [];
+  let attachments = [];
+  let personalTickets = [];
+  try {
+    attachments = isPersonalTicketBooking ? [] : await readBookingAttachments(false);
+    personalTickets = isPersonalTicketBooking ? await collectPersonalTickets(existingBooking?.personalTickets || []) : [];
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
   const removedBookingAttachments = existingBooking ? getRemovedAttachments(existingBooking.attachments || [], keptBookingAttachments) : [];
+  const personalAttachmentIds = new Set(personalTickets.flatMap((ticket) => ticket.attachments.map((attachment) => attachment.id)));
+  const removedPersonalTicketAttachments = existingBooking
+    ? (existingBooking.personalTickets || []).flatMap((ticket) => ticket.attachments || []).filter((attachment) => !personalAttachmentIds.has(attachment.id))
+    : [];
   const booking = normalizeBooking({
     id: existingBooking?.id || createId(),
     type: bookingTypeInput.value,
@@ -5764,9 +5962,10 @@ bookingForm.addEventListener("submit", async (event) => {
           seat: bookingSeatInput.value.trim()
         }
       : {},
-    ticketHolderUserId: selectedTicketHolder?.userId || "",
-    ticketHolderName: selectedTicketHolder?.displayName || "",
-    ticketUrl: isTransportLink ? bookingTicketUrlInput.value : "",
+    ticketHolderUserId: "",
+    ticketHolderName: "",
+    ticketUrl: "",
+    personalTickets: isPersonalTicketBooking ? personalTickets : [],
     attachments: [...keptBookingAttachments, ...attachments]
   });
 
@@ -5779,9 +5978,12 @@ bookingForm.addEventListener("submit", async (event) => {
   let bookingLocalSaveStarted = false;
   try {
     await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "booking", booking.id, booking.attachments);
+    for (const ticket of booking.personalTickets) {
+      await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "personal-ticket", ticket.id, ticket.attachments);
+    }
     bookingLocalSaveStarted = true;
     saveLibrary();
-    deleteRemovedAttachmentsFromCloud(removedBookingAttachments);
+    deleteRemovedAttachmentsFromCloud([...removedBookingAttachments, ...removedPersonalTicketAttachments]);
   } catch (error) {
     if (existingBooking) currentTrip().bookings[editingIndex] = existingBooking;
     else currentTrip().bookings.pop();

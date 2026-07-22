@@ -591,13 +591,18 @@
         </section>
 
         <section class="transport-ticket-fields" id="transportTicketFields" hidden>
-          <span>電子票券</span>
-          <label id="bookingTicketHolderField">
-            票券持有人
+          <span>個人電子票券</span>
+          <small class="ticket-holder-hint">共同的交通、景點或活動資訊只要建立一次；每張票券再指定給個別旅伴。</small>
+          <div id="personalTicketEditors"></div>
+          <button class="secondary-action" id="addPersonalTicketButton" type="button">新增一張個人票券</button>
+
+          <!-- 保留舊欄位作為舊版資料相容錨點；新票券由上方個人票券列管理。 -->
+          <label id="bookingTicketHolderField" hidden>
+            舊版票券持有人
             <select id="bookingTicketHolderInput"></select>
             <small id="bookingTicketHolderHint" class="ticket-holder-hint"></small>
           </label>
-          <div class="transport-ticket-mode" role="radiogroup" aria-label="電子票券提供方式">
+          <div class="transport-ticket-mode" role="radiogroup" aria-label="舊版電子票券提供方式" hidden>
             <label class="checkbox-row">
               <input type="radio" name="transportTicketMode" value="link" checked />
               <span>連結網址</span>
@@ -607,8 +612,8 @@
               <span>上傳檔案</span>
             </label>
           </div>
-          <label id="transportTicketUrlField">
-            電子票券網址
+          <label id="transportTicketUrlField" hidden>
+            舊版電子票券網址
             <input id="bookingTicketUrlInput" type="url" inputmode="url" placeholder="https://..." />
           </label>
         </section>
