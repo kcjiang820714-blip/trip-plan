@@ -534,6 +534,72 @@
           <textarea id="bookingNoteInput" rows="3" placeholder="付款狀態、注意事項"></textarea>
         </label>
 
+        <section class="booking-transport-fields" id="bookingTransportFields" hidden>
+          <label>
+            交通方式
+            <select id="bookingTransportModeInput">
+              <option value="">請選擇交通方式</option>
+              <option value="飛機">飛機</option>
+              <option value="高鐵">高鐵</option>
+              <option value="火車">火車</option>
+              <option value="捷運">捷運</option>
+              <option value="巴士">巴士</option>
+              <option value="船">船</option>
+              <option value="其他">其他</option>
+            </select>
+          </label>
+
+          <label>
+            營運商
+            <input id="bookingTransportCompanyInput" placeholder="航空公司、鐵路或客運公司" />
+          </label>
+
+          <label>
+            班次／車次／航班號
+            <input id="bookingTransportNumberInput" placeholder="例如：BR 108、123 次" />
+          </label>
+
+          <label>
+            出發日期
+            <input id="bookingDepartureDateInput" type="date" />
+          </label>
+
+          <label>
+            出發時間
+            <input id="bookingDepartureTimeInput" type="time" />
+          </label>
+
+          <label>
+            出發站／機場
+            <input id="bookingDeparturePlaceInput" placeholder="例如：桃園機場 T2、東京站" />
+          </label>
+
+          <label>
+            抵達日期
+            <input id="bookingArrivalDateInput" type="date" />
+          </label>
+
+          <label>
+            抵達時間
+            <input id="bookingArrivalTimeInput" type="time" />
+          </label>
+
+          <label>
+            抵達站／機場
+            <input id="bookingArrivalPlaceInput" placeholder="例如：關西機場、京都站" />
+          </label>
+
+          <label>
+            乘客姓名
+            <input id="bookingPassengerNameInput" placeholder="票券上的乘客姓名" />
+          </label>
+
+          <label>
+            座位／車廂
+            <input id="bookingSeatInput" placeholder="例如：12A、3 車 8 號" />
+          </label>
+        </section>
+
         <section class="transport-ticket-fields" id="transportTicketFields" hidden>
           <span>電子票券</span>
           <div class="transport-ticket-mode" role="radiogroup" aria-label="電子票券提供方式">
@@ -554,7 +620,7 @@
 
         <label id="bookingAttachmentField">
           訂單附件
-          <input id="bookingAttachmentInput" type="file" accept="image/*,.pdf" multiple />
+          <input id="bookingAttachmentInput" type="file" accept="image/*,application/pdf" multiple />
         </label>
 
         <section class="existing-attachments" id="bookingExistingAttachments" hidden></section>

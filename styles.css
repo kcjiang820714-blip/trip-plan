@@ -2264,7 +2264,8 @@ h2 {
 }
 
 .transport-ticket-fields,
-.transport-ticket-mode {
+.transport-ticket-mode,
+.booking-transport-fields {
   display: grid;
   gap: 10px;
 }
@@ -4388,6 +4389,12 @@ h2 {
   border-left-color: var(--brand);
 }
 
+.booking-transport-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-left: 4px solid var(--indigo);
+  padding-left: 12px;
+}
+
 .checkbox-row {
   grid-column: 1 / -1;
   display: flex !important;
@@ -4826,7 +4833,8 @@ h2 {
     text-align: right;
   }
 
-  .booking-stay-fields {
+  .booking-stay-fields,
+  .booking-transport-fields {
     grid-template-columns: 1fr;
   }
 

@@ -327,6 +327,18 @@ const bookingBreakfastInput = document.querySelector("#bookingBreakfastInput");
 const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
 const bookingNoteInput = document.querySelector("#bookingNoteInput");
+const bookingTransportFields = document.querySelector("#bookingTransportFields");
+const bookingTransportModeInput = document.querySelector("#bookingTransportModeInput");
+const bookingTransportCompanyInput = document.querySelector("#bookingTransportCompanyInput");
+const bookingTransportNumberInput = document.querySelector("#bookingTransportNumberInput");
+const bookingDepartureDateInput = document.querySelector("#bookingDepartureDateInput");
+const bookingDepartureTimeInput = document.querySelector("#bookingDepartureTimeInput");
+const bookingDeparturePlaceInput = document.querySelector("#bookingDeparturePlaceInput");
+const bookingArrivalDateInput = document.querySelector("#bookingArrivalDateInput");
+const bookingArrivalTimeInput = document.querySelector("#bookingArrivalTimeInput");
+const bookingArrivalPlaceInput = document.querySelector("#bookingArrivalPlaceInput");
+const bookingPassengerNameInput = document.querySelector("#bookingPassengerNameInput");
+const bookingSeatInput = document.querySelector("#bookingSeatInput");
 const transportTicketFields = document.querySelector("#transportTicketFields");
 const transportTicketUrlField = document.querySelector("#transportTicketUrlField");
 const bookingTicketUrlInput = document.querySelector("#bookingTicketUrlInput");
@@ -610,6 +622,19 @@ function normalizeBooking(booking) {
     place: booking.place || "",
     code: booking.code || "",
     note: booking.note || "",
+    transport: {
+      mode: booking.transport?.mode || "",
+      company: booking.transport?.company || "",
+      number: booking.transport?.number || "",
+      departureDate: booking.transport?.departureDate || "",
+      departureTime: booking.transport?.departureTime || "",
+      departurePlace: booking.transport?.departurePlace || "",
+      arrivalDate: booking.transport?.arrivalDate || "",
+      arrivalTime: booking.transport?.arrivalTime || "",
+      arrivalPlace: booking.transport?.arrivalPlace || "",
+      passengerName: booking.transport?.passengerName || "",
+      seat: booking.transport?.seat || ""
+    },
     ticketUrl: normalizeTicketUrl(booking.ticketUrl),
     attachments: Array.isArray(booking.attachments) ? booking.attachments.map(normalizeAttachment).filter(Boolean) : []
   };
@@ -2364,7 +2389,7 @@ function renderQuickTickets() {
   const trip = currentTrip();
   const dayDate = getActiveDayDateValue(trip);
   const bookings = getBookingsForDay(trip, dayDate)
-    .sort((a, b) => `${a.time || "99:99"} ${a.name}`.localeCompare(`${b.time || "99:99"} ${b.name}`));
+    .sort((a, b) => `${getBookingScheduleTime(a) || "99:99"} ${a.name}`.localeCompare(`${getBookingScheduleTime(b) || "99:99"} ${b.name}`));
 
   if (!quickTicketPanel) return;
 
@@ -2392,7 +2417,15 @@ function renderQuickTickets() {
 function renderQuickTicketCard(booking) {
   const primaryAttachment = getPrimaryTicketAttachment(booking.attachments);
   const ticketUrl = normalizeTicketUrl(booking.ticketUrl);
-  const timeLabel = booking.type === "住宿" ? renderStayQuickTime(booking) : booking.time || "未填時間";
+  const isTransport = booking.type === "交通";
+  const transportRoute = isTransport
+    ? [booking.transport.departurePlace, booking.transport.arrivalPlace].filter(Boolean).join(" → ")
+    : "";
+  const transportTime = isTransport
+    ? [booking.transport.departureDate || booking.date, booking.transport.departureTime || booking.time].filter(Boolean).join(" ")
+    : "";
+  const timeLabel = booking.type === "住宿" ? renderStayQuickTime(booking) : transportTime || booking.time || "未填時間";
+  const navigationPlace = isTransport ? booking.transport.departurePlace || booking.place : booking.place;
   const offlineLabel = getBookingOfflineLabel(booking);
 
   return `
@@ -2402,7 +2435,9 @@ function renderQuickTicketCard(booking) {
         <strong>${escapeHtml(booking.name)}</strong>
         <dl>
           <div><dt>時間</dt><dd>${escapeHtml(timeLabel)}</dd></div>
-          ${booking.place ? `<div><dt>地點</dt><dd>${escapeHtml(booking.place)}</dd></div>` : ""}
+          ${transportRoute ? `<div><dt>路線</dt><dd>${escapeHtml(transportRoute)}</dd></div>` : ""}
+          ${isTransport && booking.transport.number ? `<div><dt>班次</dt><dd>${escapeHtml(booking.transport.number)}</dd></div>` : ""}
+          ${!isTransport && booking.place ? `<div><dt>地點</dt><dd>${escapeHtml(booking.place)}</dd></div>` : ""}
           ${booking.code ? `<div><dt>代碼</dt><dd>${escapeHtml(booking.code)}</dd></div>` : ""}
         </dl>
         <small>${escapeHtml(offlineLabel)}</small>
@@ -2425,7 +2460,7 @@ function renderQuickTicketCard(booking) {
               >開票券</button>`
             : ""
         }
-        ${booking.place ? `<a class="secondary-action" href="${googleMapsUrl(booking.place)}" target="_blank" rel="noopener">導航</a>` : ""}
+        ${navigationPlace ? `<a class="secondary-action" href="${googleMapsUrl(navigationPlace)}" target="_blank" rel="noopener">導航</a>` : ""}
       </div>
     </article>
   `;
@@ -2435,8 +2470,16 @@ function getActiveDayDateValue(trip) {
   return addDays(trip.startDate, state.activeDayIndex);
 }
 
+function getBookingScheduleDate(booking) {
+  return booking.type === "交通" ? booking.transport?.departureDate || booking.date : booking.date;
+}
+
+function getBookingScheduleTime(booking) {
+  return booking.type === "交通" ? booking.transport?.departureTime || booking.time : booking.time;
+}
+
 function getBookingsForDay(trip, dayDate) {
-  return (trip.bookings || []).filter((booking) => booking.date === dayDate || (booking.type === "住宿" && isDateInStayRange(dayDate, booking)));
+  return (trip.bookings || []).filter((booking) => getBookingScheduleDate(booking) === dayDate || (booking.type === "住宿" && isDateInStayRange(dayDate, booking)));
 }
 
 function isDateInStayRange(dayDate, booking) {
@@ -2569,6 +2612,50 @@ function renderBookings() {
 }
 
 function renderBookingMeta(booking) {
+  if (booking.type === "交通") {
+    const transport = booking.transport || {};
+    const hasTransportDetails = Object.values(transport).some(Boolean);
+
+    if (!hasTransportDetails) {
+      const legacyDetails = [
+        { label: "日期", value: booking.date },
+        { label: "時間", value: booking.time },
+        { label: "地點", value: booking.place }
+      ].filter((detail) => detail.value);
+
+      if (legacyDetails.length === 0) return "";
+
+      return `
+        <dl class="booking-meta transport-booking-meta">
+          ${legacyDetails.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
+        </dl>
+      `;
+    }
+
+    const details = [
+      { label: "交通方式", value: [transport.mode, transport.company].filter(Boolean).join(" · ") },
+      { label: "班次", value: transport.number },
+      {
+        label: "出發",
+        value: [transport.departureDate, transport.departureTime, transport.departurePlace].filter(Boolean).join(" · ")
+      },
+      {
+        label: "抵達",
+        value: [transport.arrivalDate, transport.arrivalTime, transport.arrivalPlace].filter(Boolean).join(" · ")
+      },
+      { label: "乘客", value: transport.passengerName },
+      { label: "座位", value: transport.seat }
+    ].filter((detail) => detail.value);
+
+    if (details.length === 0) return "";
+
+    return `
+      <dl class="booking-meta transport-booking-meta">
+        ${details.map((detail) => `<div><dt>${escapeHtml(detail.label)}</dt><dd>${escapeHtml(detail.value)}</dd></div>`).join("")}
+      </dl>
+    `;
+  }
+
   if (booking.type !== "住宿") {
     const details = [
       { label: "日期", value: booking.date },
@@ -4124,8 +4211,14 @@ async function readBookingAttachment(file) {
   };
 }
 
-function readBookingAttachments() {
+function validateTransportTicketFile(file) {
+  if (file.type.startsWith("image/") || file.type === "application/pdf") return;
+  throw new Error("交通電子票券檔案只接受圖片或 PDF 格式。");
+}
+
+function readBookingAttachments(isTransportTicketFile = false) {
   const files = Array.from(bookingAttachmentInput.files || []);
+  if (isTransportTicketFile) files.forEach(validateTransportTicketFile);
   return Promise.all(files.map(readBookingAttachment));
 }
 
@@ -4229,6 +4322,8 @@ function syncBookingStayFields() {
   bookingCheckoutTimeInput.required = false;
   bookingCheckoutHourInput.required = isStay;
   bookingCheckoutMinuteInput.required = isStay;
+  bookingTransportFields.hidden = !isTransport;
+  bookingTransportModeInput.required = isTransport;
   transportTicketFields.hidden = !isTransport;
   transportTicketUrlField.hidden = !isTransport || ticketMode !== "link";
   bookingAttachmentField.hidden = isTransport && ticketMode === "link";
@@ -4249,7 +4344,7 @@ function openBookingDialog(bookingId = null) {
   bookingForm.reset();
   bookingDialogTitle.textContent = booking ? "編輯預訂" : "新增預訂";
   deleteBookingButton.hidden = !booking;
-  bookingTypeInput.value = booking?.type || (state.activeBookingGroup === "餐廳" ? "餐廳" : state.activeBookingGroup === "住宿" ? "住宿" : "景點票券");
+  bookingTypeInput.value = booking?.type || (state.activeBookingGroup === "交通" ? "交通" : state.activeBookingGroup === "餐廳" ? "餐廳" : state.activeBookingGroup === "住宿" ? "住宿" : "景點票券");
   bookingNameInput.value = booking?.name || "";
   bookingDateInput.value = booking?.date || currentTrip().startDate;
   bookingTimeInput.value = booking?.time || "";
@@ -4261,6 +4356,17 @@ function openBookingDialog(bookingId = null) {
   bookingPlaceInput.value = booking?.place || "";
   bookingCodeInput.value = booking?.code || "";
   bookingNoteInput.value = booking?.note || "";
+  bookingTransportModeInput.value = booking?.transport?.mode || "";
+  bookingTransportCompanyInput.value = booking?.transport?.company || "";
+  bookingTransportNumberInput.value = booking?.transport?.number || "";
+  bookingDepartureDateInput.value = booking?.transport?.departureDate || "";
+  bookingDepartureTimeInput.value = booking?.transport?.departureTime || "";
+  bookingDeparturePlaceInput.value = booking?.transport?.departurePlace || "";
+  bookingArrivalDateInput.value = booking?.transport?.arrivalDate || "";
+  bookingArrivalTimeInput.value = booking?.transport?.arrivalTime || "";
+  bookingArrivalPlaceInput.value = booking?.transport?.arrivalPlace || "";
+  bookingPassengerNameInput.value = booking?.transport?.passengerName || "";
+  bookingSeatInput.value = booking?.transport?.seat || "";
   bookingTicketUrlInput.value = normalizeTicketUrl(booking?.ticketUrl);
   const ticketMode = booking?.ticketUrl ? "link" : "file";
   bookingForm.querySelector(`input[name="transportTicketMode"][value="${ticketMode}"]`).checked = true;
@@ -5522,7 +5628,9 @@ bookingForm.addEventListener("submit", async (event) => {
   syncHiddenTimeInput(bookingTimeInput, bookingHourInput, bookingMinuteInput);
   syncHiddenTimeInput(bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput);
 
-  const isTransportLink = bookingTypeInput.value === "交通" && bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value === "link";
+  const transportTicketMode = bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value;
+  const isTransportLink = bookingTypeInput.value === "交通" && transportTicketMode === "link";
+  const isTransportTicketFile = bookingTypeInput.value === "交通" && transportTicketMode === "file";
   if (isTransportLink && !normalizeTicketUrl(bookingTicketUrlInput.value)) {
     alert("電子票券網址只支援 http 或 https 開頭的完整網址。");
     return;
@@ -5530,7 +5638,7 @@ bookingForm.addEventListener("submit", async (event) => {
 
   let attachments = [];
   try {
-    attachments = await readBookingAttachments();
+    attachments = await readBookingAttachments(isTransportTicketFile);
   } catch (error) {
     alert(error.message);
     return;
@@ -5554,6 +5662,21 @@ bookingForm.addEventListener("submit", async (event) => {
     place: bookingPlaceInput.value.trim(),
     code: bookingCodeInput.value.trim(),
     note: bookingNoteInput.value.trim(),
+    transport: bookingTypeInput.value === "交通"
+      ? {
+          mode: bookingTransportModeInput.value,
+          company: bookingTransportCompanyInput.value.trim(),
+          number: bookingTransportNumberInput.value.trim(),
+          departureDate: bookingDepartureDateInput.value,
+          departureTime: bookingDepartureTimeInput.value,
+          departurePlace: bookingDeparturePlaceInput.value.trim(),
+          arrivalDate: bookingArrivalDateInput.value,
+          arrivalTime: bookingArrivalTimeInput.value,
+          arrivalPlace: bookingArrivalPlaceInput.value.trim(),
+          passengerName: bookingPassengerNameInput.value.trim(),
+          seat: bookingSeatInput.value.trim()
+        }
+      : {},
     ticketUrl: isTransportLink ? bookingTicketUrlInput.value : "",
     attachments: [...keptBookingAttachments, ...attachments]
   });
