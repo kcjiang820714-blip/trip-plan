@@ -334,6 +334,8 @@ const bookingTransportNumberInput = document.querySelector("#bookingTransportNum
 const bookingDeparturePlaceInput = document.querySelector("#bookingDeparturePlaceInput");
 const bookingArrivalDateInput = document.querySelector("#bookingArrivalDateInput");
 const bookingArrivalTimeInput = document.querySelector("#bookingArrivalTimeInput");
+const bookingArrivalHourInput = document.querySelector("#bookingArrivalHourInput");
+const bookingArrivalMinuteInput = document.querySelector("#bookingArrivalMinuteInput");
 const bookingArrivalPlaceInput = document.querySelector("#bookingArrivalPlaceInput");
 const bookingPassengerNameInput = document.querySelector("#bookingPassengerNameInput");
 const bookingSeatInput = document.querySelector("#bookingSeatInput");
@@ -4775,6 +4777,7 @@ function openBookingDialog(bookingId = null) {
   bookingDeparturePlaceInput.value = booking?.transport?.departurePlace || "";
   bookingArrivalDateInput.value = booking?.transport?.arrivalDate || "";
   bookingArrivalTimeInput.value = booking?.transport?.arrivalTime || "";
+  setTimeSelectPair(bookingArrivalHourInput, bookingArrivalMinuteInput, booking?.transport?.arrivalTime || "");
   bookingArrivalPlaceInput.value = booking?.transport?.arrivalPlace || "";
   bookingPassengerNameInput.value = booking?.transport?.passengerName || "";
   bookingSeatInput.value = booking?.transport?.seat || "";
@@ -5057,6 +5060,7 @@ function populateTimeOptions() {
     [arrivalHourInput, arrivalMinuteInput],
     [bookingHourInput, bookingMinuteInput],
     [bookingCheckoutHourInput, bookingCheckoutMinuteInput],
+    [bookingArrivalHourInput, bookingArrivalMinuteInput],
     [todoHourInput, todoMinuteInput]
   ].forEach(([hourSelect, minuteSelect]) => populateTimeSelectPair(hourSelect, minuteSelect));
 }
@@ -5755,6 +5759,7 @@ timeMinuteInput.addEventListener("change", syncTimeInput);
   [arrivalTimeInput, arrivalHourInput, arrivalMinuteInput],
   [bookingTimeInput, bookingHourInput, bookingMinuteInput],
   [bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput],
+  [bookingArrivalTimeInput, bookingArrivalHourInput, bookingArrivalMinuteInput],
   [todoTimeInput, todoHourInput, todoMinuteInput]
 ].forEach(([hiddenInput, hourSelect, minuteSelect]) => {
   hourSelect?.addEventListener("change", () => syncHiddenTimeInput(hiddenInput, hourSelect, minuteSelect));
@@ -6090,6 +6095,7 @@ bookingForm.addEventListener("submit", async (event) => {
   if (!canManageTrip()) return;
   syncHiddenTimeInput(bookingTimeInput, bookingHourInput, bookingMinuteInput);
   syncHiddenTimeInput(bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput);
+  syncHiddenTimeInput(bookingArrivalTimeInput, bookingArrivalHourInput, bookingArrivalMinuteInput);
 
   const editingIndex = state.editingBookingId
     ? currentTrip().bookings.findIndex((booking) => booking.id === state.editingBookingId)

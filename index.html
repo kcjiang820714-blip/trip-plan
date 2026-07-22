@@ -571,7 +571,11 @@
 
           <label>
             抵達時間
-            <input id="bookingArrivalTimeInput" type="time" />
+            <input id="bookingArrivalTimeInput" type="hidden" />
+            <span class="time-selects">
+              <select id="bookingArrivalHourInput" aria-label="抵達小時"></select>
+              <select id="bookingArrivalMinuteInput" aria-label="抵達分鐘"></select>
+            </span>
           </label>
 
           <label>
