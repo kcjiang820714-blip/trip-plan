@@ -2263,6 +2263,21 @@ h2 {
   min-width: 0;
 }
 
+.transport-ticket-fields,
+.transport-ticket-mode {
+  display: grid;
+  gap: 10px;
+}
+
+.transport-ticket-fields > span {
+  color: var(--brand-dark);
+  font-weight: 950;
+}
+
+.transport-ticket-mode {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .booking-card-header {
   display: grid;
   gap: 5px;

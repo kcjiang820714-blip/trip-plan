@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=100" />
+    <link rel="stylesheet" href="./styles.css?v=101" />
   </head>
   <body>
     <main class="app-shell">
@@ -164,6 +164,7 @@
           </section>
           <nav class="sub-tabs" id="bookingSubTabs" aria-label="預訂分類">
             <button class="sub-tab is-active" type="button" data-booking-group="票券">票券</button>
+            <button class="sub-tab" type="button" data-booking-group="交通">交通</button>
             <button class="sub-tab" type="button" data-booking-group="餐廳">餐廳</button>
             <button class="sub-tab" type="button" data-booking-group="住宿">住宿</button>
           </nav>
@@ -469,6 +470,7 @@
           類型
           <select id="bookingTypeInput" required>
             <option value="機票">機票</option>
+            <option value="交通">交通</option>
             <option value="景點票券">景點票券</option>
             <option value="餐廳">餐廳</option>
             <option value="住宿">住宿</option>
@@ -532,7 +534,25 @@
           <textarea id="bookingNoteInput" rows="3" placeholder="付款狀態、注意事項"></textarea>
         </label>
 
-        <label>
+        <section class="transport-ticket-fields" id="transportTicketFields" hidden>
+          <span>電子票券</span>
+          <div class="transport-ticket-mode" role="radiogroup" aria-label="電子票券提供方式">
+            <label class="checkbox-row">
+              <input type="radio" name="transportTicketMode" value="link" checked />
+              <span>連結網址</span>
+            </label>
+            <label class="checkbox-row">
+              <input type="radio" name="transportTicketMode" value="file" />
+              <span>上傳檔案</span>
+            </label>
+          </div>
+          <label id="transportTicketUrlField">
+            電子票券網址
+            <input id="bookingTicketUrlInput" type="url" inputmode="url" placeholder="https://..." />
+          </label>
+        </section>
+
+        <label id="bookingAttachmentField">
           訂單附件
           <input id="bookingAttachmentInput" type="file" accept="image/*,.pdf" multiple />
         </label>
@@ -721,6 +741,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=108" type="module"></script>
+    <script src="./app.js?v=109" type="module"></script>
   </body>
 </html>

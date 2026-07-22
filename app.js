@@ -327,6 +327,10 @@ const bookingBreakfastInput = document.querySelector("#bookingBreakfastInput");
 const bookingPlaceInput = document.querySelector("#bookingPlaceInput");
 const bookingCodeInput = document.querySelector("#bookingCodeInput");
 const bookingNoteInput = document.querySelector("#bookingNoteInput");
+const transportTicketFields = document.querySelector("#transportTicketFields");
+const transportTicketUrlField = document.querySelector("#transportTicketUrlField");
+const bookingTicketUrlInput = document.querySelector("#bookingTicketUrlInput");
+const bookingAttachmentField = document.querySelector("#bookingAttachmentField");
 const bookingAttachmentInput = document.querySelector("#bookingAttachmentInput");
 const bookingExistingAttachments = document.querySelector("#bookingExistingAttachments");
 const deleteBookingButton = document.querySelector("#deleteBookingButton");
@@ -606,8 +610,21 @@ function normalizeBooking(booking) {
     place: booking.place || "",
     code: booking.code || "",
     note: booking.note || "",
+    ticketUrl: normalizeTicketUrl(booking.ticketUrl),
     attachments: Array.isArray(booking.attachments) ? booking.attachments.map(normalizeAttachment).filter(Boolean) : []
   };
+}
+
+function normalizeTicketUrl(value) {
+  const rawUrl = String(value || "").trim();
+  if (!rawUrl) return "";
+
+  try {
+    const url = new URL(rawUrl);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function normalizeAttachment(attachment) {
@@ -2374,6 +2391,7 @@ function renderQuickTickets() {
 
 function renderQuickTicketCard(booking) {
   const primaryAttachment = getPrimaryTicketAttachment(booking.attachments);
+  const ticketUrl = normalizeTicketUrl(booking.ticketUrl);
   const timeLabel = booking.type === "住宿" ? renderStayQuickTime(booking) : booking.time || "未填時間";
   const offlineLabel = getBookingOfflineLabel(booking);
 
@@ -2391,7 +2409,13 @@ function renderQuickTicketCard(booking) {
       </div>
       <div class="quick-ticket-actions">
         ${
-          primaryAttachment
+          ticketUrl
+            ? `<button
+                class="primary-button quick-ticket-open"
+                type="button"
+                data-open-ticket-url="${escapeHtml(booking.ticketUrl)}"
+              >出示票券</button>`
+            : primaryAttachment
             ? `<button
                 class="primary-button quick-ticket-open"
                 type="button"
@@ -2472,6 +2496,7 @@ function renderStayQuickTime(booking) {
 }
 
 function getBookingOfflineLabel(booking) {
+  if (normalizeTicketUrl(booking.ticketUrl)) return "電子票券需連線開啟";
   if (!booking.attachments?.length) return "尚未加入票券附件";
   if (booking.attachments.some((attachment) => attachment.dataUrl)) return "已保存在此裝置，離線可開";
   return "附件在雲端，離線時可能無法開啟";
@@ -2532,6 +2557,7 @@ function renderBookings() {
             ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
             ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
             <div class="card-actions">
+              ${normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
               ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
             </div>
           </div>
@@ -2667,6 +2693,7 @@ function getAttachmentSource(attachment) {
 }
 
 function getBookingGroup(booking) {
+  if (booking.type === "交通") return "交通";
   if (booking.type === "餐廳") return "餐廳";
   if (booking.type === "住宿") return "住宿";
   return "票券";
@@ -4181,8 +4208,20 @@ function openAttachment(ownerType, ownerId, attachmentId) {
   }
 }
 
+function openTicketUrl(ticketUrl) {
+  const safeUrl = normalizeTicketUrl(ticketUrl);
+  if (!safeUrl) {
+    window.alert("這個電子票券網址無效，請回到預訂資料重新設定。");
+    return;
+  }
+
+  window.open(safeUrl, "_blank", "noopener,noreferrer");
+}
+
 function syncBookingStayFields() {
   const isStay = bookingTypeInput.value === "住宿";
+  const isTransport = bookingTypeInput.value === "交通";
+  const ticketMode = bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value || "link";
   bookingDateLabel.firstChild.textContent = isStay ? "入住日期" : "日期";
   bookingTimeLabel.firstChild.textContent = isStay ? "check-in 時間" : "時間";
   bookingStayFields.hidden = !isStay;
@@ -4190,6 +4229,11 @@ function syncBookingStayFields() {
   bookingCheckoutTimeInput.required = false;
   bookingCheckoutHourInput.required = isStay;
   bookingCheckoutMinuteInput.required = isStay;
+  transportTicketFields.hidden = !isTransport;
+  transportTicketUrlField.hidden = !isTransport || ticketMode !== "link";
+  bookingAttachmentField.hidden = isTransport && ticketMode === "link";
+  bookingTicketUrlInput.required = isTransport && ticketMode === "link";
+  bookingAttachmentInput.required = isTransport && ticketMode === "file" && !bookingExistingAttachments.querySelector("[data-existing-attachment-id]");
 
   if (isStay && bookingDateInput.value && !bookingCheckoutDateInput.value) {
     bookingCheckoutDateInput.value = addDays(bookingDateInput.value, 1);
@@ -4217,6 +4261,9 @@ function openBookingDialog(bookingId = null) {
   bookingPlaceInput.value = booking?.place || "";
   bookingCodeInput.value = booking?.code || "";
   bookingNoteInput.value = booking?.note || "";
+  bookingTicketUrlInput.value = normalizeTicketUrl(booking?.ticketUrl);
+  const ticketMode = booking?.ticketUrl ? "link" : "file";
+  bookingForm.querySelector(`input[name="transportTicketMode"][value="${ticketMode}"]`).checked = true;
   bookingAttachmentInput.value = "";
   renderExistingAttachmentsEditor(bookingExistingAttachments, booking?.attachments || []);
   syncBookingStayFields();
@@ -5134,6 +5181,7 @@ tripWeatherEditor?.addEventListener("keydown", (event) => {
 });
 todoGroupInput.addEventListener("change", syncTodoFields);
 bookingTypeInput.addEventListener("change", syncBookingStayFields);
+bookingForm.querySelectorAll('input[name="transportTicketMode"]').forEach((input) => input.addEventListener("change", syncBookingStayFields));
 bookingDateInput.addEventListener("change", syncBookingStayFields);
 typeInput.addEventListener("change", () => {
   syncFlightFields();
@@ -5302,6 +5350,11 @@ bookingSubTabs.addEventListener("click", (event) => {
 });
 
 bookingList.addEventListener("click", (event) => {
+  const ticketButton = event.target.closest("[data-open-ticket-url]");
+  if (ticketButton) {
+    openTicketUrl(ticketButton.dataset.openTicketUrl);
+    return;
+  }
   const attachmentButton = event.target.closest("[data-open-attachment]");
   if (attachmentButton) {
     openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
@@ -5315,6 +5368,11 @@ bookingList.addEventListener("click", (event) => {
 });
 
 quickTicketPanel?.addEventListener("click", (event) => {
+  const ticketButton = event.target.closest("[data-open-ticket-url]");
+  if (ticketButton) {
+    openTicketUrl(ticketButton.dataset.openTicketUrl);
+    return;
+  }
   const attachmentButton = event.target.closest("[data-open-attachment]");
   if (!attachmentButton) return;
   openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
@@ -5464,6 +5522,12 @@ bookingForm.addEventListener("submit", async (event) => {
   syncHiddenTimeInput(bookingTimeInput, bookingHourInput, bookingMinuteInput);
   syncHiddenTimeInput(bookingCheckoutTimeInput, bookingCheckoutHourInput, bookingCheckoutMinuteInput);
 
+  const isTransportLink = bookingTypeInput.value === "交通" && bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value === "link";
+  if (isTransportLink && !normalizeTicketUrl(bookingTicketUrlInput.value)) {
+    alert("電子票券網址只支援 http 或 https 開頭的完整網址。");
+    return;
+  }
+
   let attachments = [];
   try {
     attachments = await readBookingAttachments();
@@ -5490,6 +5554,7 @@ bookingForm.addEventListener("submit", async (event) => {
     place: bookingPlaceInput.value.trim(),
     code: bookingCodeInput.value.trim(),
     note: bookingNoteInput.value.trim(),
+    ticketUrl: isTransportLink ? bookingTicketUrlInput.value : "",
     attachments: [...keptBookingAttachments, ...attachments]
   });
 
