@@ -613,7 +613,8 @@ function normalizeExchangeRates(rates) {
 }
 
 function normalizeBooking(booking) {
-  const legacyPersonalTicket = isPersonalTicketBooking(booking.type) && (
+  const usesSharedAttachments = Boolean(booking.usesSharedAttachments);
+  const legacyPersonalTicket = !usesSharedAttachments && isPersonalTicketBooking(booking.type) && (
     normalizeTicketUrl(booking.ticketUrl) || (booking.attachments || []).some((attachment) => getAttachmentSource(attachment))
   )
     ? normalizePersonalTicket({
@@ -653,6 +654,7 @@ function normalizeBooking(booking) {
     ticketHolderUserId: booking.ticketHolderUserId || "",
     ticketHolderName: booking.ticketHolderName || "",
     ticketUrl: normalizeTicketUrl(booking.ticketUrl),
+    usesSharedAttachments,
     personalTickets: Array.isArray(booking.personalTickets) && booking.personalTickets.length
       ? booking.personalTickets.map(normalizePersonalTicket).filter(hasPersonalTicketContent)
       : legacyPersonalTicket
@@ -797,6 +799,8 @@ function normalizeDay(day, index) {
 function normalizeItem(item) {
   return {
     id: item.id || createId(),
+    sourceBookingId: item.sourceBookingId || "",
+    bookingSourceSummary: item.bookingSourceSummary || "",
     time: item.time || "",
     place: item.place || "",
     type: item.type || "",
@@ -815,6 +819,123 @@ function normalizeItem(item) {
     transportMode: item.transportMode || "",
     transportSegments: Array.isArray(item.transportSegments) ? item.transportSegments.map(normalizeTransportSegment) : []
   };
+}
+
+function isBookingItineraryEligible(booking) {
+  return ["交通", "餐廳", "景點票券", "活動"].includes(booking?.type);
+}
+
+function mapBookingToItineraryItem(booking) {
+  const isTransport = booking?.type === "交通";
+  const transport = booking?.transport || {};
+  const departurePlace = transport.departurePlace || booking?.place || "";
+  const arrivalPlace = transport.arrivalPlace || "";
+  const route = [departurePlace, arrivalPlace].filter(Boolean).join(" → ");
+  const firstTransportSegment = isTransport
+    ? {
+        mode: transport.mode || "",
+        company: transport.company || "",
+        departureStation: departurePlace,
+        routeName: "",
+        routeNumber: "",
+        departureTime: transport.departureTime || booking?.time || "",
+        trainNumber: transport.number || "",
+        arrivalStation: arrivalPlace,
+        arrivalTime: transport.arrivalTime || ""
+      }
+    : null;
+  const type = {
+    "交通": "交通",
+    "餐廳": "餐廳",
+    "景點票券": "景點",
+    "活動": "其他"
+  }[booking?.type] || "其他";
+  const summaryDetails = isTransport
+    ? [route, [transport.mode, transport.company, transport.number].filter(Boolean).join(" · ")]
+    : [booking?.place || ""];
+  if (booking?.code) summaryDetails.push(`代碼 ${booking.code}`);
+  if (booking?.note) summaryDetails.push(booking.note);
+  const summary = [booking?.type || "預訂", booking?.name || "未命名預訂", ...summaryDetails]
+    .filter(Boolean)
+    .join(" · ");
+
+  return normalizeItem({
+    sourceBookingId: booking?.id || "",
+    bookingSourceSummary: summary,
+    time: isTransport ? firstTransportSegment.departureTime : booking?.time || "",
+    place: isTransport ? route || booking?.name || "" : booking?.name || booking?.place || "",
+    type,
+    content: "",
+    attractionIntro: "",
+    note: "",
+    airline: "",
+    flightCode: "",
+    departureTime: "",
+    departureAirport: "",
+    departureTerminal: "",
+    arrivalTime: "",
+    arrivalAirport: "",
+    arrivalTerminal: "",
+    attachments: [],
+    transportMode: isTransport ? transport.mode || "" : "",
+    transportSegments: firstTransportSegment ? [firstTransportSegment] : []
+  });
+}
+
+function syncBookingToItinerary(trip, booking) {
+  if (!trip || !isBookingItineraryEligible(booking)) return null;
+
+  const bookingDate = booking?.type === "交通" ? booking.transport?.departureDate || booking.date : booking?.date;
+  let targetDay = (trip.days || []).find((day) => day.date === bookingDate);
+  if (!targetDay && trip.startDate && /^\d{4}-\d{2}-\d{2}$/.test(bookingDate || "")) {
+    const [startYear, startMonth, startDay] = trip.startDate.split("-").map(Number);
+    const [bookingYear, bookingMonth, bookingDay] = bookingDate.split("-").map(Number);
+    const offset = Math.round((Date.UTC(bookingYear, bookingMonth - 1, bookingDay) - Date.UTC(startYear, startMonth - 1, startDay)) / 86400000);
+    if (offset >= 0 && offset < (trip.days || []).length) targetDay = trip.days[offset];
+  }
+  if (!targetDay) return { outOfRange: true };
+
+  let existingItem = null;
+  let existingDay = null;
+  for (const day of trip.days || []) {
+    const match = (day.items || []).find((item) => item.sourceBookingId === booking.id);
+    if (match) {
+      existingItem = match;
+      existingDay = day;
+      break;
+    }
+  }
+
+  const mappedItem = mapBookingToItineraryItem(booking);
+  const syncedItem = normalizeItem({
+    ...mappedItem,
+    id: existingItem?.id || createId(),
+    content: existingItem?.content || "",
+    attractionIntro: existingItem?.attractionIntro || "",
+    note: existingItem?.note || "",
+    attachments: existingItem?.attachments || []
+  });
+
+  if (existingDay) {
+    existingDay.items = existingDay.items.filter((item) => item.id !== existingItem.id);
+  }
+  targetDay.items.push(syncedItem);
+  targetDay.items.sort((a, b) => a.time.localeCompare(b.time));
+  return { item: syncedItem, outOfRange: false };
+}
+
+function unlinkBookingFromItinerary(trip, bookingId) {
+  if (!trip || !bookingId) return;
+  for (const day of trip.days || []) {
+    day.items = (day.items || []).map((item) => {
+      if (item.sourceBookingId !== bookingId) return item;
+      return normalizeItem({
+        ...item,
+        sourceBookingId: "",
+        bookingSourceSummary: ""
+      });
+    });
+  }
 }
 
 function normalizeTransportSegment(segment) {
@@ -1633,7 +1754,7 @@ function canViewBookingTicket(booking, trip) {
   if (booking.type !== "交通") return true;
   const hasElectronicTicket = Boolean(
     normalizeTicketUrl(booking.ticketUrl) ||
-    (booking.attachments || []).some((attachment) => getAttachmentSource(attachment)) ||
+    (!booking.usesSharedAttachments && (booking.attachments || []).some((attachment) => getAttachmentSource(attachment))) ||
     (booking.personalTickets || []).some(hasPersonalTicketContent)
   );
   if (!hasElectronicTicket) return true;
@@ -2049,6 +2170,9 @@ function renderTrip() {
         const isExpanded = state.expandedItemId === item.id;
         const detailsId = `itemDetails${item.id}`;
         const visualType = transportVisualType(item);
+        const sourceBooking = item.sourceBookingId
+          ? trip.bookings.find((booking) => booking.id === item.sourceBookingId)
+          : null;
 
         return `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
@@ -2073,6 +2197,8 @@ function renderTrip() {
             ${renderTransportInfo(item)}
             ${renderAttractionIntro(item)}
             ${renderAttachmentGallery(item.attachments, "item", item.id)}
+            ${item.bookingSourceSummary ? `<p class="booking-source-summary">${escapeHtml(item.bookingSourceSummary)}</p>` : ""}
+            ${renderBookingSourceAttachments(item, sourceBooking)}
             ${item.content ? `<p class="item-detail-content">${escapeHtml(item.content)}</p>` : ""}
             ${item.note ? `<p class="item-detail-note">${escapeHtml(item.note)}</p>` : ""}
             <div class="card-actions">
@@ -2830,7 +2956,7 @@ function renderBookings() {
             `).join("")}
             ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
-            ${!isPersonalTicketBooking(booking.type) ? renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id) : ""}
+            ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
             <div class="card-actions">
               ${tickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
               ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
@@ -3004,6 +3130,17 @@ function renderAttachmentGallery(attachments, ownerType, ownerId, excludedAttach
           : ""
       }
     </div>
+  `;
+}
+
+function renderBookingSourceAttachments(item, booking) {
+  if (!item?.sourceBookingId || !booking?.attachments?.length) return "";
+
+  return `
+    <section class="booking-source-attachments">
+      <p>預訂共同圖片與附件</p>
+      ${renderAttachmentGallery(booking.attachments, "booking", booking.id)}
+    </section>
   `;
 }
 
@@ -4567,7 +4704,7 @@ function syncBookingStayFields() {
   transportTicketFields.hidden = !isPersonalTicketBooking;
   bookingTicketHolderField.hidden = true;
   transportTicketUrlField.hidden = true;
-  bookingAttachmentField.hidden = isPersonalTicketBooking;
+  bookingAttachmentField.hidden = false;
   bookingTicketUrlInput.required = false;
   bookingAttachmentInput.required = false;
 
@@ -5918,13 +6055,13 @@ bookingForm.addEventListener("submit", async (event) => {
     : -1;
   const existingBooking = editingIndex >= 0 ? currentTrip().bookings[editingIndex] : null;
   const isPersonalTicketBooking = ["交通", "景點票券", "活動"].includes(bookingTypeInput.value);
-  const keptBookingAttachments = !isPersonalTicketBooking && existingBooking
+  const keptBookingAttachments = existingBooking
     ? getKeptAttachments(bookingExistingAttachments, existingBooking.attachments || [])
     : [];
   let attachments = [];
   let personalTickets = [];
   try {
-    attachments = isPersonalTicketBooking ? [] : await readBookingAttachments(false);
+    attachments = await readBookingAttachments(isPersonalTicketBooking);
     personalTickets = isPersonalTicketBooking ? await collectPersonalTickets(existingBooking?.personalTickets || []) : [];
   } catch (error) {
     alert(error.message);
@@ -5965,6 +6102,7 @@ bookingForm.addEventListener("submit", async (event) => {
     ticketHolderUserId: "",
     ticketHolderName: "",
     ticketUrl: "",
+    usesSharedAttachments: isPersonalTicketBooking,
     personalTickets: isPersonalTicketBooking ? personalTickets : [],
     attachments: [...keptBookingAttachments, ...attachments]
   });
@@ -5976,25 +6114,35 @@ bookingForm.addEventListener("submit", async (event) => {
   }
 
   let bookingLocalSaveStarted = false;
+  let syncResult = null;
+  const daysBeforeBookingSync = currentTrip().days.map((day) => ({ ...day, items: [...day.items] }));
   try {
     await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "booking", booking.id, booking.attachments);
     for (const ticket of booking.personalTickets) {
       await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "personal-ticket", ticket.id, ticket.attachments);
     }
     bookingLocalSaveStarted = true;
+    if (isBookingItineraryEligible(booking)) {
+      syncResult = syncBookingToItinerary(currentTrip(), booking);
+    } else if (existingBooking) {
+      unlinkBookingFromItinerary(currentTrip(), booking.id);
+    }
     saveLibrary();
     deleteRemovedAttachmentsFromCloud([...removedBookingAttachments, ...removedPersonalTicketAttachments]);
   } catch (error) {
     if (existingBooking) currentTrip().bookings[editingIndex] = existingBooking;
     else currentTrip().bookings.pop();
+    currentTrip().days = daysBeforeBookingSync;
     alert(bookingLocalSaveStarted ? "附件容量太大，無法儲存到此裝置。請改用較小的檔案。" : formatAttachmentUploadError(error));
     return;
   }
 
   state.editingBookingId = null;
   closeModal(bookingDialog);
-  renderBookings();
-  renderQuickTickets();
+  render();
+  if (syncResult?.outOfRange) {
+    alert("這筆預訂的日期不在目前旅程範圍內，因此沒有自動建立行程卡。請確認日期後再試一次。");
+  }
 });
 
 todoForm.addEventListener("submit", (event) => {
@@ -6306,12 +6454,12 @@ deleteBookingButton.addEventListener("click", () => {
   const confirmed = window.confirm(`確定刪除「${booking?.name || "這筆預訂"}」？這只會刪除這台裝置瀏覽器裡的資料。`);
   if (!confirmed) return;
 
+  unlinkBookingFromItinerary(currentTrip(), state.editingBookingId);
   currentTrip().bookings = currentTrip().bookings.filter((item) => item.id !== state.editingBookingId);
   state.editingBookingId = null;
   saveLibrary();
   closeModal(bookingDialog);
-  renderBookings();
-  renderQuickTickets();
+  render();
 });
 
 deleteTodoButton.addEventListener("click", () => {

@@ -3301,6 +3301,28 @@ h2 {
   margin-top: 12px;
 }
 
+.booking-source-summary,
+.booking-source-attachments {
+  margin: 12px 0 0;
+  border-left: 3px solid rgba(15, 107, 95, 0.34);
+  padding-left: 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.booking-source-attachments > p {
+  margin: 0;
+  color: var(--brand-dark);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.booking-source-attachments .attachment-gallery {
+  margin-top: 8px;
+}
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
