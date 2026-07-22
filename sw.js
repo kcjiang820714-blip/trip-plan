@@ -1,9 +1,9 @@
-const CACHE_NAME = "trip-notebook-v127";
+const CACHE_NAME = "trip-notebook-v129";
 const APP_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=99",
-  "./app.js?v=107",
+  "./styles.css?v=101",
+  "./app.js?v=109",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-192.png",
@@ -19,7 +19,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("trip-notebook-") && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
