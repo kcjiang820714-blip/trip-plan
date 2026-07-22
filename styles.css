@@ -2275,6 +2275,15 @@ h2 {
   font-weight: 950;
 }
 
+.ticket-holder-hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .transport-ticket-mode {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

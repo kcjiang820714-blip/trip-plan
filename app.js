@@ -340,6 +340,9 @@ const bookingArrivalPlaceInput = document.querySelector("#bookingArrivalPlaceInp
 const bookingPassengerNameInput = document.querySelector("#bookingPassengerNameInput");
 const bookingSeatInput = document.querySelector("#bookingSeatInput");
 const transportTicketFields = document.querySelector("#transportTicketFields");
+const bookingTicketHolderField = document.querySelector("#bookingTicketHolderField");
+const bookingTicketHolderInput = document.querySelector("#bookingTicketHolderInput");
+const bookingTicketHolderHint = document.querySelector("#bookingTicketHolderHint");
 const transportTicketUrlField = document.querySelector("#transportTicketUrlField");
 const bookingTicketUrlInput = document.querySelector("#bookingTicketUrlInput");
 const bookingAttachmentField = document.querySelector("#bookingAttachmentField");
@@ -635,6 +638,8 @@ function normalizeBooking(booking) {
       passengerName: booking.transport?.passengerName || "",
       seat: booking.transport?.seat || ""
     },
+    ticketHolderUserId: booking.ticketHolderUserId || "",
+    ticketHolderName: booking.ticketHolderName || "",
     ticketUrl: normalizeTicketUrl(booking.ticketUrl),
     attachments: Array.isArray(booking.attachments) ? booking.attachments.map(normalizeAttachment).filter(Boolean) : []
   };
@@ -1565,8 +1570,79 @@ function currentDay() {
 
 function canManageTrip(trip = currentTrip()) {
   if (isReadonly) return false;
+  if (trip?.ownerId && !state.cloudUser) return false;
+  if (trip?.role && !state.cloudUser) return false;
   if (!state.cloudUser) return true;
   return !trip?.role || trip.role === "owner";
+}
+
+function canViewBookingTicket(booking, trip) {
+  if (booking.type !== "交通") return true;
+  const hasElectronicTicket = Boolean(normalizeTicketUrl(booking.ticketUrl) || (booking.attachments || []).some((attachment) => getAttachmentSource(attachment)));
+  if (!hasElectronicTicket) return true;
+  if (trip?.ownerId && !state.cloudUser) return false;
+  if (trip?.role && !state.cloudUser) return false;
+  if (canManageTrip(trip)) return true;
+  return Boolean(state.cloudUser && booking.ticketHolderUserId === state.cloudUser.id);
+}
+
+function ticketHolderOwnerName(trip) {
+  if (trip.ownerId && trip.ownerId === state.cloudUser?.id) {
+    return String(state.cloudUser.user_metadata?.display_name || state.cloudUser.user_metadata?.full_name || state.cloudUser.email || "旅程建立者").trim();
+  }
+  return "旅程建立者";
+}
+
+function getTicketHolderCandidates(trip, sharedMembers = normalizeSharedMembers(trip?.sharedMembers)) {
+  const ownerId = trip?.ownerId || state.cloudUser?.id || "";
+  const owner = ownerId
+    ? [{ userId: ownerId, displayName: ticketHolderOwnerName(trip), email: state.cloudUser?.id === ownerId ? state.cloudUser?.email || "" : "" }]
+    : [];
+  const members = sharedMembers
+    .filter((member) => member.userId && member.userId !== ownerId)
+    .map((member) => ({ userId: member.userId, displayName: sharedMemberDisplayName(member), email: member.email || "" }));
+  return [...owner, ...members];
+}
+
+function renderTicketHolderOptions(trip, selectedUserId = "") {
+  const ownerId = trip.ownerId || state.cloudUser?.id || "";
+  const sharedMembers = normalizeSharedMembers(trip.sharedMembers);
+  const members = sharedMembers
+    .filter((member) => member.userId && member.userId !== ownerId)
+    .map((member) => ({ userId: member.userId, displayName: sharedMemberDisplayName(member), email: member.email || "" }));
+  const owner = ownerId
+    ? { userId: ownerId, displayName: ticketHolderOwnerName(trip), email: state.cloudUser?.id === ownerId ? state.cloudUser?.email || "" : "" }
+    : null;
+  const candidates = [...(owner ? [owner] : []), ...members];
+  const validSelectedUserId = candidates.some((candidate) => candidate.userId === selectedUserId) ? selectedUserId : "";
+
+  if (!bookingTicketHolderInput) return candidates;
+
+  if (!state.cloudUser) {
+    bookingTicketHolderInput.innerHTML = `<option value="">旅程建立者</option>`;
+    bookingTicketHolderInput.disabled = true;
+    if (bookingTicketHolderHint) bookingTicketHolderHint.textContent = "尚未登入雲端；目前票券會保留給旅程建立者使用。";
+    return candidates;
+  }
+
+  bookingTicketHolderInput.disabled = false;
+  bookingTicketHolderInput.innerHTML = [
+    `<option value="" ${validSelectedUserId ? "" : "selected"}>尚未指定（僅旅程建立者可見）</option>`,
+    ...candidates.map((candidate) => {
+      const label = [candidate.displayName, candidate.email].filter(Boolean).join(" · ");
+      return `<option value="${escapeHtml(candidate.userId)}" ${candidate.userId === validSelectedUserId ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+  ].join("");
+  if (bookingTicketHolderHint) {
+    bookingTicketHolderHint.textContent = candidates.length > 1
+      ? "只有旅程建立者與指定旅伴會在票券介面看到這張票。"
+      : "尚無受邀旅伴；目前只能指定給旅程建立者。";
+  }
+  return candidates;
+}
+
+function getSelectedTicketHolder(trip, userId) {
+  return getTicketHolderCandidates(trip).find((candidate) => candidate.userId === userId) || null;
 }
 
 function canUseCollaborativeTools(trip = currentTrip()) {
@@ -2389,6 +2465,7 @@ function renderQuickTickets() {
   const trip = currentTrip();
   const dayDate = getActiveDayDateValue(trip);
   const bookings = getBookingsForDay(trip, dayDate)
+    .filter((booking) => canViewBookingTicket(booking, trip))
     .sort((a, b) => `${getBookingScheduleTime(a) || "99:99"} ${a.name}`.localeCompare(`${getBookingScheduleTime(b) || "99:99"} ${b.name}`));
 
   if (!quickTicketPanel) return;
@@ -2571,7 +2648,7 @@ function renderTripSectionTabs() {
 
 function renderBookings() {
   const trip = currentTrip();
-  const bookings = trip.bookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
+  const bookings = trip.bookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup && canViewBookingTicket(booking, trip));
   bookingSectionTitle.textContent = state.activeBookingGroup;
   bookingSubTabs.querySelectorAll("[data-booking-group]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.bookingGroup === state.activeBookingGroup);
@@ -2596,6 +2673,7 @@ function renderBookings() {
               <h3>${escapeHtml(booking.name)}</h3>
             </header>
             ${renderBookingMeta(booking)}
+            ${canManageTrip(trip) && booking.type === "交通" ? `<p class="booking-card-line ticket-holder-label"><span>持有人</span>${escapeHtml(booking.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
             ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
             ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
             ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
@@ -4325,6 +4403,7 @@ function syncBookingStayFields() {
   bookingTransportFields.hidden = !isTransport;
   bookingTransportModeInput.required = isTransport;
   transportTicketFields.hidden = !isTransport;
+  bookingTicketHolderField.hidden = !isTransport;
   transportTicketUrlField.hidden = !isTransport || ticketMode !== "link";
   bookingAttachmentField.hidden = isTransport && ticketMode === "link";
   bookingTicketUrlInput.required = isTransport && ticketMode === "link";
@@ -4367,6 +4446,8 @@ function openBookingDialog(bookingId = null) {
   bookingArrivalPlaceInput.value = booking?.transport?.arrivalPlace || "";
   bookingPassengerNameInput.value = booking?.transport?.passengerName || "";
   bookingSeatInput.value = booking?.transport?.seat || "";
+  const defaultTicketHolderUserId = booking?.ticketHolderUserId || (!booking ? currentTrip().ownerId || state.cloudUser?.id || "" : "");
+  renderTicketHolderOptions(currentTrip(), defaultTicketHolderUserId);
   bookingTicketUrlInput.value = normalizeTicketUrl(booking?.ticketUrl);
   const ticketMode = booking?.ticketUrl ? "link" : "file";
   bookingForm.querySelector(`input[name="transportTicketMode"][value="${ticketMode}"]`).checked = true;
@@ -5648,6 +5729,9 @@ bookingForm.addEventListener("submit", async (event) => {
     ? currentTrip().bookings.findIndex((booking) => booking.id === state.editingBookingId)
     : -1;
   const existingBooking = editingIndex >= 0 ? currentTrip().bookings[editingIndex] : null;
+  const selectedTicketHolder = bookingTypeInput.value === "交通"
+    ? getSelectedTicketHolder(currentTrip(), bookingTicketHolderInput.value)
+    : null;
   const keptBookingAttachments = existingBooking ? getKeptAttachments(bookingExistingAttachments, existingBooking.attachments || []) : [];
   const removedBookingAttachments = existingBooking ? getRemovedAttachments(existingBooking.attachments || [], keptBookingAttachments) : [];
   const booking = normalizeBooking({
@@ -5677,6 +5761,8 @@ bookingForm.addEventListener("submit", async (event) => {
           seat: bookingSeatInput.value.trim()
         }
       : {},
+    ticketHolderUserId: selectedTicketHolder?.userId || "",
+    ticketHolderName: selectedTicketHolder?.displayName || "",
     ticketUrl: isTransportLink ? bookingTicketUrlInput.value : "",
     attachments: [...keptBookingAttachments, ...attachments]
   });
