@@ -331,8 +331,6 @@ const bookingTransportFields = document.querySelector("#bookingTransportFields")
 const bookingTransportModeInput = document.querySelector("#bookingTransportModeInput");
 const bookingTransportCompanyInput = document.querySelector("#bookingTransportCompanyInput");
 const bookingTransportNumberInput = document.querySelector("#bookingTransportNumberInput");
-const bookingDepartureDateInput = document.querySelector("#bookingDepartureDateInput");
-const bookingDepartureTimeInput = document.querySelector("#bookingDepartureTimeInput");
 const bookingDeparturePlaceInput = document.querySelector("#bookingDeparturePlaceInput");
 const bookingArrivalDateInput = document.querySelector("#bookingArrivalDateInput");
 const bookingArrivalTimeInput = document.querySelector("#bookingArrivalTimeInput");
@@ -4393,8 +4391,8 @@ function syncBookingStayFields() {
   const isStay = bookingTypeInput.value === "住宿";
   const isTransport = bookingTypeInput.value === "交通";
   const ticketMode = bookingForm.querySelector('input[name="transportTicketMode"]:checked')?.value || "link";
-  bookingDateLabel.firstChild.textContent = isStay ? "入住日期" : "日期";
-  bookingTimeLabel.firstChild.textContent = isStay ? "check-in 時間" : "時間";
+  bookingDateLabel.firstChild.textContent = isStay ? "入住日期" : isTransport ? "出發日期" : "日期";
+  bookingTimeLabel.firstChild.textContent = isStay ? "check-in 時間" : isTransport ? "出發時間" : "時間";
   bookingStayFields.hidden = !isStay;
   bookingCheckoutDateInput.required = isStay;
   bookingCheckoutTimeInput.required = false;
@@ -4402,6 +4400,7 @@ function syncBookingStayFields() {
   bookingCheckoutMinuteInput.required = isStay;
   bookingTransportFields.hidden = !isTransport;
   bookingTransportModeInput.required = isTransport;
+  bookingPlaceInput.closest("label").hidden = isTransport;
   transportTicketFields.hidden = !isTransport;
   bookingTicketHolderField.hidden = !isTransport;
   transportTicketUrlField.hidden = !isTransport || ticketMode !== "link";
@@ -4425,9 +4424,11 @@ function openBookingDialog(bookingId = null) {
   deleteBookingButton.hidden = !booking;
   bookingTypeInput.value = booking?.type || (state.activeBookingGroup === "交通" ? "交通" : state.activeBookingGroup === "餐廳" ? "餐廳" : state.activeBookingGroup === "住宿" ? "住宿" : "景點票券");
   bookingNameInput.value = booking?.name || "";
-  bookingDateInput.value = booking?.date || currentTrip().startDate;
-  bookingTimeInput.value = booking?.time || "";
-  setTimeSelectPair(bookingHourInput, bookingMinuteInput, booking?.time || "");
+  const bookingDate = booking?.date || booking?.transport?.departureDate || currentTrip().startDate;
+  const bookingTime = booking?.time || booking?.transport?.departureTime || "";
+  bookingDateInput.value = bookingDate;
+  bookingTimeInput.value = bookingTime;
+  setTimeSelectPair(bookingHourInput, bookingMinuteInput, bookingTime);
   bookingCheckoutDateInput.value = booking?.checkoutDate || addDays(bookingDateInput.value, 1);
   bookingCheckoutTimeInput.value = booking?.checkoutTime || "";
   setTimeSelectPair(bookingCheckoutHourInput, bookingCheckoutMinuteInput, booking?.checkoutTime || "");
@@ -4438,8 +4439,6 @@ function openBookingDialog(bookingId = null) {
   bookingTransportModeInput.value = booking?.transport?.mode || "";
   bookingTransportCompanyInput.value = booking?.transport?.company || "";
   bookingTransportNumberInput.value = booking?.transport?.number || "";
-  bookingDepartureDateInput.value = booking?.transport?.departureDate || "";
-  bookingDepartureTimeInput.value = booking?.transport?.departureTime || "";
   bookingDeparturePlaceInput.value = booking?.transport?.departurePlace || "";
   bookingArrivalDateInput.value = booking?.transport?.arrivalDate || "";
   bookingArrivalTimeInput.value = booking?.transport?.arrivalTime || "";
@@ -4504,8 +4503,11 @@ function openItemDialog(index = null) {
   arrivalTerminalInput.value = item.arrivalTerminal || "";
   transportModeInput.value = item.transportMode || item.transportSegments[0]?.mode || "火車";
   const transportSegmentList = item.transportSegments.length
-    ? item.transportSegments
+    ? item.transportSegments.map((segment) => ({ ...segment }))
     : [{ ...createBlankTransportSegment(transportModeInput.value), departureStation: item.type === "交通" ? item.place : "" }];
+  if (item.type === "交通" && !transportSegmentList[0].departureTime && item.time) {
+    transportSegmentList[0].departureTime = item.time;
+  }
   renderTransportSegments(transportSegmentList);
   syncFlightFields();
   syncTransportFields();
@@ -5665,6 +5667,7 @@ itemForm.addEventListener("submit", async (event) => {
   };
 
   if (item.type === "交通") {
+    item.time = item.transportSegments[0]?.departureTime || "";
     item.place = getTransportTitle(item.transportSegments) || item.place;
   }
 
@@ -5751,8 +5754,8 @@ bookingForm.addEventListener("submit", async (event) => {
           mode: bookingTransportModeInput.value,
           company: bookingTransportCompanyInput.value.trim(),
           number: bookingTransportNumberInput.value.trim(),
-          departureDate: bookingDepartureDateInput.value,
-          departureTime: bookingDepartureTimeInput.value,
+          departureDate: bookingDateInput.value,
+          departureTime: bookingTimeInput.value,
           departurePlace: bookingDeparturePlaceInput.value.trim(),
           arrivalDate: bookingArrivalDateInput.value,
           arrivalTime: bookingArrivalTimeInput.value,
@@ -6051,6 +6054,9 @@ function syncFlightFields() {
 function syncTransportFields() {
   const isTransport = typeInput.value === "交通";
   transportFields.hidden = !isTransport;
+  timeInput.closest("label").hidden = isTransport;
+  timeHourInput.required = !isTransport;
+  timeMinuteInput.required = !isTransport;
   placeInput.readOnly = isTransport;
   placeInput.required = !isTransport;
 
