@@ -680,6 +680,8 @@ function isPersonalTicketBooking(type) {
 function normalizePersonalTicket(ticket = {}) {
   return {
     id: ticket.id || createId(),
+    // 缺少 visibility 的舊資料一律是個人票券，避免未指定持有人被意外公開。
+    visibility: ticket.visibility === "shared" ? "shared" : "personal",
     ticketHolderUserId: ticket.ticketHolderUserId || ticket.holderUserId || "",
     ticketHolderName: ticket.ticketHolderName || ticket.holderName || "",
     ticketUrl: normalizeTicketUrl(ticket.ticketUrl),
@@ -1771,6 +1773,7 @@ function canViewPersonalTicket(ticket, booking, trip) {
   if (trip?.ownerId && !state.cloudUser) return false;
   if (trip?.role && !state.cloudUser) return false;
   if (canManageTrip(trip)) return true;
+  if (ticket.visibility === "shared") return true;
   return Boolean(state.cloudUser && ticket.ticketHolderUserId === state.cloudUser.id);
 }
 
@@ -1834,7 +1837,7 @@ function getSelectedTicketHolder(trip, userId) {
 }
 
 function createBlankPersonalTicket() {
-  return { id: createId(), ticketHolderUserId: "", ticketHolderName: "", ticketUrl: "", attachments: [] };
+  return { id: createId(), visibility: "personal", ticketHolderUserId: "", ticketHolderName: "", ticketUrl: "", attachments: [] };
 }
 
 function renderPersonalTicketEditors(tickets = []) {
@@ -1845,10 +1848,15 @@ function renderPersonalTicketEditors(tickets = []) {
 }
 
 function renderPersonalTicketEditor(ticket, index, ticketCount, candidates = getTicketHolderCandidates(currentTrip())) {
+  const isShared = ticket.visibility === "shared";
   return `
     <article class="personal-ticket-editor" data-personal-ticket-editor data-personal-ticket-id="${escapeHtml(ticket.id)}">
       <header><strong>第 ${index + 1} 張票券</strong>${ticketCount > 1 ? `<button class="text-button danger-text" type="button" data-remove-personal-ticket>移除</button>` : ""}</header>
-      <label>票券持有人
+      <div class="transport-ticket-mode personal-ticket-visibility" role="radiogroup" aria-label="票券使用範圍">
+        <label class="checkbox-row"><input class="personal-ticket-visibility" type="radio" name="personalTicketVisibility-${escapeHtml(ticket.id)}" value="personal" ${isShared ? "" : "checked"} /><span>個人票券</span></label>
+        <label class="checkbox-row"><input class="personal-ticket-visibility" type="radio" name="personalTicketVisibility-${escapeHtml(ticket.id)}" value="shared" ${isShared ? "checked" : ""} /><span>共同票券（所有旅伴可出示）</span></label>
+      </div>
+      <label class="personal-ticket-holder-field" ${isShared ? "hidden" : ""}>票券持有人
         <select class="personal-ticket-holder" ${state.cloudUser ? "" : "disabled"}>
           <option value="">尚未指定（僅旅程建立者可見）</option>
           ${candidates.map((candidate) => `<option value="${escapeHtml(candidate.userId)}" ${candidate.userId === ticket.ticketHolderUserId ? "selected" : ""}>${escapeHtml([candidate.displayName, candidate.email].filter(Boolean).join(" · "))}</option>`).join("")}
@@ -1871,16 +1879,20 @@ function renderPersonalTicketEditor(ticket, index, ticketCount, candidates = get
 
 function syncPersonalTicketEditor(editor) {
   const mode = editor.querySelector(".personal-ticket-mode:checked")?.value || "link";
+  const visibility = editor.querySelector(".personal-ticket-visibility:checked")?.value || "personal";
   editor.querySelector(".personal-ticket-url-field").hidden = mode !== "link";
   editor.querySelector(".personal-ticket-file-field").hidden = mode !== "file";
+  editor.querySelector(".personal-ticket-holder-field").hidden = visibility === "shared";
 }
 
 async function collectPersonalTickets(existingTickets = []) {
   const editors = Array.from(personalTicketEditors.querySelectorAll("[data-personal-ticket-editor]"));
   const tickets = await Promise.all(editors.map(async (editor) => {
-    const existingTicket = existingTickets.find((ticket) => ticket.id === editor.dataset.personalTicketId) || createBlankPersonalTicket();
+    const persistedTicket = existingTickets.find((ticket) => ticket.id === editor.dataset.personalTicketId);
+    const existingTicket = persistedTicket || createBlankPersonalTicket();
     const holderInput = editor.querySelector(".personal-ticket-holder");
     const selectedTicketHolder = getSelectedTicketHolder(currentTrip(), holderInput.value);
+    const visibility = editor.querySelector(".personal-ticket-visibility:checked")?.value === "shared" ? "shared" : "personal";
     const mode = editor.querySelector(".personal-ticket-mode:checked")?.value || "link";
     const ticketUrlInput = editor.querySelector(".personal-ticket-url");
     const fileInput = editor.querySelector(".personal-ticket-file");
@@ -1891,7 +1903,18 @@ async function collectPersonalTickets(existingTickets = []) {
     const files = mode === "file" ? Array.from(fileInput.files || []) : [];
     files.forEach((file) => validateTransportTicketFile(file));
     const attachments = mode === "file" ? [...keptAttachments, ...await Promise.all(files.map(readBookingAttachment))] : [];
-    return normalizePersonalTicket({ id: existingTicket.id, ticketHolderUserId: selectedTicketHolder?.userId || "", ticketHolderName: selectedTicketHolder?.displayName || "", ticketUrl, attachments });
+    const ticket = normalizePersonalTicket({
+      id: existingTicket.id,
+      visibility,
+      ticketHolderUserId: visibility === "personal" ? selectedTicketHolder?.userId || "" : "",
+      ticketHolderName: visibility === "personal" ? selectedTicketHolder?.displayName || "" : "",
+      ticketUrl,
+      attachments
+    });
+    if (visibility === "personal" && hasPersonalTicketContent(ticket) && !ticket.ticketHolderUserId && (!persistedTicket || persistedTicket.visibility === "shared")) {
+      throw new Error("個人票券請先選擇票券持有人；若要讓所有旅伴使用，請改選共同票券。");
+    }
+    return ticket;
   }));
   return tickets.filter(hasPersonalTicketContent);
 }
@@ -2780,7 +2803,7 @@ function renderQuickTicketCard(booking) {
         ${
           tickets.map((ticket) => {
             const ticketAttachment = getPrimaryTicketAttachment(ticket.attachments);
-            const holderLabel = canManageTrip(currentTrip()) ? `<small>${escapeHtml(ticket.ticketHolderName || "未指定")}</small>` : "";
+            const holderLabel = canManageTrip(currentTrip()) ? `<small>${escapeHtml(ticket.visibility === "shared" ? "共同票券" : ticket.ticketHolderName || "未指定")}</small>` : "";
             return ticket.ticketUrl
               ? `${holderLabel}<button class="primary-button quick-ticket-open" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示票券</button>`
               : ticketAttachment
@@ -2947,7 +2970,7 @@ function renderBookings() {
             ${renderBookingMeta(booking)}
             ${tickets.map((ticket) => `
               <section class="personal-ticket-card">
-                ${canManageTrip(trip) ? `<p class="booking-card-line ticket-holder-label"><span>持有人</span>${escapeHtml(ticket.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
+                ${canManageTrip(trip) ? `<p class="booking-card-line ticket-holder-label"><span>${ticket.visibility === "shared" ? "範圍" : "持有人"}</span>${escapeHtml(ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
                 <div class="card-actions">
                   ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>` : ""}
                   ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "票券")}</button>`).join("") : ""}
@@ -3134,12 +3157,22 @@ function renderAttachmentGallery(attachments, ownerType, ownerId, excludedAttach
 }
 
 function renderBookingSourceAttachments(item, booking) {
-  if (!item?.sourceBookingId || !booking?.attachments?.length) return "";
+  if (!item?.sourceBookingId || !booking) return "";
+  const sharedTickets = booking.type === "交通"
+    ? (booking.personalTickets || []).filter((ticket) => ticket.visibility === "shared" && canViewPersonalTicket(ticket, booking, currentTrip()))
+    : [];
+  if (!booking.attachments?.length && !sharedTickets.length) return "";
 
   return `
     <section class="booking-source-attachments">
-      <p>預訂共同圖片與附件</p>
-      ${renderAttachmentGallery(booking.attachments, "booking", booking.id)}
+      ${booking.attachments?.length ? `<p>預訂共同圖片與附件</p>${renderAttachmentGallery(booking.attachments, "booking", booking.id)}` : ""}
+      ${sharedTickets.map((ticket) => `
+        <div class="card-actions booking-shared-ticket">
+          <span>共同票券</span>
+          ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示共同票券</button>` : ""}
+          ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "共同票券")}</button>`).join("") : ""}
+        </div>
+      `).join("")}
     </section>
   `;
 }
@@ -5689,7 +5722,7 @@ addPersonalTicketButton.addEventListener("click", () => {
   });
 });
 personalTicketEditors.addEventListener("change", (event) => {
-  if (!event.target.matches(".personal-ticket-mode")) return;
+  if (!event.target.matches(".personal-ticket-mode, .personal-ticket-visibility")) return;
   syncPersonalTicketEditor(event.target.closest("[data-personal-ticket-editor]"));
 });
 personalTicketEditors.addEventListener("click", (event) => {
@@ -5941,7 +5974,13 @@ expenseDashboard.addEventListener("click", (event) => {
   renderExpenses();
 });
 
-timeline.addEventListener("click", (event) => {
+function handleTimelineClick(event) {
+  const ticketButton = event.target.closest("[data-open-ticket-url]");
+  if (ticketButton) {
+    openTicketUrl(ticketButton.dataset.openTicketUrl);
+    return;
+  }
+
   const attachmentButton = event.target.closest("[data-open-attachment]");
   if (attachmentButton) {
     openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
@@ -5968,7 +6007,9 @@ timeline.addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit]");
   if (!button) return;
   openItemDialog(Number(button.dataset.edit));
-});
+}
+
+timeline.addEventListener("click", handleTimelineClick);
 
 itemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
