@@ -232,6 +232,9 @@ const dayProgressText = document.querySelector("#dayProgressText");
 const dayWeatherChip = document.querySelector("#dayWeatherChip");
 const timelineCount = document.querySelector("#timelineCount");
 const dayTabs = document.querySelector("#dayTabs");
+const dayPreviousButton = document.querySelector("#dayPreviousButton");
+const dayNextButton = document.querySelector("#dayNextButton");
+const dayCurrentLabel = document.querySelector("#dayCurrentLabel");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const desktopSidebar = document.querySelector(".desktop-sidebar");
 const desktopEditTripButton = document.querySelector("#desktopEditTripButton");
@@ -398,6 +401,9 @@ const todoPlaceLabel = document.querySelector("#todoPlaceLabel");
 const todoPlaceLabelText = document.querySelector("#todoPlaceLabelText");
 const todoPlaceInput = document.querySelector("#todoPlaceInput");
 const todoNoteInput = document.querySelector("#todoNoteInput");
+const todoAttachmentField = document.querySelector("#todoAttachmentField");
+const todoAttachmentInput = document.querySelector("#todoAttachmentInput");
+const todoExistingAttachments = document.querySelector("#todoExistingAttachments");
 const deleteTodoButton = document.querySelector("#deleteTodoButton");
 const expenseDialog = document.querySelector("#expenseDialog");
 const expenseForm = document.querySelector("#expenseForm");
@@ -766,6 +772,7 @@ function normalizeTodo(todo) {
     place: todo.place || cloudDetails.place || "",
     date: todo.date || cloudDetails.date || "",
     time: todo.time || cloudDetails.time || "",
+    attachments: (Array.isArray(todo.attachments) ? todo.attachments : cloudDetails.attachments || []).map(normalizeAttachment).filter(Boolean),
     done: Boolean(todo.done),
     visibility: todo.visibility || "private"
   };
@@ -796,7 +803,8 @@ function formatTodoCloudNote(todo) {
     currency: todo.currency || "TWD",
     place: todo.place || "",
     date: todo.date || "",
-    time: todo.time || ""
+    time: todo.time || "",
+    attachments: (todo.attachments || []).map(toCloudAttachment).filter(Boolean)
   });
 }
 
@@ -1598,6 +1606,12 @@ async function uploadTripAttachments(client, trip) {
       }
     }
   }
+
+  for (const todo of trip.todos || []) {
+    for (const attachment of todo.attachments || []) {
+      await uploadAttachmentToCloud(client, trip, "todo", todo.id || "todo", attachment);
+    }
+  }
 }
 
 async function deleteAttachmentFromCloud(client, attachment) {
@@ -2114,6 +2128,24 @@ function renderScrollableDayTabs(trip, activeDayIndex) {
     .join("");
 }
 
+function formatCompactDayLabel(day, dayIndex) {
+  const date = new Date(`${day?.date || ""}T12:00:00+08:00`);
+  const isValid = !Number.isNaN(date.getTime());
+  const dateLabel = isValid
+    ? new Intl.DateTimeFormat("zh-TW", { month: "numeric", day: "numeric", weekday: "short", timeZone: "Asia/Taipei" })
+      .format(date)
+      .replace("週", "週")
+    : "日期未定";
+  return `Day ${dayIndex + 1}・${dateLabel}`;
+}
+
+function renderCompactDayNavigation(trip, activeDayIndex) {
+  const day = trip?.days?.[activeDayIndex];
+  if (dayCurrentLabel) dayCurrentLabel.textContent = formatCompactDayLabel(day, activeDayIndex);
+  if (dayPreviousButton) dayPreviousButton.disabled = activeDayIndex <= 0;
+  if (dayNextButton) dayNextButton.disabled = activeDayIndex >= (trip?.days?.length || 1) - 1;
+}
+
 function canSwapTripDays(trip = currentTrip()) {
   return canManageTrip(trip) && (trip?.days?.length || 0) >= 2;
 }
@@ -2187,9 +2219,7 @@ function renderTrip() {
   renderTripSectionTabs();
 
   dayTabs.innerHTML = renderScrollableDayTabs(trip, state.activeDayIndex);
-  requestAnimationFrame(() => {
-    dayTabs.querySelector('[aria-current="date"]')?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
-  });
+  renderCompactDayNavigation(trip, state.activeDayIndex);
 
   const day = currentDay();
   const dayDate = getActiveDayDateValue(trip);
@@ -2253,15 +2283,15 @@ function getItineraryItemVisual(item) {
   const sourceItem = item || {};
   const type = sourceItem.type || "其他";
   const typeVisuals = {
-    景點: { icon: "景", tone: "sight" },
-    餐廳: { icon: "餐", tone: "food" },
-    午餐: { icon: "餐", tone: "food" },
-    交通: { icon: "乘", tone: "transport" },
-    飛機: { icon: "飛", tone: "transport" },
-    住宿: { icon: "宿", tone: "stay" },
-    購物: { icon: "買", tone: "shop" },
-    散步: { icon: "步", tone: "walk" },
-    其他: { icon: "遊", tone: "other" }
+    景點: { icon: "⛩", tone: "sight" },
+    餐廳: { icon: "🍽", tone: "food" },
+    午餐: { icon: "🍽", tone: "food" },
+    交通: { icon: "🚆", tone: "transport" },
+    飛機: { icon: "✈️", tone: "transport" },
+    住宿: { icon: "🛏", tone: "stay" },
+    購物: { icon: "🛍", tone: "shop" },
+    散步: { icon: "🚶", tone: "walk" },
+    其他: { icon: "✦", tone: "other" }
   };
   const visual = typeVisuals[type] || typeVisuals.其他;
   const image = (sourceItem.attachments || []).find((attachment) => {
@@ -3190,31 +3220,58 @@ function getBookingFocusDetails(booking) {
   return getBookingReferencePresentation(booking, todayString());
 }
 
+function bookingTicketOpenButton(ticket, actionClass, label, isPrimary = false) {
+  const primaryClass = isPrimary ? " booking-ticket-primary" : "";
+  if (ticket.ticketUrl) {
+    return `<button class="${actionClass}${primaryClass}" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">${escapeHtml(label)}</button>`;
+  }
+  const attachment = (ticket.attachments || [])[0];
+  if (!attachment) return "";
+  return `<button class="${actionClass}${primaryClass}" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">${escapeHtml(label)}</button>`;
+}
+
 function renderBookingTicketActions(booking, trip, actionClass = "text-button", actionLabel = "出示電子票券") {
-  const visibleTickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
-  const personalTicketActions = visibleTickets.map((ticket) => {
-    const holder = ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "旅程建立者";
-    const buttons = ticket.ticketUrl
-      ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">${escapeHtml(actionLabel)}</button>`
-      : (ticket.attachments || []).map((attachment) => `
-          <button class="${actionClass}" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">
-            ${escapeHtml(actionLabel === "出示電子票券" ? `出示 ${attachment.name || "票券"}` : actionLabel)}
-          </button>
-        `).join("");
+  const ticketButton = (ticket, buttonClass, label, isPrimary = false) => {
+    const primaryClass = isPrimary ? " booking-ticket-primary" : "";
+    if (ticket.ticketUrl) {
+      return `<button class="${buttonClass}${primaryClass}" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">${escapeHtml(label)}</button>`;
+    }
+    const attachment = (ticket.attachments || [])[0];
+    if (!attachment) return "";
+    return `<button class="${buttonClass}${primaryClass}" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">${escapeHtml(label)}</button>`;
+  };
+  const tickets = (booking.personalTickets || [])
+    .filter((ticket) => canViewPersonalTicket(ticket, booking, trip))
+    .map((ticket) => ({
+      ticket,
+      holder: ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "旅程建立者"
+    }))
+    .filter(({ ticket }) => Boolean(ticket.ticketUrl || ticket.attachments?.length));
 
-    if (!buttons) return "";
-    return `
-      <div class="booking-ticket-action-group">
-        ${canManageTrip(trip) ? `<span>${escapeHtml(holder)}</span>` : ""}
-        ${buttons}
-      </div>
-    `;
-  }).join("");
-  const legacyTicketAction = visibleTickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl)
-    ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">${escapeHtml(actionLabel)}</button>`
-    : "";
+  if (!tickets.length && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl)) {
+    return `<div class="booking-ticket-controls"><button class="${actionClass} booking-ticket-primary" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">${escapeHtml(actionLabel)}</button></div>`;
+  }
+  if (!tickets.length) return "";
 
-  return personalTicketActions || legacyTicketAction;
+  const [primary, ...companions] = tickets;
+  const primaryButton = ticketButton(primary.ticket, actionClass, actionLabel, true);
+  const companionRows = companions
+    .map(({ ticket, holder }) => {
+      const button = ticketButton(ticket, "booking-ticket-companion", `${holder}的票券`);
+      return button ? `<li><span>${escapeHtml(holder)}</span>${button}</li>` : "";
+    })
+    .filter(Boolean)
+    .join("");
+  return `
+    <div class="booking-ticket-controls">
+      ${primaryButton}
+      ${companionRows ? `<details class="booking-ticket-companions"><summary>其他旅伴票券（${companions.length}）</summary><ul>${companionRows}</ul></details>` : ""}
+    </div>
+  `;
+}
+
+function renderBookingTicketControls(booking, trip, actionClass = "text-button", actionLabel = "出示電子票券") {
+  return renderBookingTicketActions(booking, trip, actionClass, actionLabel);
 }
 
 function renderBookingAttachmentActions(booking, actionClass = "text-button", actionLabel = "") {
@@ -3227,8 +3284,8 @@ function renderBookingAttachmentActions(booking, actionClass = "text-button", ac
 
 function renderUpcomingBookingFocus(booking, trip) {
   const details = getBookingFocusDetails(booking);
-  const ticketActions = renderBookingTicketActions(booking, trip, "booking-focus-primary", "開啟票券");
-  const attachmentActions = renderBookingAttachmentActions(booking, "booking-focus-secondary", ticketActions ? "查看附件" : "開啟票券");
+  const ticketActions = renderBookingTicketActions(booking, trip, "booking-focus-primary", "出示電子票券");
+  const attachmentActions = renderBookingAttachmentActions(booking, "booking-focus-secondary", ticketActions ? "查看附件" : "開啟附件");
   const hasOpenAction = Boolean(ticketActions || attachmentActions);
 
   return `
@@ -4063,6 +4120,11 @@ function renderTodos() {
 
   const renderTodoRow = (todo) => `
     <article class="todo-list-row ${todo.done ? "is-done" : ""}">
+      ${
+        todo.group === "購物清單" && getPrimaryImageAttachment(todo.attachments)
+          ? `<button class="todo-product-thumbnail" type="button" data-open-attachment="todo" data-owner-id="${escapeHtml(todo.id)}" data-attachment-id="${escapeHtml(getPrimaryImageAttachment(todo.attachments).id)}" aria-label="查看 ${escapeHtml(todo.text)} 商品圖片"><img src="${escapeHtml(getAttachmentSource(getPrimaryImageAttachment(todo.attachments)))}" alt="${escapeHtml(todo.text)} 商品圖片" /></button>`
+          : ""
+      }
       <label class="todo-list-check">
         <input type="checkbox" data-toggle-todo="${escapeHtml(todo.id)}" ${todo.done ? "checked" : ""} />
         <span aria-hidden="true"></span>
@@ -4911,6 +4973,8 @@ function openTodoDialog(todoId = null) {
   syncHiddenTimeInput(todoTimeInput, todoHourInput, todoMinuteInput);
   todoPlaceInput.value = todo?.place || "";
   todoNoteInput.value = todo?.note || "";
+  todoAttachmentInput.value = "";
+  renderExistingAttachmentsEditor(todoExistingAttachments, todo?.attachments || []);
   syncTodoFields();
   openModal(todoDialog);
 }
@@ -4929,6 +4993,7 @@ function syncTodoFields() {
   todoShoppingFields.hidden = !isShopping;
   todoReminderFields.hidden = !isReminder;
   todoPlaceLabel.hidden = !hasPlace;
+  todoAttachmentField.hidden = !isShopping;
   todoPlaceLabelText.textContent = isPacking ? "放置位置" : isShopping ? "購買地點" : "地點";
   todoPlaceInput.placeholder = isPacking ? "行李箱、隨身包" : isShopping ? "蝦皮、藥妝店、機場" : "飯店、車站、景點";
 
@@ -4937,7 +5002,8 @@ function syncTodoFields() {
     [todoQuantityFields, hasQuantity],
     [todoShoppingFields, isShopping],
     [todoReminderFields, isReminder],
-    [todoPlaceLabel, hasPlace]
+    [todoPlaceLabel, hasPlace],
+    [todoAttachmentField, isShopping]
   ].forEach(([container, enabled]) => {
     container?.querySelectorAll("input, select, textarea").forEach((control) => {
       control.disabled = !enabled;
@@ -5305,6 +5371,12 @@ function readItemPhotos() {
   return Promise.all(files.map(readBookingAttachment));
 }
 
+function readTodoAttachments() {
+  const files = Array.from(todoAttachmentInput?.files || []);
+  if (files.length > 1) throw new Error("購物清單一次只能設定一張商品圖片。請先選擇最能辨識商品的一張。");
+  return Promise.all(files.map(readBookingAttachment));
+}
+
 function dataUrlToBlob(dataUrl) {
   const [header, base64Data] = String(dataUrl || "").split(",");
   const mimeType = header.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream";
@@ -5336,6 +5408,11 @@ function findAttachment(ownerType, ownerId, attachmentId) {
       .days.flatMap((day) => day.items)
       .find((entry) => entry.id === ownerId);
     return item?.attachments.find((attachment) => attachment.id === attachmentId);
+  }
+
+  if (ownerType === "todo") {
+    const todo = currentTrip().todos.find((item) => item.id === ownerId);
+    return todo?.attachments.find((attachment) => attachment.id === attachmentId) || null;
   }
 
   return null;
@@ -6529,6 +6606,16 @@ dayTabs.addEventListener("click", (event) => {
   rememberViewState(captureViewState());
 });
 
+[dayPreviousButton, dayNextButton].forEach((button) => {
+  button?.addEventListener("click", () => {
+    const trip = currentTrip();
+    const step = Number(button.dataset.dayStep) || 0;
+    state.activeDayIndex = Math.max(0, Math.min(trip.days.length - 1, state.activeDayIndex + step));
+    renderTrip();
+    rememberViewState(captureViewState());
+  });
+});
+
 itineraryPanel?.addEventListener("click", (event) => {
   const weatherButton = event.target.closest("#dayWeatherChip");
   if (weatherButton) {
@@ -6908,7 +6995,7 @@ bookingForm.addEventListener("submit", async (event) => {
   }
 });
 
-todoForm.addEventListener("submit", (event) => {
+todoForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!canUseCollaborativeTools()) return;
   syncHiddenTimeInput(todoTimeInput, todoHourInput, todoMinuteInput);
@@ -6917,42 +7004,54 @@ todoForm.addEventListener("submit", (event) => {
   const existingTodo = state.editingTodoId ? trip.todos.find((item) => item.id === state.editingTodoId) : null;
   if (existingTodo && !canEditTodo(existingTodo, trip)) return;
 
-  if (existingTodo) {
-    existingTodo.group = todoGroupInput.value;
-    existingTodo.text = todoTextInput.value.trim();
-    existingTodo.dueDate = todoGroupInput.value === "行前準備" ? todoDueDateInput.value : "";
-    existingTodo.priority = todoGroupInput.value === "行前準備" ? todoPriorityInput.value : "";
-    existingTodo.quantity = ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoQuantityInput.value : "";
-    existingTodo.unit = ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoUnitInput.value.trim() : "";
-    existingTodo.amount = todoGroupInput.value === "購物清單" ? todoAmountInput.value : "";
-    existingTodo.currency = todoGroupInput.value === "購物清單" ? todoCurrencyInput.value : "TWD";
-    existingTodo.date = todoGroupInput.value === "旅途中提醒" ? todoDateInput.value : "";
-    existingTodo.time = todoGroupInput.value === "旅途中提醒" ? todoTimeInput.value : "";
-    existingTodo.place = ["行李打包", "購物清單", "旅途中提醒"].includes(todoGroupInput.value) ? todoPlaceInput.value.trim() : "";
-    existingTodo.note = todoNoteInput.value.trim();
-  } else {
-    trip.todos.push(normalizeTodo({
-      id: createId(),
-      ownerId: state.cloudUser?.id || null,
-      group: todoGroupInput.value,
-      text: todoTextInput.value.trim(),
-      dueDate: todoGroupInput.value === "行前準備" ? todoDueDateInput.value : "",
-      priority: todoGroupInput.value === "行前準備" ? todoPriorityInput.value : "",
-      quantity: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoQuantityInput.value : "",
-      unit: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoUnitInput.value.trim() : "",
-      amount: todoGroupInput.value === "購物清單" ? todoAmountInput.value : "",
-      currency: todoGroupInput.value === "購物清單" ? todoCurrencyInput.value : "TWD",
-      date: todoGroupInput.value === "旅途中提醒" ? todoDateInput.value : "",
-      time: todoGroupInput.value === "旅途中提醒" ? todoTimeInput.value : "",
-      place: ["行李打包", "購物清單", "旅途中提醒"].includes(todoGroupInput.value) ? todoPlaceInput.value.trim() : "",
-      note: todoNoteInput.value.trim(),
-      done: false,
-      visibility: "private"
-    }));
+  let newAttachments = [];
+  try {
+    newAttachments = await readTodoAttachments();
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
+
+  const previousTodo = existingTodo ? structuredClone(existingTodo) : null;
+  const keptAttachments = existingTodo ? getKeptAttachments(todoExistingAttachments, existingTodo.attachments || []) : [];
+  const removedAttachments = existingTodo ? getRemovedAttachments(existingTodo.attachments || [], keptAttachments) : [];
+  const todoData = {
+    id: existingTodo?.id || createId(),
+    cloudId: existingTodo?.cloudId || null,
+    ownerId: existingTodo?.ownerId || state.cloudUser?.id || null,
+    group: todoGroupInput.value,
+    text: todoTextInput.value.trim(),
+    dueDate: todoGroupInput.value === "行前準備" ? todoDueDateInput.value : "",
+    priority: todoGroupInput.value === "行前準備" ? todoPriorityInput.value : "",
+    quantity: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoQuantityInput.value : "",
+    unit: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoUnitInput.value.trim() : "",
+    amount: todoGroupInput.value === "購物清單" ? todoAmountInput.value : "",
+    currency: todoGroupInput.value === "購物清單" ? todoCurrencyInput.value : "TWD",
+    date: todoGroupInput.value === "旅途中提醒" ? todoDateInput.value : "",
+    time: todoGroupInput.value === "旅途中提醒" ? todoTimeInput.value : "",
+    place: ["行李打包", "購物清單", "旅途中提醒"].includes(todoGroupInput.value) ? todoPlaceInput.value.trim() : "",
+    note: todoNoteInput.value.trim(),
+    attachments: todoGroupInput.value === "購物清單" ? [...keptAttachments, ...newAttachments] : [],
+    done: existingTodo?.done || false,
+    visibility: existingTodo?.visibility || "private"
+  };
+  const todo = normalizeTodo(todoData);
+
+  if (existingTodo) Object.assign(existingTodo, todo);
+  else trip.todos.push(todo);
+
+  try {
+    await uploadOwnerAttachmentsBeforeLocalSave(trip, "todo", todo.id, todo.attachments);
+    saveLibrary();
+    deleteRemovedAttachmentsFromCloud(removedAttachments);
+  } catch (error) {
+    if (previousTodo) Object.assign(existingTodo, previousTodo);
+    else trip.todos = trip.todos.filter((item) => item.id !== todo.id);
+    alert(error?.name === "QuotaExceededError" ? "商品圖片容量太大，無法儲存。請改用較小的圖片。" : formatAttachmentUploadError(error));
+    return;
   }
 
   state.editingTodoId = null;
-  saveLibrary();
   closeModal(todoDialog);
   renderTodos();
 });
@@ -6968,6 +7067,12 @@ todoGroups.addEventListener("change", (event) => {
 });
 
 todoGroups.addEventListener("click", (event) => {
+  const attachmentButton = event.target.closest("[data-open-attachment]");
+  if (attachmentButton) {
+    event.preventDefault();
+    openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
+    return;
+  }
   const button = event.target.closest("[data-edit-todo]");
   if (!button) return;
   event.preventDefault();

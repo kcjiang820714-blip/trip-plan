@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=106" />
+    <link rel="stylesheet" href="./styles.css?v=110" />
   </head>
   <body>
     <main class="app-shell">
@@ -161,7 +161,12 @@
         </section>
 
         <section class="trip-sticky-nav">
-          <nav class="day-tabs" id="dayTabs" aria-label="滑動選擇日期"></nav>
+          <nav class="compact-day-navigation" aria-label="選擇行程日期">
+            <button class="compact-day-step" id="dayPreviousButton" type="button" data-day-step="-1" aria-label="前一天">‹</button>
+            <span class="compact-day-current" id="dayCurrentLabel" aria-live="polite">Day 1</span>
+            <button class="compact-day-step" id="dayNextButton" type="button" data-day-step="1" aria-label="後一天">›</button>
+          </nav>
+          <nav class="day-tabs" id="dayTabs" aria-label="滑動選擇日期" hidden></nav>
         </section>
 
         <nav class="trip-section-tabs" id="tripSectionTabs" aria-label="旅程功能">
@@ -817,6 +822,13 @@
           </label>
         </section>
 
+        <label id="todoAttachmentField" hidden>
+          商品圖片
+          <small>可上傳一張商品照片，會自動壓縮後儲存；編輯時也可以替換或移除。</small>
+          <input id="todoAttachmentInput" type="file" accept="image/*" />
+        </label>
+        <section class="existing-attachments" id="todoExistingAttachments" hidden></section>
+
         <section class="todo-detail-fields" id="todoReminderFields" hidden>
           <label>
             日期
@@ -925,6 +937,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=114" type="module"></script>
+    <script src="./app.js?v=116" type="module"></script>
   </body>
 </html>

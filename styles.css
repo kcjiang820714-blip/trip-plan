@@ -6417,6 +6417,373 @@ body {
   }
 }
 
+/* Final alignment pass: one typography scale and non-truncated, content-first cards. */
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-display: "Noto Serif TC", "PingFang TC", "Microsoft JhengHei", serif;
+  --text-caption: 0.78rem;
+  --text-body: 0.95rem;
+  --text-title: 1.2rem;
+  --leading-tight: 1.22;
+  --leading-body: 1.55;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-ui);
+}
+
+.trip-appbar {
+  align-items: start;
+  min-height: 62px;
+}
+
+.trip-appbar .title-group {
+  min-width: 0;
+  padding: 5px 0;
+}
+
+.trip-appbar h1 {
+  overflow: visible;
+  color: var(--ref-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 4.7vw, 1.6rem);
+  font-weight: 720;
+  line-height: var(--leading-tight);
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.trip-appbar .title-group p {
+  font-size: var(--text-caption);
+  line-height: 1.3;
+}
+
+.compact-day-navigation {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  width: min(100%, 720px);
+  min-height: 54px;
+  margin: 0 auto;
+  border: 1px solid var(--ref-line);
+  border-radius: 14px;
+  background: var(--ref-surface);
+  box-shadow: 0 5px 16px rgba(43, 50, 49, 0.05);
+}
+
+.compact-day-step {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ref-blue);
+  font-size: 1.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.compact-day-step:disabled {
+  color: #cbd1ce;
+  cursor: not-allowed;
+}
+
+.compact-day-current {
+  min-width: 0;
+  color: var(--ref-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 4.4vw, 1.28rem);
+  font-weight: 720;
+  line-height: var(--leading-tight);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.itinerary-type-marker {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+#itineraryPanel .item-summary-content {
+  min-width: 0;
+}
+
+#itineraryPanel .item-title {
+  display: block;
+  color: var(--ref-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 720;
+  line-height: 1.32;
+  overflow-wrap: anywhere;
+}
+
+#itineraryPanel .item-content-preview,
+#itineraryPanel .meta {
+  overflow-wrap: anywhere;
+  line-height: var(--leading-body);
+}
+
+.booking-ticket-controls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.booking-ticket-primary {
+  display: inline-grid;
+  place-items: center;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ref-coral);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1.2;
+  padding: 10px 14px;
+  box-shadow: 0 8px 18px rgba(243, 101, 75, 0.2);
+}
+
+.booking-focus-card .booking-ticket-primary {
+  background: #fff;
+  color: #b84d3c;
+}
+
+.booking-ticket-companions {
+  min-width: 0;
+  border: 1px solid var(--ref-line);
+  border-radius: 10px;
+  background: rgba(255, 254, 250, 0.6);
+}
+
+.booking-ticket-companions summary {
+  min-height: 38px;
+  color: var(--ref-muted);
+  font-size: var(--text-caption);
+  font-weight: 750;
+  line-height: 38px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.booking-ticket-companions ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 8px 8px;
+  list-style: none;
+}
+
+.booking-ticket-companions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 4px 0;
+}
+
+.booking-ticket-companions li > span {
+  min-width: 0;
+  color: var(--ref-ink);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+
+.booking-ticket-companion {
+  min-height: 34px;
+  border: 1px solid rgba(85, 127, 152, 0.28);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ref-blue);
+  font-size: var(--text-caption);
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.todo-product-thumbnail {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border: 1px solid var(--ref-line);
+  border-radius: 12px;
+  background: var(--ref-green-soft);
+  padding: 0;
+  cursor: pointer;
+}
+
+.todo-product-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#todoAttachmentField {
+  display: grid;
+  gap: 6px;
+}
+
+#todoAttachmentField small {
+  color: var(--ref-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+
+@media (max-width: 679px) {
+  .trip-appbar {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .trip-appbar-actions {
+    justify-content: end;
+  }
+
+  .trip-appbar-actions #editTripButton {
+    display: none;
+  }
+
+  .trip-sticky-nav {
+    margin-bottom: 16px;
+  }
+
+  #itineraryPanel .item-summary {
+    grid-template-columns: minmax(0, 1fr) 94px 18px;
+    grid-template-areas:
+      "copy photo arrow"
+      "meta photo arrow";
+    align-items: center;
+    gap: 8px 10px;
+    min-height: 142px;
+    padding: 14px 12px 14px 16px;
+  }
+
+  #itineraryPanel .time {
+    grid-area: copy;
+    align-self: end;
+    padding: 0 0 4px;
+    color: var(--ref-blue);
+    font-size: 1.28rem;
+    font-weight: 760;
+  }
+
+  #itineraryPanel .item-summary-content {
+    grid-area: copy;
+    align-self: start;
+    display: grid;
+    gap: 7px;
+    padding-top: 32px;
+  }
+
+  #itineraryPanel .item-summary .meta {
+    grid-area: meta;
+    align-self: start;
+    color: var(--ref-green);
+    font-size: var(--text-caption);
+  }
+
+  #itineraryPanel .itinerary-card-photo {
+    grid-area: photo;
+    width: 94px;
+    min-width: 94px;
+    aspect-ratio: 1 / 1.24;
+    border-radius: 12px;
+  }
+
+  #itineraryPanel .expand-indicator {
+    grid-area: arrow;
+    align-self: center;
+  }
+
+  #itineraryPanel .itinerary-type-marker {
+    top: 22px;
+    left: -64px;
+  }
+
+  .todo-list-row:has(.todo-product-thumbnail) {
+    grid-template-columns: 54px auto minmax(0, 1fr) auto auto;
+  }
+
+  .todo-list-row:has(.todo-product-thumbnail) .todo-product-thumbnail {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-check {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-title {
+    grid-column: 3 / -2;
+    grid-row: 1;
+  }
+
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-detail,
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-owner {
+    grid-column: 3 / -1;
+  }
+}
+
+@media (min-width: 1100px) {
+  .trip-appbar h1 {
+    font-size: clamp(1.55rem, 2.25vw, 2.2rem);
+  }
+
+  .compact-day-navigation {
+    width: 100%;
+    max-width: none;
+  }
+
+  #itineraryPanel .item-summary {
+    grid-template-columns: 82px minmax(0, 1fr) 128px 26px;
+    gap: 14px;
+    min-height: 124px;
+    padding: 14px 16px 14px 0;
+  }
+
+  #itineraryPanel .time {
+    align-self: start;
+    padding-top: 18px;
+    font-size: 1.1rem;
+  }
+
+  #itineraryPanel .item-summary-content {
+    display: grid;
+    gap: 7px;
+    align-content: center;
+  }
+
+  #itineraryPanel .itinerary-card-photo {
+    width: 128px;
+    aspect-ratio: 4 / 3;
+  }
+
+  #itineraryPanel .itinerary-type-marker {
+    width: 44px;
+    height: 44px;
+  }
+
+  .booking-ticket-controls {
+    justify-items: stretch;
+  }
+
+  .todo-list-row:has(.todo-product-thumbnail) {
+    grid-template-columns: 54px auto minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, .95fr) max-content;
+  }
+}
+
 /* Reference itinerary: mobile photo timeline + desktop planning workspace */
 
 .itinerary-side-column {
@@ -9593,4 +9960,58 @@ body {
     font-style: normal;
     text-align: right;
   }
+}
+
+/* Last cascade: these rules deliberately win over legacy component styles. */
+.trip-appbar h1 { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 679px) {
+  #itineraryPanel .item-summary {
+    grid-template-columns: minmax(0, 1fr) 94px 18px;
+    grid-template-areas: "time photo arrow" "title photo arrow" "meta photo arrow";
+    gap: 5px 10px;
+    min-height: 150px;
+    padding: 14px 12px 14px 16px;
+  }
+  #itineraryPanel .time { grid-area: time; align-self: end; padding: 0; font-size: 1.08rem; }
+  #itineraryPanel .item-summary-content { display: contents; padding: 0; }
+  #itineraryPanel .item-title { grid-area: title; align-self: center; }
+  #itineraryPanel .item-summary .meta { grid-area: meta; align-self: start; font-size: var(--text-caption); }
+  #itineraryPanel .itinerary-card-photo { grid-area: photo; width: 94px; min-width: 94px; aspect-ratio: 1 / 1.24; }
+  #itineraryPanel .expand-indicator { grid-area: arrow; align-self: center; }
+  .todo-list-row:has(.todo-product-thumbnail) {
+    grid-template-columns: 56px 34px minmax(0, 1fr) 24px;
+    grid-template-areas: "image check title action" "image check detail action";
+    align-items: center;
+    min-height: 80px;
+  }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-product-thumbnail { grid-area: image; width: 56px; height: 56px; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-check { grid-area: check; grid-row: auto; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-title { grid-area: title; min-width: 0; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-title strong { overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.35; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-detail { grid-area: detail; grid-column: auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-owner { display: none; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-row-action { grid-area: action; grid-column: auto; grid-row: 1 / span 2; }
+}
+
+@media (min-width: 1100px) {
+  #itineraryPanel .item-summary {
+    grid-template-columns: 82px 48px minmax(0, 1fr) 128px 26px;
+    grid-template-areas: "time marker content photo arrow";
+    gap: 14px;
+    min-height: 124px;
+  }
+  #itineraryPanel .time { grid-area: time; }
+  #itineraryPanel .itinerary-type-marker { position: static; grid-area: marker; }
+  #itineraryPanel .item-summary-content { grid-area: content; }
+  #itineraryPanel .itinerary-card-photo { display: grid; grid-area: photo; grid-column: auto; grid-row: auto; width: 128px; aspect-ratio: 4 / 3; }
+  #itineraryPanel .expand-indicator { grid-area: arrow; }
+  #itineraryPanel .transport-visual { display: none; }
+  .todo-list-row:has(.todo-product-thumbnail) { grid-template-columns: 56px 38px minmax(0, 1.35fr) minmax(160px, .95fr) 102px 24px; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-product-thumbnail { grid-column: 1; grid-row: 1; width: 56px; height: 56px; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-check { grid-column: 2; grid-row: 1; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-title { grid-column: 3; grid-row: 1; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-detail { grid-column: 4; grid-row: 1; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-list-owner { display: inline-grid; grid-column: 5; grid-row: 1; }
+  .todo-list-row:has(.todo-product-thumbnail) .todo-row-action { grid-column: 6; grid-row: 1; }
 }
