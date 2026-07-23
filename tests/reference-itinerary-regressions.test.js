@@ -107,6 +107,11 @@ test("桌機時間軸直線與分類圖示中心共用同一個座標公式", ()
   assert.match(finalAxisContract, /--itinerary-marker-center:\s*calc\(var\(--itinerary-time-column\)\s*\+\s*var\(--itinerary-grid-gap\)\s*\+\s*var\(--itinerary-marker-half-column\)\)/);
   assert.match(finalAxisContract, /--itinerary-axis:\s*var\(--itinerary-marker-center\)/);
   assert.match(finalAxisContract, /\.timeline::before\s*\{[\s\S]*?left:\s*var\(--itinerary-axis\)/);
+  assert.match(finalAxisContract, /\.timeline::before\s*\{[\s\S]*?width:\s*2px/);
+  assert.match(finalAxisContract, /\.timeline::before\s*\{[\s\S]*?background:\s*#aeb8b0/);
+  assert.match(finalAxisContract, /\.timeline::before\s*\{[\s\S]*?z-index:\s*0/);
+  assert.match(finalAxisContract, /\.item-card\s*\{[\s\S]*?z-index:\s*1/);
+  assert.match(finalAxisContract, /\.itinerary-type-marker\s*\{[\s\S]*?z-index:\s*2/);
   assert.match(finalAxisContract, /\.item-summary(?:[^\{])*\{[\s\S]*?grid-template-columns:\s*var\(--itinerary-time-column\)\s+var\(--itinerary-marker-column\)\s+minmax\(0,\s*1fr\)\s+26px/);
   assert.match(finalAxisContract, /\.item-card::before\s*\{[\s\S]*?content:\s*none/);
 });
