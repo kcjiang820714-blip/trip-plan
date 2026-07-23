@@ -7455,6 +7455,12 @@ select {
   }
 }
 
+@media (max-width: 679px) {
+  #tripTitle {
+    font-family: var(--ref-serif);
+  }
+}
+
 /* Desktop timeline axis contract: the rule and each marker derive from one grid coordinate. */
 @media (min-width: 1100px) {
   #tripView[data-active-section="itinerary"] #itineraryPanel .timeline {
