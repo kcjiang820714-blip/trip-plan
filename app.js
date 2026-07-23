@@ -221,12 +221,16 @@ const landingTripMeta = document.querySelector("#landingTripMeta");
 const landingTripCount = document.querySelector("#landingTripCount");
 const landingItemCount = document.querySelector("#landingItemCount");
 const landingToday = document.querySelector("#landingToday");
+const tripPageName = document.querySelector("#tripPageName");
 const tripTitle = document.querySelector("#tripTitle");
 const tripDates = document.querySelector("#tripDates");
 const tripSummary = document.querySelector("#tripSummary");
 const itineraryPanel = document.querySelector("#itineraryPanel");
 const activeDate = document.querySelector("#activeDate");
 const activeDayTitle = document.querySelector("#activeDayTitle");
+const dayProgressText = document.querySelector("#dayProgressText");
+const dayWeatherChip = document.querySelector("#dayWeatherChip");
+const timelineCount = document.querySelector("#timelineCount");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
 const openPdfPreviewButton = document.querySelector("#openPdfPreviewButton");
@@ -2081,10 +2085,16 @@ function renderDayTab(trip, dayIndex, className, isActive = false) {
   return `
     <button class="day-tab ${className}${segmentClass}" type="button" data-day="${dayIndex}" ${isActive ? 'aria-current="date"' : ""}>
       <span>Day ${dayIndex + 1}</span>
-      <strong>${escapeHtml(day.date)}</strong>
+      <strong>${escapeHtml(formatShortDate(day.date))}</strong>
       ${segment ? `<em>${escapeHtml(segment.title)}</em>` : ""}
     </button>
   `;
+}
+
+function renderScrollableDayTabs(trip, activeDayIndex) {
+  return trip.days
+    .map((_, dayIndex) => renderDayTab(trip, dayIndex, dayIndex === activeDayIndex ? "is-active" : "", dayIndex === activeDayIndex))
+    .join("");
 }
 
 function canSwapTripDays(trip = currentTrip()) {
@@ -2106,19 +2116,22 @@ function renderDaySwapControl(trip) {
     })
     .join("");
 
-  const control = document.createElement("div");
+  const control = document.createElement("details");
   control.className = "day-swap-control";
   control.dataset.daySwapControl = "";
   control.innerHTML = `
-    <label>
-      <span>與</span>
-      <select data-day-swap-target aria-label="選擇要互換的 Day">
-        ${targetOptions}
-      </select>
-    </label>
-    <button class="secondary-button" type="button" data-swap-day>交換 Day</button>
+    <summary>調整 Day 順序</summary>
+    <div>
+      <label>
+        <span>與</span>
+        <select data-day-swap-target aria-label="選擇要互換的 Day">
+          ${targetOptions}
+        </select>
+      </label>
+      <button class="secondary-button" type="button" data-swap-day>交換 Day</button>
+    </div>
   `;
-  header.append(control);
+  (header.querySelector(".itinerary-day-copy") || header).append(control);
 }
 
 function swapTripDays(targetDayIndex) {
@@ -2156,53 +2169,132 @@ function renderTrip() {
   tripSummary.textContent = `${trip.days.length} 天，${countItems(trip)} 個行程`;
   renderTripSectionTabs();
 
-  const previousDay = trip.days[state.activeDayIndex - 1];
-  const nextDay = trip.days[state.activeDayIndex + 1];
-  dayTabs.innerHTML = `
-    <button class="day-nav-arrow" type="button" data-day-step="-1" ${previousDay ? "" : "disabled"} aria-label="前一天" title="前一天">‹</button>
-    ${
-      previousDay
-        ? renderDayTab(trip, state.activeDayIndex - 1, "is-neighbor")
-        : `<span class="day-tab-placeholder" aria-hidden="true"></span>`
-    }
-    ${renderDayTab(trip, state.activeDayIndex, "is-active", true)}
-    ${
-      nextDay
-        ? renderDayTab(trip, state.activeDayIndex + 1, "is-neighbor")
-        : `<span class="day-tab-placeholder" aria-hidden="true"></span>`
-    }
-    <button class="day-nav-arrow" type="button" data-day-step="1" ${nextDay ? "" : "disabled"} aria-label="後一天" title="後一天">›</button>
-  `;
+  dayTabs.innerHTML = renderScrollableDayTabs(trip, state.activeDayIndex);
+  requestAnimationFrame(() => {
+    dayTabs.querySelector('[aria-current="date"]')?.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
+  });
 
   const day = currentDay();
+  const dayDate = getActiveDayDateValue(trip);
   const activeSegment = tripSegmentForDay(trip, state.activeDayIndex);
-  activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${day.date}${activeSegment ? ` · ${activeSegment.title}` : ""}`;
+  activeDate.textContent = `Day ${state.activeDayIndex + 1} · ${formatShortDate(dayDate)}${activeSegment ? ` · ${activeSegment.title}` : ""}`;
   activeDayTitle.textContent = day.title;
+  dayProgressText.textContent = getItineraryDayProgress(day, dayDate);
+  renderDayWeatherChip(trip, dayDate);
   renderDaySwapControl(trip);
   renderBookings();
-  renderTravelDayPanel();
+  renderItineraryContent();
   renderWeatherPanel();
   renderQuickTickets();
   renderPdfPreview();
   renderTodos();
   renderExpenses();
+}
 
-  if (day.items.length === 0) {
-    timeline.innerHTML = `<div class="empty-state">這一天還沒有行程。點「新增行程」開始安排。</div>`;
+function getItineraryDayProgress(day, dayDate) {
+  const totalCount = day.items.length;
+  if (!totalCount) return "這一天還沒有行程";
+  if (dayDate !== todayString()) return `共 ${totalCount} 個行程`;
+
+  const currentTime = getCurrentTimeValue();
+  const remainingCount = day.items.filter((item) => !item.time || item.time > currentTime).length;
+  return remainingCount ? `今天還有 ${remainingCount} 個行程` : "今天的行程已完成";
+}
+
+function renderDayWeatherChip(trip, dayDate) {
+  if (!dayWeatherChip) return;
+
+  const location = getWeatherLocationsForDate(trip, dayDate)[0] || null;
+  const forecast = location ? getForecastForDate(trip.weatherForecasts?.[location.id] || null, dayDate) : null;
+  const label = location
+    ? `${weatherLocationTitle(location)} · ${forecast ? formatTemperatureRange(forecast) : "尚未更新"}`
+    : "天氣未設定";
+  const isExpanded = !weatherPanel.hidden;
+  dayWeatherChip.innerHTML = `
+    ${renderWeatherIcon(forecast?.weatherCode ?? null)}
+    <span>${escapeHtml(label)}</span>
+    <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
+  `;
+  dayWeatherChip.setAttribute("aria-label", `${label}，展開今日天氣`);
+  dayWeatherChip.setAttribute("aria-expanded", String(isExpanded));
+}
+
+function renderItineraryContent() {
+  const trip = currentTrip();
+  const day = currentDay();
+  const dayDate = getActiveDayDateValue(trip);
+  const focus = selectItineraryFocus(day.items, dayDate, todayString(), getCurrentTimeValue());
+  renderTravelDayPanel(focus);
+  renderItineraryTimeline(day, focus.item);
+}
+
+function renderTravelDayPanel(focus) {
+  if (!travelDayPanel) return;
+
+  const trip = currentTrip();
+  const item = focus?.item || null;
+
+  if (!item) {
+    travelDayPanel.innerHTML = `
+      <section class="itinerary-focus-card is-empty">
+        <p class="eyebrow">下一個行程</p>
+        <h3>留一點空白，也是一種安排</h3>
+        <p>這一天還沒有行程，可以從下方新增第一站。</p>
+      </section>
+    `;
     return;
   }
 
-  timeline.innerHTML = day.items
-    .map(
-      (item, index) => {
-        const isExpanded = state.expandedItemId === item.id;
-        const detailsId = `itemDetails${item.id}`;
-        const visualType = transportVisualType(item);
-        const sourceBooking = item.sourceBookingId
-          ? trip.bookings.find((booking) => booking.id === item.sourceBookingId)
-          : null;
+  travelDayPanel.innerHTML = `
+    <article class="itinerary-focus-card">
+      <header class="itinerary-focus-header">
+        <span>${escapeHtml(focus.label)}</span>
+        <time>${escapeHtml(item.time || "時間未定")}</time>
+      </header>
+      <div class="itinerary-focus-main">
+        <span class="itinerary-focus-marker" aria-hidden="true"></span>
+        <div>
+          <p>${escapeHtml(item.type || "行程")}</p>
+          <h3>${escapeHtml(getItemTitle(item) || "未命名行程")}</h3>
+          ${
+            item.note || item.content
+              ? `<small>${escapeHtml(item.note || item.content)}</small>`
+              : `<small>查看詳細內容，或直接開啟地圖導航。</small>`
+          }
+        </div>
+      </div>
+      <div class="itinerary-focus-actions">
+        <a class="primary-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">開啟導航</a>
+        <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(item.id || "")}">查看詳情</button>
+      </div>
+    </article>
+  `;
+}
 
-        return `
+function renderItineraryTimeline(day, focusItem) {
+  const trip = currentTrip();
+  const items = day.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.id !== focusItem?.id || state.expandedItemId === item.id);
+
+  if (timelineCount) timelineCount.textContent = `${items.length} 筆`;
+  if (!items.length) {
+    timeline.innerHTML = day.items.length
+      ? `<div class="empty-state itinerary-timeline-empty">下一個行程已顯示在上方。</div>`
+      : `<div class="empty-state">這一天還沒有行程。點「新增行程」開始安排。</div>`;
+    return;
+  }
+
+  timeline.innerHTML = items
+    .map(({ item, index }) => {
+      const isExpanded = state.expandedItemId === item.id;
+      const detailsId = `itemDetails${item.id}`;
+      const visualType = transportVisualType(item);
+      const sourceBooking = item.sourceBookingId
+        ? trip.bookings.find((booking) => booking.id === item.sourceBookingId)
+        : null;
+
+      return `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
           <button
             class="item-summary"
@@ -2236,84 +2328,8 @@ function renderTrip() {
           </div>
         </article>
       `;
-      }
-    )
+    })
     .join("");
-}
-
-function renderTravelDayPanel() {
-  if (!travelDayPanel) return;
-
-  const trip = currentTrip();
-  const day = currentDay();
-  const dayDate = getActiveDayDateValue(trip);
-  const travelStatus = getTravelStatus(day, dayDate);
-  const passedCount = countPassedItems(day, dayDate);
-  const totalCount = day.items.length;
-  const bookings = getBookingsForDay(trip, dayDate);
-  const reminders = getTravelRemindersForDay(trip, dayDate);
-  const progressText = totalCount ? `${Math.min(passedCount, totalCount)}/${totalCount} 已過` : "尚無行程";
-
-  travelDayPanel.innerHTML = `
-    <section class="travel-day-card">
-      <header class="travel-day-header">
-        <div>
-          <p class="eyebrow">今日旅程</p>
-          <h3>${escapeHtml(day.title || `Day ${state.activeDayIndex + 1}`)}</h3>
-        </div>
-        <span>${escapeHtml(progressText)}</span>
-      </header>
-      <div class="travel-day-metrics" aria-label="今日摘要">
-        <span><strong>${bookings.length}</strong>票券</span>
-        <span><strong>${reminders.length}</strong>提醒</span>
-        <span><strong>${totalCount}</strong>行程</span>
-      </div>
-      ${
-        travelStatus.currentItem
-          ? `
-            <article class="travel-stop-card is-current">
-              <span class="travel-stop-time">${escapeHtml(travelStatus.currentItem.time || "--:--")}</span>
-              <div>
-                <p>目前正在進行</p>
-                <strong>${escapeHtml(getItemTitle(travelStatus.currentItem))}</strong>
-                <small>${escapeHtml(travelStatus.currentItem.type || "行程")}${travelStatus.currentItem.note ? ` · ${escapeHtml(travelStatus.currentItem.note)}` : ""}</small>
-              </div>
-            </article>
-          `
-          : ""
-      }
-      ${
-        travelStatus.nextItem
-          ? renderTravelStopBlock("下一站", travelStatus.nextItem, "next")
-          : `
-            <article class="travel-stop-card is-empty">
-              <div>
-                <p>下一站</p>
-                <strong>${totalCount ? "今天後面沒有更多行程" : "今天還沒有排定行程"}</strong>
-                <small>${totalCount ? "可以休息、記帳，或查看明天的行程。" : "可以新增行程，或先把票券與待辦補上。"}</small>
-              </div>
-            </article>
-          `
-      }
-    </section>
-  `;
-}
-
-function renderTravelStopBlock(label, item, kind) {
-  return `
-    <article class="travel-stop-card is-${escapeHtml(kind)}">
-      <span class="travel-stop-time">${escapeHtml(item.time || "--:--")}</span>
-      <div>
-        <p>${escapeHtml(label)}</p>
-        <strong>${escapeHtml(getItemTitle(item))}</strong>
-        <small>${escapeHtml(item.type || "行程")}${item.note ? ` · ${escapeHtml(item.note)}` : ""}</small>
-      </div>
-    </article>
-    <div class="travel-day-actions">
-      <a class="primary-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">下一站導航</a>
-      <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(item.id || "")}">查看行程</button>
-    </div>
-  `;
 }
 
 function renderWeatherPanel(statusText = "") {
@@ -2877,27 +2893,18 @@ function isDateInStayRange(dayDate, booking) {
   return booking.date <= dayDate && dayDate <= booking.checkoutDate;
 }
 
-function getTravelRemindersForDay(trip, dayDate) {
-  return (trip.todos || []).filter((todo) => todo.group === "旅途中提醒" && !todo.done && todo.date === dayDate);
-}
+function selectItineraryFocus(items, dayDate, currentDate, currentTime) {
+  if (!items.length) return { item: null, label: "下一個行程" };
+  if (dayDate !== currentDate) return { item: items[0], label: "下一個行程" };
 
-function getTravelStatus(day, dayDate) {
-  const items = day.items || [];
-  if (!items.length) return { currentItem: null, nextItem: null };
-  if (dayDate !== todayString()) return { currentItem: null, nextItem: items[0] };
+  const nextItem = items.find((item) => !item.time || item.time > currentTime);
+  if (nextItem) return { item: nextItem, label: "下一個行程" };
 
-  const currentTime = getCurrentTimeValue();
-  const passedItems = items.filter((item) => item.time && item.time <= currentTime);
-  const currentItem = passedItems[passedItems.length - 1] || null;
-  const nextItem = items.find((item) => !item.time || item.time > currentTime) || null;
-
-  return { currentItem, nextItem };
-}
-
-function countPassedItems(day, dayDate) {
-  if (dayDate !== todayString()) return 0;
-  const currentTime = getCurrentTimeValue();
-  return day.items.filter((item) => item.time && item.time < currentTime).length;
+  const currentItems = items.filter((item) => item.time && item.time <= currentTime);
+  return {
+    item: currentItems[currentItems.length - 1] || items[0],
+    label: "目前行程"
+  };
 }
 
 function getCurrentTimeValue() {
@@ -2907,7 +2914,7 @@ function getCurrentTimeValue() {
 
 function refreshTravelModeNow() {
   if (!tripView.hidden && state.activeTripSection === "itinerary") {
-    renderTravelDayPanel();
+    renderItineraryContent();
   }
 }
 
@@ -2940,12 +2947,24 @@ function getBookingOfflineLabel(booking, visiblePersonalTickets = booking.person
   return "附件在雲端，離線時可能無法開啟";
 }
 
+function getTripSectionPageName(section) {
+  return {
+    itinerary: "行程",
+    bookings: "預訂",
+    todos: "待辦",
+    expenses: "記帳",
+    pdf: "PDF 預覽"
+  }[section] || "行程";
+}
+
 function renderTripSectionTabs() {
   const addButton = document.querySelector("[data-trip-section-add]");
   const canManage = canManageTrip();
   const canUseTools = canUseCollaborativeTools();
   const primaryTripSections = new Set(["itinerary", "bookings", "todos", "expenses"]);
 
+  tripView.dataset.activeSection = state.activeTripSection;
+  if (tripPageName) tripPageName.textContent = getTripSectionPageName(state.activeTripSection);
   editTripButton.hidden = !canManage;
   addItemButton.hidden = !canManage;
   if (addExpenseButton) addExpenseButton.hidden = !canUseTools;
@@ -2977,10 +2996,7 @@ function renderBookings() {
   });
   bookingNextUpcoming.hidden = !nextUpcomingBooking;
   bookingNextUpcoming.innerHTML = nextUpcomingBooking
-    ? `
-        <p class="eyebrow">下一個預訂</p>
-        ${renderBookingCard(nextUpcomingBooking, trip, true)}
-      `
+    ? renderUpcomingBookingFocus(nextUpcomingBooking, trip)
     : "";
 
   if (bookings.length === 0) {
@@ -2988,44 +3004,136 @@ function renderBookings() {
     return;
   }
 
-  bookingList.innerHTML = bookings.map((booking) => renderBookingCard(booking, trip)).join("");
+  bookingList.innerHTML = bookings.map((booking) => renderBookingListCard(booking, trip)).join("");
+}
 
-  function renderBookingCard(booking, trip, isNextUpcoming = false) {
-    const coverImage = getPrimaryImageAttachment(booking.attachments);
-    const tickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
+function getBookingFocusDetails(booking) {
+  const transport = booking.transport || {};
+  const isTransport = booking.type === "交通";
+  const date = getBookingScheduleDate(booking);
+  const time = getBookingScheduleTime(booking);
+  const route = isTransport
+    ? [transport.departurePlace || booking.place, transport.arrivalPlace].filter(Boolean).join(" → ")
+    : booking.place;
+  const service = isTransport
+    ? [transport.mode, transport.company, transport.number].filter(Boolean).join(" · ")
+    : booking.type === "住宿"
+    ? "入住"
+    : booking.type;
 
+  return {
+    date,
+    time,
+    route,
+    service
+  };
+}
+
+function renderBookingTicketActions(booking, trip, actionClass = "text-button") {
+  const visibleTickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
+  const personalTicketActions = visibleTickets.map((ticket) => {
+    const holder = ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "旅程建立者";
+    const buttons = ticket.ticketUrl
+      ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>`
+      : (ticket.attachments || []).map((attachment) => `
+          <button class="${actionClass}" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">
+            出示 ${escapeHtml(attachment.name || "票券")}
+          </button>
+        `).join("");
+
+    if (!buttons) return "";
     return `
-      <article class="utility-card booking-card ${coverImage ? "has-cover" : ""} ${isNextUpcoming ? "is-next-upcoming" : ""}">
-        <div class="booking-card-main">
-          <header class="booking-card-header">
-            <div class="booking-card-labels">
-              <span class="meta">${escapeHtml(booking.type)}</span>
-              ${isNextUpcoming ? `<span class="booking-next-upcoming">下一個預訂</span>` : ""}
-            </div>
-            <h3>${escapeHtml(booking.name)}</h3>
-          </header>
-          ${renderBookingMeta(booking)}
-          ${tickets.map((ticket) => `
-            <section class="personal-ticket-card">
-              ${canManageTrip(trip) ? `<p class="booking-card-line ticket-holder-label"><span>${ticket.visibility === "shared" ? "範圍" : "持有人"}</span>${escapeHtml(ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
-              <div class="card-actions">
-                ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>` : ""}
-                ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "票券")}</button>`).join("") : ""}
-              </div>
-            </section>
-          `).join("")}
-          ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
-          ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
-          ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
-          <div class="card-actions">
-            ${tickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
-            ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
-          </div>
-        </div>
-        ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
-      </article>
+      <div class="booking-ticket-action-group">
+        ${canManageTrip(trip) ? `<span>${escapeHtml(holder)}</span>` : ""}
+        ${buttons}
+      </div>
     `;
-  }
+  }).join("");
+  const legacyTicketAction = visibleTickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl)
+    ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>`
+    : "";
+
+  return personalTicketActions || legacyTicketAction;
+}
+
+function renderBookingAttachmentActions(booking, actionClass = "text-button") {
+  return (booking.attachments || []).map((attachment) => `
+    <button class="${actionClass}" type="button" data-open-attachment="booking" data-owner-id="${escapeHtml(booking.id)}" data-attachment-id="${escapeHtml(attachment.id)}">
+      查看 ${escapeHtml(attachment.name || "附件")}
+    </button>
+  `).join("");
+}
+
+function renderUpcomingBookingFocus(booking, trip) {
+  const details = getBookingFocusDetails(booking);
+  const ticketActions = renderBookingTicketActions(booking, trip, "booking-focus-primary");
+  const attachmentActions = renderBookingAttachmentActions(booking, "booking-focus-secondary");
+
+  return `
+    <article class="booking-focus-card">
+      <header class="booking-focus-header">
+        <span class="booking-focus-kicker">NEXT · 下一個預訂</span>
+        <span class="booking-focus-type">${escapeHtml(booking.type)}</span>
+      </header>
+      <div class="booking-focus-title">
+        <p>${escapeHtml(details.service || "預訂")}</p>
+        <h2>${escapeHtml(booking.name || "未命名預訂")}</h2>
+      </div>
+      <div class="booking-focus-journey">
+        <div class="booking-focus-schedule">
+          <span>${escapeHtml(details.date || "日期未定")}</span>
+          <strong class="booking-focus-time">${escapeHtml(details.time || "整日")}</strong>
+        </div>
+        <div class="booking-focus-route">
+          <span aria-hidden="true">⌖</span>
+          <strong>${escapeHtml(details.route || "地點待確認")}</strong>
+        </div>
+      </div>
+      ${booking.code ? `
+        <p class="booking-focus-code">
+          <span>訂位代碼</span>
+          <strong>${escapeHtml(booking.code)}</strong>
+        </p>
+      ` : ""}
+      <div class="booking-focus-actions">
+        ${ticketActions}
+        ${attachmentActions}
+        ${canManageTrip(trip) ? `<button class="booking-focus-edit" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯預訂</button>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function renderBookingListCard(booking, trip) {
+  const details = getBookingFocusDetails(booking);
+  const coverImage = getPrimaryImageAttachment(booking.attachments);
+  const ticketActions = renderBookingTicketActions(booking, trip);
+
+  return `
+    <article class="utility-card booking-card ${coverImage ? "has-cover" : ""}">
+      ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
+      <div class="booking-card-main">
+        <header class="booking-card-header">
+          <div class="booking-card-labels">
+            <span class="meta">${escapeHtml(booking.type)}</span>
+            ${details.date ? `<span class="booking-list-date">${escapeHtml(details.date)}</span>` : ""}
+          </div>
+          <h3>${escapeHtml(booking.name || "未命名預訂")}</h3>
+        </header>
+        <div class="booking-list-summary">
+          ${details.time ? `<strong>${escapeHtml(details.time)}</strong>` : ""}
+          ${details.route ? `<span>${escapeHtml(details.route)}</span>` : ""}
+        </div>
+        ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
+        ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
+        ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
+        <div class="card-actions booking-list-actions">
+          ${ticketActions}
+          ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
+        </div>
+      </div>
+    </article>
+  `;
 }
 
 function renderBookingMeta(booking) {
@@ -5886,6 +5994,14 @@ dayTabs.addEventListener("click", (event) => {
 });
 
 itineraryPanel?.addEventListener("click", (event) => {
+  const weatherButton = event.target.closest("#dayWeatherChip");
+  if (weatherButton) {
+    weatherPanel.hidden = !weatherPanel.hidden;
+    weatherButton.setAttribute("aria-expanded", String(!weatherPanel.hidden));
+    weatherButton.querySelector("i")?.replaceChildren(document.createTextNode(weatherPanel.hidden ? "⌄" : "⌃"));
+    return;
+  }
+
   const swapButton = event.target.closest("[data-swap-day]");
   if (!swapButton) return;
 
@@ -5900,7 +6016,7 @@ tripSectionTabs.addEventListener("click", (event) => {
   renderTripSectionTabs();
   rememberViewState(captureViewState());
   if (state.activeTripSection === "itinerary") {
-    renderTravelDayPanel();
+    renderItineraryContent();
     renderWeatherPanel();
     renderQuickTickets();
   }

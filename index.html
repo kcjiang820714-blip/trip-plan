@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=103" />
+    <link rel="stylesheet" href="./styles.css?v=105" />
   </head>
   <body>
     <main class="app-shell">
@@ -108,12 +108,15 @@
             ‹
           </button>
           <div class="title-group">
-            <h1>行程總覽</h1>
+            <p id="tripPageName">行程</p>
+            <h1 id="tripTitle">旅程名稱</h1>
           </div>
-          <button class="icon-button" id="openPdfPreviewButton" type="button" aria-label="開啟 PDF 預覽">更多</button>
-          <button class="icon-button" id="editTripButton" type="button" aria-label="編輯旅程" title="編輯旅程">
-            ✎
-          </button>
+          <div class="trip-appbar-actions">
+            <button class="icon-button" id="openPdfPreviewButton" type="button" aria-label="開啟 PDF 預覽" title="更多工具">•••</button>
+            <button class="icon-button" id="editTripButton" type="button" aria-label="編輯旅程" title="編輯旅程">
+              ✎
+            </button>
+          </div>
         </header>
 
         <section class="trip-visual" aria-label="旅程概覽">
@@ -129,28 +132,49 @@
         </section>
 
         <section class="trip-sticky-nav">
-          <nav class="day-tabs" id="dayTabs" aria-label="選擇日期"></nav>
+          <nav class="day-tabs" id="dayTabs" aria-label="滑動選擇日期"></nav>
         </section>
 
         <nav class="trip-section-tabs" id="tripSectionTabs" aria-label="旅程功能">
-          <button class="trip-section-tab is-active" type="button" data-trip-section="itinerary">總覽</button>
-          <button class="trip-section-tab" type="button" data-trip-section="bookings">預訂</button>
-          <button class="trip-section-tab trip-section-add" type="button" data-trip-section-add aria-label="新增">＋</button>
-          <button class="trip-section-tab" type="button" data-trip-section="todos">待辦</button>
-          <button class="trip-section-tab" type="button" data-trip-section="expenses">記帳</button>
+          <button class="trip-section-tab is-active" type="button" data-trip-section="itinerary">
+            <span aria-hidden="true">⌁</span><small>行程</small>
+          </button>
+          <button class="trip-section-tab" type="button" data-trip-section="bookings">
+            <span aria-hidden="true">▣</span><small>預訂</small>
+          </button>
+          <button class="trip-section-tab trip-section-add" type="button" data-trip-section-add aria-label="新增">
+            <span aria-hidden="true">＋</span>
+          </button>
+          <button class="trip-section-tab" type="button" data-trip-section="todos">
+            <span aria-hidden="true">✓</span><small>待辦</small>
+          </button>
+          <button class="trip-section-tab" type="button" data-trip-section="expenses">
+            <span aria-hidden="true">$</span><small>記帳</small>
+          </button>
         </nav>
 
         <section class="trip-section-panel" id="itineraryPanel" data-section-panel="itinerary">
-          <section class="day-header">
-            <div>
+          <section class="day-header itinerary-day-heading">
+            <div class="itinerary-day-copy">
               <p class="eyebrow" id="activeDate">Day 1</p>
               <h2 id="activeDayTitle">抵達京都</h2>
+              <p class="itinerary-day-progress" id="dayProgressText">今天有 3 個行程</p>
             </div>
+            <button class="day-weather-chip" id="dayWeatherChip" type="button" aria-controls="weatherPanel" aria-expanded="false">
+              天氣未設定
+            </button>
           </section>
 
-          <section class="weather-panel" id="weatherPanel" aria-label="今日天氣"></section>
-          <section class="travel-day-panel" id="travelDayPanel" aria-label="今日旅程"></section>
+          <section class="weather-panel" id="weatherPanel" aria-label="今日天氣" hidden></section>
+          <section class="travel-day-panel" id="travelDayPanel" aria-label="下一個行程"></section>
           <section class="quick-ticket-panel" id="quickTicketPanel" aria-label="今日票券" hidden></section>
+          <header class="itinerary-timeline-heading">
+            <div>
+              <p class="eyebrow">今日路線</p>
+              <h3>其他行程</h3>
+            </div>
+            <span id="timelineCount">0 筆</span>
+          </header>
           <section class="timeline" id="timeline" aria-live="polite"></section>
           <button class="timeline-add-button" id="addItemButton" type="button">＋ 新增行程</button>
         </section>
@@ -814,6 +838,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=111" type="module"></script>
+    <script src="./app.js?v=113" type="module"></script>
   </body>
 </html>
