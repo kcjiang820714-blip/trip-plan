@@ -82,3 +82,26 @@ test("共同票券的標籤、按鈕與操作列有獨立可對齊的版面", ()
   assert.match(css, /\.itinerary-shared-ticket button\s*\{[\s\S]*?min-height:\s*44px/);
   assert.match(css, /\.item-details \.card-actions\s*\{[\s\S]*?grid-template-columns:/);
 });
+
+test("桌機緊湊日期導覽只佔行程主欄，與右側摘要欄分開", () => {
+  const finalDesktop = css.slice(css.lastIndexOf("/* Desktop itinerary containment:"));
+
+  assert.match(finalDesktop, /#tripView\[data-active-section="itinerary"\] \.trip-sticky-nav\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+380px/);
+  assert.match(finalDesktop, /#tripView\[data-active-section="itinerary"\] \.compact-day-navigation\s*\{[\s\S]*?grid-column:\s*1/);
+  assert.match(finalDesktop, /#tripView\[data-active-section="itinerary"\] \.compact-day-navigation\s*\{[\s\S]*?width:\s*100%/);
+});
+
+test("桌機時間軸只保留 SVG 分類圖示，不再額外疊加藍色圓點", () => {
+  const finalDesktop = css.slice(css.lastIndexOf("/* Desktop itinerary containment:"));
+
+  assert.match(finalDesktop, /#itineraryPanel \.item-card::after\s*\{[\s\S]*?content:\s*none/);
+  assert.match(finalDesktop, /#itineraryPanel \.itinerary-type-marker\s*\{[\s\S]*?justify-self:\s*center/);
+});
+
+test("桌機展開詳情與摘要卡使用相同左右邊界，不會溢出時間軸", () => {
+  const finalDesktop = css.slice(css.lastIndexOf("/* Desktop itinerary containment:"));
+
+  assert.match(finalDesktop, /#itineraryPanel \.item-details\s*\{[\s\S]*?margin:\s*-1px\s+0\s+0\s+124px/);
+  assert.match(finalDesktop, /#itineraryPanel \.item-details\s*\{[\s\S]*?width:\s*calc\(100%\s*-\s*124px\)/);
+  assert.match(finalDesktop, /#itineraryPanel \.item-details\s*\{[\s\S]*?box-sizing:\s*border-box/);
+});
