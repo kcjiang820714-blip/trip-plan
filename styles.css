@@ -7455,6 +7455,56 @@ select {
   }
 }
 
+/* Desktop timeline axis contract: the rule and each marker derive from one grid coordinate. */
+@media (min-width: 1100px) {
+  #tripView[data-active-section="itinerary"] #itineraryPanel .timeline {
+    --itinerary-time-column: 82px;
+    --itinerary-marker-column: 48px;
+    --itinerary-grid-gap: 14px;
+    --itinerary-marker-half-column: 24px;
+    --itinerary-marker-center: calc(var(--itinerary-time-column) + var(--itinerary-grid-gap) + var(--itinerary-marker-half-column));
+    --itinerary-axis: var(--itinerary-marker-center);
+    position: relative;
+  }
+
+  #tripView[data-active-section="itinerary"] #itineraryPanel .timeline::before {
+    content: "";
+    position: absolute;
+    top: 24px;
+    bottom: 24px;
+    left: var(--itinerary-axis);
+    width: 2px;
+    background: #aeb8b0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-card {
+    position: relative;
+    z-index: 1;
+  }
+
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-card::before {
+    content: none;
+  }
+
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary,
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary.no-itinerary-photo,
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:not(:has(.itinerary-card-photo)) {
+    grid-template-columns: var(--itinerary-time-column) var(--itinerary-marker-column) minmax(0, 1fr) 26px;
+    grid-template-areas: "time marker content arrow";
+    column-gap: var(--itinerary-grid-gap);
+  }
+
+  #tripView[data-active-section="itinerary"] #itineraryPanel .itinerary-type-marker {
+    position: static;
+    grid-area: marker;
+    justify-self: center;
+    align-self: center;
+    z-index: 2;
+  }
+}
+
 /* Desktop itinerary containment: navigation, marker, and expanded card share one grid. */
 @media (min-width: 1100px) {
   #tripView[data-active-section="itinerary"] .trip-sticky-nav {
@@ -9650,6 +9700,26 @@ select {
   min-width: 0;
 }
 
+#addBookingButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ref-coral);
+  color: #fff;
+  font: inherit;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  padding: 0 20px;
+  box-shadow: 0 9px 20px rgba(243, 101, 75, 0.24);
+}
+
+#addBookingButton:hover {
+  background: #e95b43;
+}
+
 .booking-workspace,
 .booking-main-column,
 #bookingList {
@@ -10033,6 +10103,21 @@ select {
     display: none;
   }
 
+  #bookingsPanel > .booking-desktop-heading {
+    display: block;
+    margin: 0;
+  }
+
+  #bookingsPanel > .booking-desktop-heading > div {
+    display: none;
+  }
+
+  #bookingsPanel #addBookingButton {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+  }
+
   #bookingsPanel .sub-tabs {
     order: 0;
     margin: 0 -16px;
@@ -10127,7 +10212,14 @@ select {
 
   .booking-desktop-heading {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
     margin-bottom: 24px;
+  }
+
+  .booking-desktop-heading #addBookingButton {
+    flex: 0 0 auto;
   }
 
   .booking-desktop-heading .eyebrow {
