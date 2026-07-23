@@ -98,6 +98,19 @@ test("桌機時間軸只保留 SVG 分類圖示，不再額外疊加藍色圓點
   assert.match(finalDesktop, /#itineraryPanel \.itinerary-type-marker\s*\{[\s\S]*?justify-self:\s*center/);
 });
 
+test("桌機時間軸直線與分類圖示中心共用同一個座標公式", () => {
+  const finalAxisContract = css.slice(css.lastIndexOf("/* Desktop timeline axis contract:"));
+
+  assert.match(finalAxisContract, /--itinerary-time-column:\s*82px/);
+  assert.match(finalAxisContract, /--itinerary-marker-column:\s*48px/);
+  assert.match(finalAxisContract, /--itinerary-grid-gap:\s*14px/);
+  assert.match(finalAxisContract, /--itinerary-marker-center:\s*calc\(var\(--itinerary-time-column\)\s*\+\s*var\(--itinerary-grid-gap\)\s*\+\s*var\(--itinerary-marker-half-column\)\)/);
+  assert.match(finalAxisContract, /--itinerary-axis:\s*var\(--itinerary-marker-center\)/);
+  assert.match(finalAxisContract, /\.timeline::before\s*\{[\s\S]*?left:\s*var\(--itinerary-axis\)/);
+  assert.match(finalAxisContract, /\.item-summary(?:[^\{])*\{[\s\S]*?grid-template-columns:\s*var\(--itinerary-time-column\)\s+var\(--itinerary-marker-column\)\s+minmax\(0,\s*1fr\)\s+26px/);
+  assert.match(finalAxisContract, /\.item-card::before\s*\{[\s\S]*?content:\s*none/);
+});
+
 test("桌機展開詳情與摘要卡使用相同左右邊界，不會溢出時間軸", () => {
   const finalDesktop = css.slice(css.lastIndexOf("/* Desktop itinerary containment:"));
 
