@@ -45,3 +45,9 @@ node --check app.js
 ## Concerns
 
 目前執行環境沒有可控制的瀏覽器，因此無法產出手機 UI 擷圖；已改以 CSS 守門測試、完整回歸測試與語法檢查驗證。建議整合時在實際瀏覽器以手機寬度再確認一次底部導覽與安全區。
+
+## Review 修正：水平間距與按鈕觸控高度
+
+- 移除 `max-width: 679px` 下四個主要 panel 的 `padding-inline: var(--space-4)`。`.app-shell` 已提供 16px 水平內距；移除後，手機畫面從 viewport 到內容實際維持單一 16px 間距，且不影響卡片原有內距。
+- 擴充 `tests/mobile-layout.test.js`：逐一禁止四個主要 panel 在手機覆寫中再加入 `padding-inline`，並確認 `.primary-button` 維持 44px 最小觸控高度。
+- 已先執行新增測試，確認它會因舊有重複間距規則而失敗；修正後將執行完整驗證命令。
