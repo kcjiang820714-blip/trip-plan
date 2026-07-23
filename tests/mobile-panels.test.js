@@ -42,7 +42,9 @@ test("預訂可標示下一筆，記帳在摘要後有新增入口", () => {
   assert.match(app, /booking-focus-card/);
   assert.match(app, /renderUpcomingBookingFocus/);
   assert.doesNotMatch(functionSource("renderBookings"), /\.sort\(/);
-  assert.match(html, /<h2 id="expenseSummary">尚無支出<\/h2>\s*<\/div>\s*<button class="secondary-action expense-add-button" id="addExpenseButton"/);
+  const expensePanel = html.match(/<section class="trip-section-panel" id="expensesPanel"[\s\S]*?<\/section>\s*<\/section>\s*<section class="install-panel"/)?.[0] ?? "";
+  assert.match(expensePanel, /<h2>記帳<\/h2>\s*<span class="sr-only" id="expenseSummary">尚無支出<\/span>/);
+  assert.match(expensePanel, /id="expenseDashboard"[\s\S]*<button class="secondary-action expense-add-button" id="addExpenseButton"/);
 });
 
 test("下一筆預訂會跨分類挑出所有可見預訂中最早的未來項目，且不改寫原陣列", () => {
