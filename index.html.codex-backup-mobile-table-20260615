@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#136f63" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="旅．拾光" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>旅．拾光</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css?v=95" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="readonly-banner" id="readonlyBanner" hidden>
+        <strong>唯讀分享模式</strong>
+        <p>你可以查看行程與開啟地圖，不能新增、編輯或匯入資料。</p>
+      </section>
+
+      <section class="landing-view" id="landingView">
+        <header class="landing-hero">
+          <div class="landing-brand">
+            <p class="eyebrow">旅．拾光</p>
+            <strong>Travel Light Log</strong>
+          </div>
+
+          <div class="landing-actions">
+            <button class="primary-button" id="enterTripsButton" type="button">進入旅程</button>
+            <button class="secondary-action" id="quickAddTripButton" type="button">新增旅程</button>
+          </div>
+        </header>
+
+        <section class="landing-ticket" aria-label="最近旅程">
+          <div class="ticket-map" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <p class="eyebrow">最近拾起的旅程</p>
+            <h2 id="landingTripTitle">尚未建立旅程</h2>
+            <p id="landingTripMeta">建立第一趟旅程開始規劃</p>
+          </div>
+          <button class="icon-button" id="openRecentTripButton" type="button" aria-label="開啟最近旅程" title="開啟最近旅程">›</button>
+        </section>
+
+        <section class="landing-stats" aria-label="旅程摘要">
+          <div>
+            <span id="landingTripCount">0</span>
+            <p>旅程</p>
+          </div>
+          <div>
+            <span id="landingItemCount">0</span>
+            <p>行程</p>
+          </div>
+          <div>
+            <span id="landingToday">今天</span>
+            <p>拾光日</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="homeView" hidden>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">旅．拾光</p>
+            <h1>我的旅程</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="secondary-action" id="backToLandingButton" type="button">封面</button>
+            <button class="primary-button" id="addTripButton" type="button">新增旅程</button>
+          </div>
+        </header>
+
+        <section class="data-actions" aria-label="資料同步">
+          <button class="secondary-action" id="exportButton" type="button">匯出資料</button>
+          <button class="secondary-action" id="importButton" type="button">匯入資料</button>
+          <input id="importFileInput" type="file" accept="application/json,.json" hidden />
+        </section>
+
+        <section class="cloud-panel" id="cloudPanel">
+          <div>
+            <p class="eyebrow">雲端同步</p>
+            <h2>Supabase</h2>
+            <p id="cloudStatus">尚未登入。登入後會把旅程同步到雲端。</p>
+          </div>
+          <form class="cloud-form" id="cloudAuthForm">
+            <input id="cloudEmailInput" type="email" autocomplete="email" placeholder="Email" />
+            <input id="cloudPasswordInput" type="password" autocomplete="current-password" placeholder="密碼" />
+            <div class="cloud-actions">
+              <button class="secondary-action" id="cloudSignUpButton" type="button">註冊</button>
+              <button class="primary-button" id="cloudSignInButton" type="submit">登入</button>
+              <button class="secondary-action" id="cloudSyncButton" type="button" hidden>立即同步</button>
+              <button class="secondary-action" id="cloudSignOutButton" type="button" hidden>登出</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="trip-list" id="tripList" aria-label="旅程清單"></section>
+      </section>
+
+      <section id="tripView" hidden>
+        <header class="trip-appbar">
+          <button class="icon-button" id="backToTripsButton" type="button" aria-label="回旅程清單" title="回旅程清單">
+            ‹
+          </button>
+          <div class="title-group">
+            <h1>行程總覽</h1>
+          </div>
+          <button class="icon-button" id="editTripButton" type="button" aria-label="編輯旅程" title="編輯旅程">
+            ✎
+          </button>
+        </header>
+
+        <section class="trip-visual" aria-label="旅程概覽">
+          <div class="route-line" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <p id="tripDates">2026/10/12 - 2026/10/14</p>
+            <strong id="tripSummary">3 天，9 個行程</strong>
+          </div>
+        </section>
+
+        <section class="trip-sticky-nav">
+          <nav class="day-tabs" id="dayTabs" aria-label="選擇日期"></nav>
+        </section>
+
+        <nav class="trip-section-tabs" id="tripSectionTabs" aria-label="旅程功能">
+          <button class="trip-section-tab is-active" type="button" data-trip-section="itinerary">總覽</button>
+          <button class="trip-section-tab" type="button" data-trip-section="bookings">預訂</button>
+          <button class="trip-section-tab trip-section-add" type="button" data-trip-section-add aria-label="新增">＋</button>
+          <button class="trip-section-tab" type="button" data-trip-section="todos">待辦</button>
+          <button class="trip-section-tab" type="button" data-trip-section="expenses">記帳</button>
+        </nav>
+
+        <section class="trip-section-panel" id="itineraryPanel" data-section-panel="itinerary">
+          <section class="day-header">
+            <div>
+              <p class="eyebrow" id="activeDate">Day 1</p>
+              <h2 id="activeDayTitle">抵達京都</h2>
+            </div>
+          </section>
+
+          <section class="weather-panel" id="weatherPanel" aria-label="今日天氣"></section>
+          <section class="travel-day-panel" id="travelDayPanel" aria-label="今日旅程"></section>
+          <section class="quick-ticket-panel" id="quickTicketPanel" aria-label="今日票券" hidden></section>
+          <section class="timeline" id="timeline" aria-live="polite"></section>
+          <button class="timeline-add-button" id="addItemButton" type="button">＋ 新增行程</button>
+        </section>
+
+        <section class="trip-section-panel" id="bookingsPanel" data-section-panel="bookings" hidden>
+          <section class="day-header">
+            <div>
+              <p class="eyebrow">預訂</p>
+              <h2 id="bookingSectionTitle">票券</h2>
+            </div>
+          </section>
+          <nav class="sub-tabs" id="bookingSubTabs" aria-label="預訂分類">
+            <button class="sub-tab is-active" type="button" data-booking-group="票券">票券</button>
+            <button class="sub-tab" type="button" data-booking-group="餐廳">餐廳</button>
+            <button class="sub-tab" type="button" data-booking-group="住宿">住宿</button>
+          </nav>
+          <section class="utility-list" id="bookingList"></section>
+        </section>
+
+        <section class="trip-section-panel" id="todosPanel" data-section-panel="todos" hidden>
+          <section class="day-header">
+            <div>
+              <p class="eyebrow">待辦事項</p>
+              <h2 id="todoSectionTitle">行前準備</h2>
+            </div>
+          </section>
+          <nav class="sub-tabs" id="todoSubTabs" aria-label="待辦分類">
+            <button class="sub-tab is-active" type="button" data-todo-group="行前準備">行前準備</button>
+            <button class="sub-tab" type="button" data-todo-group="行李打包">行李打包</button>
+            <button class="sub-tab" type="button" data-todo-group="購物清單">購物清單</button>
+            <button class="sub-tab" type="button" data-todo-group="旅途中提醒">旅途中提醒</button>
+          </nav>
+          <section class="todo-groups" id="todoGroups"></section>
+        </section>
+
+        <section class="trip-section-panel" id="expensesPanel" data-section-panel="expenses" hidden>
+          <section class="day-header">
+            <div>
+              <p class="eyebrow">記帳</p>
+              <h2 id="expenseSummary">尚無支出</h2>
+            </div>
+          </section>
+          <section class="expense-section">
+            <header class="expense-section-heading">
+              <p class="eyebrow">設定</p>
+              <h3>成員與匯率</h3>
+            </header>
+            <div class="expense-settings-grid">
+              <section class="expense-members">
+                <div>
+                  <p class="eyebrow">成員</p>
+                  <div class="member-chips" id="memberChips"></div>
+                </div>
+                <form class="inline-form" id="memberForm">
+                  <input id="memberNameInput" placeholder="新增成員，例如 小美" />
+                  <button class="secondary-action" type="submit">新增</button>
+                </form>
+                <form class="inline-form member-profile-form" id="memberProfileForm" hidden>
+                  <input id="memberDisplayNameInput" placeholder="設定我的記帳名稱" />
+                  <button class="secondary-action" type="submit">儲存名稱</button>
+                </form>
+              </section>
+              <section class="exchange-panel">
+                <div>
+                  <p class="eyebrow">匯率</p>
+                  <h3>換算台幣</h3>
+                  <p>請填「1 單位外幣可以換成多少 TWD」。例如 JPY 填 0.22，代表 1 JPY 約等於 0.22 TWD。輸入完成後點其他地方才會套用。</p>
+                </div>
+                <div class="exchange-rate-list" id="exchangeRateList"></div>
+              </section>
+            </div>
+          </section>
+          <section class="expense-section">
+            <header class="expense-section-heading">
+              <p class="eyebrow">分析</p>
+              <h3>統計與帳務總表</h3>
+            </header>
+            <section class="expense-dashboard" id="expenseDashboard"></section>
+          </section>
+          <section class="expense-section">
+            <header class="expense-section-heading">
+              <p class="eyebrow">明細</p>
+              <h3>每日帳目</h3>
+            </header>
+            <section class="expense-day-list" id="expenseList"></section>
+          </section>
+        </section>
+      </section>
+
+      <section class="install-panel" id="installPanel">
+        <div>
+          <strong>加入手機主畫面</strong>
+          <p>用 Safari 或 Chrome 打開後，選「分享」再選「加入主畫面」。</p>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="editor" id="itemDialog">
+      <form method="dialog" id="itemForm">
+        <header>
+          <h2 id="dialogTitle">新增行程</h2>
+          <button class="icon-button" data-close-dialog="itemDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          時間
+          <input id="timeInput" name="time" type="hidden" />
+          <span class="time-selects">
+            <select id="timeHourInput" aria-label="小時" required></select>
+            <select id="timeMinuteInput" aria-label="分鐘" required></select>
+          </span>
+        </label>
+
+        <label>
+          地點
+          <input id="placeInput" name="place" placeholder="清水寺" required />
+        </label>
+
+        <label>
+          交通 / 分類
+          <select id="typeInput" name="type" required>
+            <option value="景點">景點</option>
+            <option value="餐廳">餐廳</option>
+            <option value="午餐">午餐</option>
+            <option value="交通">交通</option>
+            <option value="飛機">飛機</option>
+            <option value="住宿">住宿</option>
+            <option value="購物">購物</option>
+            <option value="散步">散步</option>
+            <option value="其他">其他</option>
+          </select>
+        </label>
+
+        <section class="flight-fields" id="flightFields" hidden>
+          <label>
+            航空公司
+            <input id="airlineInput" name="airline" placeholder="長榮航空" />
+          </label>
+
+          <label>
+            航班代碼
+            <input id="flightCodeInput" name="flightCode" placeholder="BR198" autocapitalize="characters" />
+          </label>
+
+          <label>
+            出發時間
+            <input id="departureTimeInput" name="departureTime" type="hidden" />
+            <span class="time-selects">
+              <select id="departureHourInput" aria-label="出發小時"></select>
+              <select id="departureMinuteInput" aria-label="出發分鐘"></select>
+            </span>
+          </label>
+
+          <label>
+            出發機場
+            <input id="departureAirportInput" name="departureAirport" placeholder="桃園國際機場 TPE" />
+          </label>
+
+          <label>
+            出發航廈
+            <input id="departureTerminalInput" name="departureTerminal" placeholder="第二航廈" />
+          </label>
+
+          <label>
+            抵達時間
+            <input id="arrivalTimeInput" name="arrivalTime" type="hidden" />
+            <span class="time-selects">
+              <select id="arrivalHourInput" aria-label="抵達小時"></select>
+              <select id="arrivalMinuteInput" aria-label="抵達分鐘"></select>
+            </span>
+          </label>
+
+          <label>
+            抵達機場
+            <input id="arrivalAirportInput" name="arrivalAirport" placeholder="關西國際機場 KIX" />
+          </label>
+
+          <label>
+            抵達航廈
+            <input id="arrivalTerminalInput" name="arrivalTerminal" placeholder="第 1 航廈" />
+          </label>
+        </section>
+
+        <section class="transport-fields" id="transportFields" hidden>
+          <label>
+            交通方式
+            <select id="transportModeInput" name="transportMode">
+              <option value="火車">火車</option>
+              <option value="地鐵">地鐵</option>
+              <option value="JR">JR</option>
+              <option value="公車/巴士">公車/巴士</option>
+              <option value="步行">步行</option>
+              <option value="其他">其他</option>
+            </select>
+          </label>
+
+          <section class="transport-segments" id="transportSegments" aria-label="交通轉乘段落"></section>
+
+          <button class="secondary-action add-segment-button" id="addTransportSegmentButton" type="button">新增轉乘</button>
+        </section>
+
+        <section class="attraction-fields" id="attractionFields">
+          <label>
+            景點介紹
+            <textarea id="attractionIntroInput" name="attractionIntro" rows="4" placeholder="可以記錄景點特色、歷史背景、推薦看點或拍照位置"></textarea>
+          </label>
+        </section>
+
+        <label>
+          行程內容
+          <textarea id="itemContentInput" name="content" rows="3" placeholder="會顯示在行程卡片上，例如：參觀主殿、拍照、逛周邊小店"></textarea>
+        </label>
+
+        <label>
+          備註
+          <textarea id="noteInput" name="note" rows="4" placeholder="集合地點、訂位資訊、提醒事項"></textarea>
+        </label>
+
+        <label>
+          照片
+          <input id="itemPhotoInput" type="file" accept="image/*" multiple />
+        </label>
+
+        <section class="existing-attachments" id="itemExistingAttachments" hidden></section>
+
+        <footer>
+          <button class="secondary-button" id="deleteItemButton" type="button">刪除</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="tripDialog">
+      <form method="dialog" id="tripForm">
+        <header>
+          <h2 id="tripDialogTitle">編輯旅程</h2>
+          <button class="icon-button" data-close-dialog="tripDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          旅程名稱
+          <input id="tripNameInput" name="tripName" required />
+        </label>
+
+        <label>
+          開始日期
+          <input id="tripStartInput" name="tripStart" type="date" required />
+        </label>
+
+        <label>
+          結束日期
+          <input id="tripEndInput" name="tripEnd" type="date" required />
+        </label>
+
+        <label>
+          天數
+          <input id="tripDaysInput" name="tripDays" readonly />
+        </label>
+
+        <section class="trip-day-title-editor" id="tripDayTitleEditor" aria-label="每日標題"></section>
+
+        <section class="trip-segment-editor" id="tripSegmentEditor" aria-label="旅程分段"></section>
+
+        <section class="trip-weather-editor" id="tripWeatherEditor" aria-label="每日天氣城市"></section>
+
+        <section class="trip-share-panel" id="tripSharePanel" hidden>
+          <div class="trip-share-heading">
+            <div>
+              <strong>旅伴共享</strong>
+              <span>輸入朋友註冊用的 Email，讓他看到這趟旅程。</span>
+            </div>
+          </div>
+          <div class="trip-invite-form" id="tripInviteForm">
+            <input id="tripInviteEmailInput" type="email" placeholder="朋友的 Email" autocomplete="email" />
+            <input id="tripInviteDisplayNameInput" placeholder="記帳顯示名稱，例如 小美" />
+            <select id="tripInviteRoleInput" aria-label="共享權限">
+              <option value="viewer">只能查看</option>
+              <option value="participant">可記帳與待辦</option>
+            </select>
+            <button class="secondary-action" id="tripInviteButton" type="button">邀請</button>
+          </div>
+          <p class="trip-share-status" id="tripShareStatus"></p>
+          <div class="trip-member-list" id="tripMemberList"></div>
+        </section>
+
+        <footer>
+          <button class="secondary-button" id="deleteTripButton" type="button">刪除旅程</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="bookingDialog">
+      <form method="dialog" id="bookingForm">
+        <header>
+          <h2 id="bookingDialogTitle">新增預訂</h2>
+          <button class="icon-button" data-close-dialog="bookingDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          類型
+          <select id="bookingTypeInput" required>
+            <option value="機票">機票</option>
+            <option value="景點票券">景點票券</option>
+            <option value="餐廳">餐廳</option>
+            <option value="住宿">住宿</option>
+            <option value="活動">活動</option>
+            <option value="其他">其他</option>
+          </select>
+        </label>
+
+        <label>
+          名稱
+          <input id="bookingNameInput" placeholder="餐廳名稱、飯店、票券名稱" required />
+        </label>
+
+        <label id="bookingDateLabel">
+          日期
+          <input id="bookingDateInput" type="date" required />
+        </label>
+
+        <label id="bookingTimeLabel">
+          時間
+          <input id="bookingTimeInput" type="hidden" />
+          <span class="time-selects">
+            <select id="bookingHourInput" aria-label="預訂小時"></select>
+            <select id="bookingMinuteInput" aria-label="預訂分鐘"></select>
+          </span>
+        </label>
+
+        <section class="booking-stay-fields" id="bookingStayFields" hidden>
+          <label>
+            退房日期
+            <input id="bookingCheckoutDateInput" type="date" />
+          </label>
+
+          <label>
+            check-out 時間
+            <input id="bookingCheckoutTimeInput" type="hidden" />
+            <span class="time-selects">
+              <select id="bookingCheckoutHourInput" aria-label="check-out 小時"></select>
+              <select id="bookingCheckoutMinuteInput" aria-label="check-out 分鐘"></select>
+            </span>
+          </label>
+
+          <label class="checkbox-row">
+            <input id="bookingBreakfastInput" type="checkbox" />
+            <span>含早餐</span>
+          </label>
+        </section>
+
+        <label>
+          地點 / 地址
+          <input id="bookingPlaceInput" placeholder="地點、地址或集合處" />
+        </label>
+
+        <label>
+          訂位 / 訂單代碼
+          <input id="bookingCodeInput" placeholder="Booking ID、訂位代碼" />
+        </label>
+
+        <label>
+          備註
+          <textarea id="bookingNoteInput" rows="3" placeholder="付款狀態、注意事項"></textarea>
+        </label>
+
+        <label>
+          訂單附件
+          <input id="bookingAttachmentInput" type="file" accept="image/*,.pdf" multiple />
+        </label>
+
+        <section class="existing-attachments" id="bookingExistingAttachments" hidden></section>
+
+        <footer>
+          <button class="secondary-button" id="deleteBookingButton" type="button">刪除預訂</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="todoDialog">
+      <form method="dialog" id="todoForm">
+        <header>
+          <h2 id="todoDialogTitle">新增待辦</h2>
+          <button class="icon-button" data-close-dialog="todoDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          清單
+          <select id="todoGroupInput" required>
+            <option value="行前準備">行前準備</option>
+            <option value="行李打包">行李打包</option>
+            <option value="購物清單">購物清單</option>
+            <option value="旅途中提醒">旅途中提醒</option>
+          </select>
+        </label>
+
+        <label>
+          項目
+          <input id="todoTextInput" placeholder="護照、轉接頭、藥品" required />
+        </label>
+
+        <section class="todo-detail-fields" id="todoPrepFields">
+          <label>
+            期限日期
+            <input id="todoDueDateInput" type="date" />
+          </label>
+          <label>
+            重要程度
+            <select id="todoPriorityInput">
+              <option value="">一般</option>
+              <option value="高">高</option>
+              <option value="中">中</option>
+              <option value="低">低</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="todo-detail-fields" id="todoQuantityFields" hidden>
+          <label>
+            數量
+            <input id="todoQuantityInput" type="number" min="0" step="0.01" placeholder="2" />
+          </label>
+          <label>
+            單位
+            <input id="todoUnitInput" placeholder="個、件、包" />
+          </label>
+        </section>
+
+        <section class="todo-detail-fields" id="todoShoppingFields" hidden>
+          <label>
+            預估金額
+            <input id="todoAmountInput" type="number" min="0" step="0.01" placeholder="300" />
+          </label>
+          <label>
+            幣別
+            <select id="todoCurrencyInput">
+              <option value="TWD">TWD</option>
+              <option value="JPY">JPY</option>
+              <option value="KRW">KRW</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="CHF">CHF</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="todo-detail-fields" id="todoReminderFields" hidden>
+          <label>
+            日期
+            <input id="todoDateInput" type="date" />
+          </label>
+          <label>
+            時間
+            <input id="todoTimeInput" type="hidden" />
+            <span class="time-selects">
+              <select id="todoHourInput" aria-label="提醒小時"></select>
+              <select id="todoMinuteInput" aria-label="提醒分鐘"></select>
+            </span>
+          </label>
+        </section>
+
+        <label id="todoPlaceLabel" hidden>
+          <span id="todoPlaceLabelText">地點</span>
+          <input id="todoPlaceInput" placeholder="行李箱、蝦皮、飯店" />
+        </label>
+
+        <label>
+          備註
+          <textarea id="todoNoteInput" rows="3" placeholder="補充說明、注意事項"></textarea>
+        </label>
+
+        <footer>
+          <button class="secondary-button" id="deleteTodoButton" type="button">刪除待辦</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="editor" id="expenseDialog">
+      <form method="dialog" id="expenseForm">
+        <header>
+          <h2 id="expenseDialogTitle">新增支出</h2>
+          <button class="icon-button" data-close-dialog="expenseDialog" type="button" aria-label="關閉" title="關閉">×</button>
+        </header>
+
+        <label>
+          日期
+          <input id="expenseDateInput" type="date" required />
+        </label>
+
+        <label>
+          品項
+          <input id="expenseNameInput" placeholder="拉麵、電車票、門票" required />
+        </label>
+
+        <label>
+          金額
+          <input id="expenseAmountInput" type="number" min="0" step="0.01" placeholder="1200" required />
+        </label>
+
+        <label>
+          貨幣
+          <select id="expenseCurrencyInput" required>
+            <option value="JPY">JPY</option>
+            <option value="TWD">TWD</option>
+            <option value="USD">USD</option>
+            <option value="KRW">KRW</option>
+            <option value="EUR">EUR</option>
+            <option value="CHF">CHF</option>
+          </select>
+        </label>
+
+        <label>
+          分類
+          <select id="expenseCategoryInput" required>
+            <option value="餐飲">餐飲</option>
+            <option value="交通">交通</option>
+            <option value="住宿">住宿</option>
+            <option value="票券">票券</option>
+            <option value="購物">購物</option>
+            <option value="其他">其他</option>
+          </select>
+        </label>
+
+        <label>
+          付款人
+          <select id="expensePayerInput" required></select>
+        </label>
+
+        <section class="expense-share-fields">
+          <p>一起分攤的人</p>
+          <div class="check-list" id="expenseShareInputs"></div>
+        </section>
+
+        <label>
+          備註
+          <textarea id="expenseNoteInput" rows="3" placeholder="付款方式、分攤對象"></textarea>
+        </label>
+
+        <footer>
+          <button class="secondary-button" id="deleteExpenseButton" type="button">刪除支出</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="attachment-viewer" id="attachmentViewer">
+      <header>
+        <h2 id="attachmentViewerTitle">附件預覽</h2>
+        <button class="icon-button" id="closeAttachmentViewerButton" type="button" aria-label="關閉" title="關閉">×</button>
+      </header>
+      <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
+    </dialog>
+
+    <script src="./app.js?v=105" type="module"></script>
+  </body>
+</html>
