@@ -4985,6 +4985,7 @@ h2 {
 
 @media (min-width: 680px) {
   .app-shell {
+    width: min(100%, 900px);
     padding-top: 36px;
   }
 
@@ -5022,5 +5023,304 @@ h2 {
 
   .item-details {
     margin-left: 86px;
+  }
+}
+
+:root {
+  --color-bg: #F7F4EF;
+  --color-surface: #FFFDF8;
+  --color-ink: #182521;
+  --color-muted: #66706B;
+  --color-primary: #0F6B5F;
+  --color-accent: #D98145;
+  --color-line: #D8DDD3;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-card: 12px;
+  --shadow-card: 0 8px 24px rgba(24, 37, 33, .08);
+}
+
+#tripView {
+  background: var(--color-bg);
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+}
+
+.trip-section-tabs {
+  background: var(--color-surface);
+  padding: var(--space-3) var(--space-4) env(safe-area-inset-bottom);
+}
+
+.primary-button {
+  min-height: 44px;
+  background: var(--color-primary);
+}
+
+.utility-card,
+.todo-group,
+.booking-card,
+.expense-day-card {
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.expense-add-button {
+  display: none;
+}
+
+.booking-next-upcoming {
+  display: none;
+}
+
+.booking-next-focus {
+  display: none;
+}
+
+@media (max-width: 679px) {
+  .utility-card,
+  .todo-group,
+  .booking-card,
+  .expense-day-card {
+    border-radius: var(--radius-card);
+  }
+
+  .primary-button {
+    min-height: 44px;
+  }
+
+  #itineraryPanel {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #itineraryPanel .day-header {
+    order: 0;
+  }
+
+  #itineraryPanel .weather-panel {
+    order: 1;
+    margin-bottom: 0;
+  }
+
+  #itineraryPanel .travel-day-panel {
+    order: 2;
+    margin-bottom: 0;
+  }
+
+  #itineraryPanel .quick-ticket-panel {
+    order: 3;
+    margin-bottom: 0;
+  }
+
+  #itineraryPanel .timeline {
+    order: 4;
+  }
+
+  #itineraryPanel .timeline-add-button {
+    order: 5;
+  }
+
+  .weather-card {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .weather-location-card {
+    padding: 8px 10px;
+  }
+
+  .weather-location-summary {
+    min-height: 48px;
+  }
+
+  #itineraryPanel .item-card,
+  #itineraryPanel .item-summary {
+    min-height: 48px;
+  }
+
+  .sub-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .sub-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sub-tab {
+    flex: 0 0 auto;
+    min-width: 88px;
+    white-space: nowrap;
+  }
+
+  .booking-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .booking-next-focus {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .booking-next-focus > .eyebrow {
+    margin: 0;
+  }
+
+  .booking-card-main {
+    min-width: 0;
+  }
+
+  .booking-card .booking-cover {
+    order: -1;
+    width: 100%;
+    max-height: none;
+    aspect-ratio: 16 / 9;
+  }
+
+  .booking-card.is-next-upcoming {
+    border-color: color-mix(in srgb, var(--brand), white 58%);
+    box-shadow: 0 12px 28px rgba(15, 107, 95, 0.14);
+  }
+
+  .booking-card-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    align-items: center;
+  }
+
+  .booking-next-upcoming {
+    display: inline-flex;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--brand), white 88%);
+    color: var(--brand-dark);
+    font-size: 0.74rem;
+    font-weight: 950;
+    line-height: 1;
+    padding: 6px 8px;
+  }
+
+  .todo-table {
+    gap: 10px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .todo-table-row:not(.todo-table-head) {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .todo-table-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    min-height: 48px;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .todo-table-head {
+    display: none;
+  }
+
+  .todo-main-cell {
+    grid-column: 1 / -1;
+  }
+
+  .todo-main-cell input {
+    width: 24px;
+    height: 24px;
+    margin-top: 0;
+  }
+
+  .todo-detail-cell {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    white-space: normal;
+  }
+
+  .todo-second-cell {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    max-width: 42vw;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 950;
+    overflow-wrap: anywhere;
+    text-align: right;
+  }
+
+  .todo-third-cell {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  .todo-status-cell {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+  }
+
+  .todo-action-cell {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: end;
+  }
+
+  .todo-table-row.is-done {
+    opacity: 0.68;
+  }
+
+  .todo-table-row.is-done .todo-title-stack strong {
+    text-decoration: line-through;
+  }
+
+  .expense-settings-grid,
+  .expense-dashboard,
+  .expense-day-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #expensesPanel .day-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  #expensesPanel .expense-add-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: start;
+    min-height: 44px;
+  }
+
+  #expensesPanel .expense-section:first-of-type {
+    opacity: 0.9;
+  }
+
+  .expense-entry-main strong {
+    overflow-wrap: anywhere;
+  }
+
+  .expense-entry-amount {
+    min-width: 0;
   }
 }

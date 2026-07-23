@@ -229,6 +229,7 @@ const activeDate = document.querySelector("#activeDate");
 const activeDayTitle = document.querySelector("#activeDayTitle");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
+const openPdfPreviewButton = document.querySelector("#openPdfPreviewButton");
 const pdfPreviewStage = document.querySelector("#pdfPreviewStage");
 const pdfImageControls = document.querySelector("#pdfImageControls");
 const printPdfPreviewButton = document.querySelector("#printPdfPreviewButton");
@@ -239,12 +240,14 @@ const timeline = document.querySelector("#timeline");
 const quickTicketPanel = document.querySelector("#quickTicketPanel");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
 const bookingSectionTitle = document.querySelector("#bookingSectionTitle");
+const bookingNextUpcoming = document.querySelector("#bookingNextUpcoming");
 const bookingList = document.querySelector("#bookingList");
 const todoSubTabs = document.querySelector("#todoSubTabs");
 const todoSectionTitle = document.querySelector("#todoSectionTitle");
 const todoGroups = document.querySelector("#todoGroups");
 const expenseList = document.querySelector("#expenseList");
 const expenseSummary = document.querySelector("#expenseSummary");
+const addExpenseButton = document.querySelector("#addExpenseButton");
 const memberChips = document.querySelector("#memberChips");
 const memberForm = document.querySelector("#memberForm");
 const memberNameInput = document.querySelector("#memberNameInput");
@@ -2846,6 +2849,25 @@ function getBookingScheduleTime(booking) {
   return booking.type === "交通" ? booking.transport?.departureTime || booking.time : booking.time;
 }
 
+function findNextUpcomingBooking(bookings, currentDate, currentTime) {
+  const currentSchedule = `${currentDate} ${currentTime}`;
+  let nextBooking = null;
+  let nextSchedule = "";
+
+  for (const booking of bookings) {
+    const scheduleDate = getBookingScheduleDate(booking);
+    if (!scheduleDate) continue;
+    const schedule = `${scheduleDate} ${getBookingScheduleTime(booking) || "23:59"}`;
+    if (schedule < currentSchedule) continue;
+    if (!nextBooking || schedule < nextSchedule) {
+      nextBooking = booking;
+      nextSchedule = schedule;
+    }
+  }
+
+  return nextBooking;
+}
+
 function getBookingsForDay(trip, dayDate) {
   return (trip.bookings || []).filter((booking) => getBookingScheduleDate(booking) === dayDate || (booking.type === "住宿" && isDateInStayRange(dayDate, booking)));
 }
@@ -2922,19 +2944,21 @@ function renderTripSectionTabs() {
   const addButton = document.querySelector("[data-trip-section-add]");
   const canManage = canManageTrip();
   const canUseTools = canUseCollaborativeTools();
+  const primaryTripSections = new Set(["itinerary", "bookings", "todos", "expenses"]);
 
   editTripButton.hidden = !canManage;
   addItemButton.hidden = !canManage;
+  if (addExpenseButton) addExpenseButton.hidden = !canUseTools;
   if (addButton) {
     addButton.hidden =
       (state.activeTripSection === "itinerary" && !canManage) ||
       (state.activeTripSection === "bookings" && !canManage) ||
-      state.activeTripSection === "pdf" ||
+      (state.activeTripSection === "pdf" && !canManage) ||
       ((state.activeTripSection === "todos" || state.activeTripSection === "expenses") && !canUseTools);
   }
 
   document.querySelectorAll("[data-trip-section]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.tripSection === state.activeTripSection);
+    button.classList.toggle("is-active", primaryTripSections.has(button.dataset.tripSection) && button.dataset.tripSection === state.activeTripSection);
   });
 
   document.querySelectorAll("[data-section-panel]").forEach((panel) => {
@@ -2944,54 +2968,64 @@ function renderTripSectionTabs() {
 
 function renderBookings() {
   const trip = currentTrip();
-  const bookings = trip.bookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup && canViewBookingTicket(booking, trip));
+  const visibleBookings = trip.bookings.filter((booking) => canViewBookingTicket(booking, trip));
+  const bookings = visibleBookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
+  const nextUpcomingBooking = findNextUpcomingBooking(visibleBookings, todayString(), getCurrentTimeValue());
   bookingSectionTitle.textContent = state.activeBookingGroup;
   bookingSubTabs.querySelectorAll("[data-booking-group]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.bookingGroup === state.activeBookingGroup);
   });
+  bookingNextUpcoming.hidden = !nextUpcomingBooking;
+  bookingNextUpcoming.innerHTML = nextUpcomingBooking
+    ? `
+        <p class="eyebrow">下一個預訂</p>
+        ${renderBookingCard(nextUpcomingBooking, trip, true)}
+      `
+    : "";
 
   if (bookings.length === 0) {
     bookingList.innerHTML = `<div class="empty-state">這裡還沒有${escapeHtml(state.activeBookingGroup)}預訂。</div>`;
     return;
   }
 
-  bookingList.innerHTML = bookings
-    .slice()
-    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
-    .map((booking) => {
-      const coverImage = getPrimaryImageAttachment(booking.attachments);
-      const tickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
+  bookingList.innerHTML = bookings.map((booking) => renderBookingCard(booking, trip)).join("");
 
-      return `
-        <article class="utility-card booking-card ${coverImage ? "has-cover" : ""}">
-          <div class="booking-card-main">
-            <header class="booking-card-header">
+  function renderBookingCard(booking, trip, isNextUpcoming = false) {
+    const coverImage = getPrimaryImageAttachment(booking.attachments);
+    const tickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
+
+    return `
+      <article class="utility-card booking-card ${coverImage ? "has-cover" : ""} ${isNextUpcoming ? "is-next-upcoming" : ""}">
+        <div class="booking-card-main">
+          <header class="booking-card-header">
+            <div class="booking-card-labels">
               <span class="meta">${escapeHtml(booking.type)}</span>
-              <h3>${escapeHtml(booking.name)}</h3>
-            </header>
-            ${renderBookingMeta(booking)}
-            ${tickets.map((ticket) => `
-              <section class="personal-ticket-card">
-                ${canManageTrip(trip) ? `<p class="booking-card-line ticket-holder-label"><span>${ticket.visibility === "shared" ? "範圍" : "持有人"}</span>${escapeHtml(ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
-                <div class="card-actions">
-                  ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>` : ""}
-                  ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "票券")}</button>`).join("") : ""}
-                </div>
-              </section>
-            `).join("")}
-            ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
-            ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
-            ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
-            <div class="card-actions">
-              ${tickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
-              ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
+              ${isNextUpcoming ? `<span class="booking-next-upcoming">下一個預訂</span>` : ""}
             </div>
+            <h3>${escapeHtml(booking.name)}</h3>
+          </header>
+          ${renderBookingMeta(booking)}
+          ${tickets.map((ticket) => `
+            <section class="personal-ticket-card">
+              ${canManageTrip(trip) ? `<p class="booking-card-line ticket-holder-label"><span>${ticket.visibility === "shared" ? "範圍" : "持有人"}</span>${escapeHtml(ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "未指定（僅建立者可見）")}</p>` : ""}
+              <div class="card-actions">
+                ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>` : ""}
+                ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "票券")}</button>`).join("") : ""}
+              </div>
+            </section>
+          `).join("")}
+          ${booking.code ? `<p class="booking-card-line"><span>代碼</span>${escapeHtml(booking.code)}</p>` : ""}
+          ${booking.note ? `<p class="booking-card-note">${escapeHtml(booking.note)}</p>` : ""}
+          ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
+          <div class="card-actions">
+            ${tickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl) ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>` : ""}
+            ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
           </div>
-          ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
-        </article>
-      `;
-    })
-    .join("");
+        </div>
+        ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
+      </article>
+    `;
+  }
 }
 
 function renderBookingMeta(booking) {
@@ -5451,6 +5485,11 @@ document.querySelector("#addTripButton").addEventListener("click", () => openTri
 document.querySelector("#backToTripsButton").addEventListener("click", showHome);
 document.querySelector("#addItemButton").addEventListener("click", () => openItemDialog());
 document.querySelector("#editTripButton").addEventListener("click", () => openTripDialog(currentTrip().id));
+openPdfPreviewButton?.addEventListener("click", () => {
+  state.activeTripSection = "pdf";
+  renderTrip();
+  rememberViewState(captureViewState());
+});
 printPdfPreviewButton?.addEventListener("click", handlePrintPdfPreview);
 pdfImageControls?.addEventListener("change", handlePdfImageControlChange);
 pdfImageControls?.addEventListener("click", handlePdfImageControlClick);
@@ -5464,13 +5503,15 @@ document.querySelector("[data-trip-section-add]")?.addEventListener("click", () 
     openTodoDialog();
   } else if (state.activeTripSection === "expenses") {
     if (canUseCollaborativeTools()) openExpenseDialog();
+  } else if (state.activeTripSection === "pdf") {
+    if (canManageTrip()) openItemDialog();
   } else if (canManageTrip()) openItemDialog();
 });
 document.querySelector("#addTodoButton")?.addEventListener("click", () => {
   if (isReadonly) return;
   openTodoDialog();
 });
-document.querySelector("#addExpenseButton")?.addEventListener("click", () => openExpenseDialog());
+addExpenseButton?.addEventListener("click", () => openExpenseDialog());
 exportButton.addEventListener("click", () => {
   if (!isReadonly) exportLibrary();
 });
@@ -5914,7 +5955,7 @@ bookingSubTabs.addEventListener("click", (event) => {
   rememberViewState(captureViewState());
 });
 
-bookingList.addEventListener("click", (event) => {
+function handleBookingClick(event) {
   const ticketButton = event.target.closest("[data-open-ticket-url]");
   if (ticketButton) {
     openTicketUrl(ticketButton.dataset.openTicketUrl);
@@ -5930,7 +5971,10 @@ bookingList.addEventListener("click", (event) => {
   if (!button) return;
   if (isReadonly) return;
   openBookingDialog(button.dataset.editBooking);
-});
+}
+
+bookingList.addEventListener("click", handleBookingClick);
+bookingNextUpcoming.addEventListener("click", handleBookingClick);
 
 quickTicketPanel?.addEventListener("click", (event) => {
   const ticketButton = event.target.closest("[data-open-ticket-url]");
