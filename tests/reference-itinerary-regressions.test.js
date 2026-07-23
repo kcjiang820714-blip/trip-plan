@@ -18,7 +18,7 @@ function functionSource(name) {
   throw new Error(`${name} 函式不完整`);
 }
 
-test("長行程名稱和沒有使用者照片的項目不會製造卡通圖片框", () => {
+test("長行程名稱的列表不會產生圖片欄，附件圖片只在詳情保留", () => {
   const visual = new Function(`${functionSource("getItineraryItemVisual")}\nreturn getItineraryItemVisual;`)();
   const longTransport = visual({
     type: "交通",
@@ -29,8 +29,13 @@ test("長行程名稱和沒有使用者照片的項目不會製造卡通圖片�
   assert.equal(longTransport.imageSource, "");
   assert.equal(longTransport.icon, "transport");
   assert.doesNotMatch(longTransport.icon, /[\u{1F000}-\u{1FAFF}]/u);
-  assert.match(app, /referenceVisual\.imageSource\s*\?\s*`<span class="itinerary-card-photo has-image"/);
-  assert.match(css, /\.item-summary:not\(:has\(\.itinerary-card-photo\)\)/);
+  const timelineStart = app.indexOf("function renderItineraryTimeline(");
+  const weatherPanelStart = app.indexOf("function renderWeatherPanel(");
+  const timelineSource = app.slice(timelineStart, weatherPanelStart);
+  assert.doesNotMatch(timelineSource, /referenceVisual\.imageSource/);
+  assert.match(timelineSource, /renderAttachmentGallery\(item\.attachments, "item", item\.id\)/);
+  const finalListCss = css.slice(css.lastIndexOf("/* Itinerary list: image-free summaries */"));
+  assert.match(finalListCss, /#itineraryPanel \.item-summary\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+24px/);
   assert.match(css, /-webkit-line-clamp:\s*3/);
 });
 
