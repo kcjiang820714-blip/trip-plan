@@ -278,6 +278,8 @@ const memberNameInput = document.querySelector("#memberNameInput");
 const memberProfileForm = document.querySelector("#memberProfileForm");
 const memberDisplayNameInput = document.querySelector("#memberDisplayNameInput");
 const exchangeRateList = document.querySelector("#exchangeRateList");
+const exchangeRateStatus = document.querySelector("#exchangeRateStatus");
+const updateExchangeRatesButton = document.querySelector("#updateExchangeRatesButton");
 const expenseDashboard = document.querySelector("#expenseDashboard");
 const itemDialog = document.querySelector("#itemDialog");
 const itemForm = document.querySelector("#itemForm");
@@ -424,6 +426,8 @@ const closeAttachmentViewerButton = document.querySelector("#closeAttachmentView
 let activeAttachmentUrl = null;
 let supabaseClient = null;
 let cloudSaveTimer = null;
+let exchangeRateUpdatePromise = null;
+const exchangeRateUpdateStatuses = new Map();
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -453,6 +457,7 @@ function normalizeLibrary(library) {
   return {
     trips: library.trips.map((trip) => {
       const dateRange = normalizeTripDates(trip);
+      const exchangeRateMetadata = normalizeExchangeRateMetadata(trip);
       const days = Array.isArray(trip.days) && trip.days.length > 0
         ? trip.days.map((day, index) => normalizeDay(day, index, dateRange.startDate))
         : createBlankDays(dateRange.dayCount, dateRange.startDate);
@@ -472,6 +477,7 @@ function normalizeLibrary(library) {
         sharedMembers: normalizeSharedMembers(trip.sharedMembers),
         members: normalizeMembers(trip.members),
         exchangeRates: normalizeExchangeRates(trip.exchangeRates),
+        ...exchangeRateMetadata,
         weatherLocations: normalizeWeatherLocations(trip.weatherLocations),
         weatherForecasts: normalizeWeatherForecasts(trip.weatherForecasts),
         bookings: Array.isArray(trip.bookings) ? trip.bookings.map(normalizeBooking) : [],
@@ -646,6 +652,21 @@ function normalizeExchangeRates(rates) {
   );
 }
 
+function normalizeExchangeRateTimestamp(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const timestamp = new Date(value);
+  return Number.isFinite(timestamp.getTime()) ? timestamp.toISOString() : null;
+}
+
+function normalizeExchangeRateMetadata(trip) {
+  const source = typeof trip?.exchangeRatesSource === "string" ? trip.exchangeRatesSource.trim() : "";
+  return {
+    exchangeRatesUpdatedAt: normalizeExchangeRateTimestamp(trip?.exchangeRatesUpdatedAt),
+    exchangeRatesSource: source || null,
+    exchangeRatesAutoAttemptedAt: normalizeExchangeRateTimestamp(trip?.exchangeRatesAutoAttemptedAt)
+  };
+}
+
 function normalizeBooking(booking) {
   const usesSharedAttachments = Boolean(booking.usesSharedAttachments);
   const legacyPersonalTicket = !usesSharedAttachments && isPersonalTicketBooking(booking.type) && (
@@ -811,6 +832,7 @@ function formatTodoCloudNote(todo) {
 }
 
 function normalizeExpense(expense) {
+  const exchangeRate = Number(expense.exchangeRate);
   return {
     id: expense.id || createId(),
     cloudId: expense.cloudId || null,
@@ -822,7 +844,8 @@ function normalizeExpense(expense) {
     category: expense.category || "其他",
     payer: expense.payer || "我",
     shareWith: normalizeMembers(expense.shareWith),
-    note: expense.note || ""
+    note: expense.note || "",
+    exchangeRate: Number.isFinite(exchangeRate) && exchangeRate > 0 ? exchangeRate : null
   };
 }
 
@@ -1353,7 +1376,8 @@ function fromCloudExpense(row) {
     category: row.category,
     payer: row.payer,
     shareWith: Array.isArray(row.share_with) ? row.share_with : [],
-    note: row.note || ""
+    note: row.note || "",
+    exchangeRate: row.exchange_rate
   });
 }
 
@@ -1382,6 +1406,7 @@ function toCloudExpensePayload(trip, expense) {
     payer: expense.payer || "我",
     share_with: normalizeMembers(expense.shareWith),
     note: expense.note || "",
+    exchange_rate: expense.exchangeRate ?? null,
     updated_at: new Date().toISOString()
   };
 }
@@ -1411,7 +1436,7 @@ async function loadCloudCollaborativeData(client, trips) {
   const [{ data: expenseRows, error: expenseError }, { data: todoRows, error: todoError }] = await Promise.all([
     client
       .from("trip_expenses")
-      .select("id,trip_id,created_by,date,name,amount,currency,category,payer,share_with,note,created_at,updated_at")
+      .select("id,trip_id,created_by,date,name,amount,currency,category,payer,share_with,note,exchange_rate,created_at,updated_at")
       .in("trip_id", tripIds),
     client
       .from("trip_todos")
@@ -4321,7 +4346,7 @@ function expenseCategoryBreakdown(trip) {
   return buildExpenseCategoryBreakdown(
     trip.expenses.map((expense) => ({
       category: expense.category,
-      amountTwd: convertToTwd(expense.amount, expense.currency, trip)
+      amountTwd: convertToTwd(expense.amount, expense.currency, trip, expense.exchangeRate)
     }))
   );
 }
@@ -4471,7 +4496,7 @@ function renderExpenses() {
   renderExchangeRates();
   renderExpenseMemberNavigation(trip);
 
-  const totalTwd = trip.expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+  const totalTwd = trip.expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip, expense.exchangeRate), 0);
   const ledger = calculateExpenseLedger(trip);
   const settlements = calculateSettlements(ledger);
   const categories = expenseCategoryBreakdown(trip);
@@ -4486,6 +4511,8 @@ function renderExpenses() {
   expenseSettlementSide.innerHTML = settlementMarkup;
   expenseMobileSettlement.innerHTML = settlementMarkup;
   expenseAdvancedStats.innerHTML = renderExpenseAdvancedSummary(ledger);
+
+  if (state.activeTripSection === "expenses") void updateDailyExchangeRates(trip);
 }
 
 function groupExpensesByDate(trip) {
@@ -4549,7 +4576,7 @@ function renderExpenseDayCard(date, expenses, trip) {
                 </div>
                 <div class="expense-entry-amount">
                   <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
-                  <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
+                  <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip, expense.exchangeRate)))}</span>
                 </div>
                 ${
                   !canEditExpense(expense, trip)
@@ -4610,7 +4637,7 @@ function calculateExpenseLedger(trip) {
 
     const shareWith = normalizeMembers(expense.shareWith).filter((member) => members.includes(member));
     const participants = shareWith.length ? shareWith : members;
-    const amount = convertToTwd(expense.amount, expense.currency, trip);
+    const amount = convertToTwd(expense.amount, expense.currency, trip, expense.exchangeRate);
     const shareAmount = participants.length ? amount / participants.length : 0;
 
     ledger[expense.payer].paid += amount;
@@ -4724,7 +4751,7 @@ function calculateExpenseCategoryTotals(trip) {
       };
     }
 
-    result[category].totalTwd += convertToTwd(expense.amount, expense.currency, trip);
+    result[category].totalTwd += convertToTwd(expense.amount, expense.currency, trip, expense.exchangeRate);
     result[category].count += 1;
     result[category].currencies[expense.currency] = (result[category].currencies[expense.currency] || 0) + expense.amount;
     return result;
@@ -4790,7 +4817,7 @@ function calculateMemberCategoryTotals(trip) {
     const category = expense.category || "其他";
     const shareWith = normalizeMembers(expense.shareWith).filter((member) => members.includes(member));
     const participants = shareWith.length ? shareWith : members;
-    const amount = convertToTwd(expense.amount, expense.currency, trip);
+    const amount = convertToTwd(expense.amount, expense.currency, trip, expense.exchangeRate);
     const shareAmount = participants.length ? amount / participants.length : 0;
 
     participants.forEach((member) => {
@@ -5067,23 +5094,112 @@ function parseExchangeRate(value) {
   return Number.isFinite(rate) && rate > 0 ? rate : null;
 }
 
-function convertToTwd(amount, currency, trip = currentTrip()) {
+function buildTwdExchangeRates(sourceRates) {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_EXCHANGE_RATES).map(([currency, defaultRate]) => {
+      if (currency === "TWD") return [currency, 1];
+      const sourceRate = Number(sourceRates?.[currency]);
+      return [currency, Number.isFinite(sourceRate) && sourceRate > 0 ? 1 / sourceRate : defaultRate];
+    })
+  );
+}
+
+function isSameLocalDate(first, second) {
+  const firstDate = new Date(first);
+  const secondDate = new Date(second);
+  return Number.isFinite(firstDate.getTime()) && Number.isFinite(secondDate.getTime()) &&
+    firstDate.getFullYear() === secondDate.getFullYear() &&
+    firstDate.getMonth() === secondDate.getMonth() &&
+    firstDate.getDate() === secondDate.getDate();
+}
+
+function formatExchangeRateUpdatedAt(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleString("zh-TW", { dateStyle: "medium", timeStyle: "short" })
+    : "尚未成功更新";
+}
+
+function renderExchangeRateStatus(trip) {
+  if (!exchangeRateStatus || !updateExchangeRatesButton) return;
+
+  const status = exchangeRateUpdateStatuses.get(trip.id) || "";
+  const source = trip.exchangeRatesSource || "手動設定／預設參考匯率";
+  exchangeRateStatus.classList.toggle("is-error", Boolean(status));
+  exchangeRateStatus.innerHTML = `
+    <span>資料來源：${escapeHtml(source)}</span>
+    <span>中間參考匯率：1 TWD 可換外幣，系統已反算為 1 外幣 = TWD。</span>
+    <span>最後成功更新：${escapeHtml(formatExchangeRateUpdatedAt(trip.exchangeRatesUpdatedAt))}</span>
+    ${status ? `<span>${escapeHtml(status)}</span>` : ""}
+  `;
+  updateExchangeRatesButton.disabled = !canManageTrip(trip) || exchangeRateUpdatePromise !== null;
+}
+
+async function updateDailyExchangeRates(trip = currentTrip(), force = false) {
+  if (!trip || !canManageTrip(trip)) return false;
+
+  const now = new Date();
+  if (!force && (isSameLocalDate(trip.exchangeRatesUpdatedAt, now) || isSameLocalDate(trip.exchangeRatesAutoAttemptedAt, now))) return false;
+  if (exchangeRateUpdatePromise) return exchangeRateUpdatePromise;
+
+  const existingRates = normalizeExchangeRates(trip.exchangeRates);
+  if (!force) {
+    trip.exchangeRatesAutoAttemptedAt = now.toISOString();
+    saveLibrary();
+  }
+  exchangeRateUpdateStatuses.set(trip.id, "正在更新每日參考匯率…");
+  renderExchangeRateStatus(trip);
+
+  exchangeRateUpdatePromise = (async () => {
+    try {
+      const response = await fetch("https://open.er-api.com/v6/latest/TWD");
+      if (!response.ok) throw new Error(`匯率服務回應 ${response.status}`);
+      const payload = await response.json();
+      if (payload?.result !== "success" || !payload?.rates) throw new Error("匯率服務資料不完整");
+
+      trip.exchangeRates = buildTwdExchangeRates(payload.rates);
+      trip.exchangeRatesUpdatedAt = new Date().toISOString();
+      trip.exchangeRatesSource = "ExchangeRate-API（open.er-api.com，TWD 基準反算）";
+      exchangeRateUpdateStatuses.delete(trip.id);
+      saveLibrary();
+      renderExpenses();
+      return true;
+    } catch (error) {
+      // 不覆蓋既有匯率；網路暫時失敗時仍以最後可用資料換算。
+      const hasExistingRates = Object.keys(existingRates).length > 0;
+      exchangeRateUpdateStatuses.set(trip.id, hasExistingRates ? "更新失敗，上次成功資料仍在使用。" : "更新失敗，請稍後再試。");
+      renderExchangeRateStatus(trip);
+      return false;
+    } finally {
+      exchangeRateUpdatePromise = null;
+      renderExchangeRateStatus(trip);
+    }
+  })();
+
+  return exchangeRateUpdatePromise;
+}
+
+function convertToTwd(amount, currency, trip = currentTrip(), lockedExchangeRate = null) {
   const rates = normalizeExchangeRates(trip.exchangeRates);
-  return (Number(amount) || 0) * (rates[currency] || 1);
+  const lockedRate = Number(lockedExchangeRate);
+  const rate = Number.isFinite(lockedRate) && lockedRate > 0 ? lockedRate : rates[currency] || 1;
+  return (Number(amount) || 0) * rate;
 }
 
 function renderExchangeRates() {
-  if (exchangeRateList.contains(document.activeElement)) return;
+  if (!exchangeRateList) return;
   const trip = currentTrip();
-  trip.exchangeRates = normalizeExchangeRates(trip.exchangeRates);
-  exchangeRateList.innerHTML = Object.entries(trip.exchangeRates)
+  renderExchangeRateStatus(trip);
+  if (exchangeRateList.contains(document.activeElement)) return;
+  const rates = normalizeExchangeRates(trip.exchangeRates);
+  exchangeRateList.innerHTML = Object.entries(rates)
     .map(
       ([currency, rate]) => {
         const value = exchangeRateDrafts.get(currency) ?? formatExchangeRate(rate, currency);
         return `
         <label class="exchange-rate-row">
           <span>${escapeHtml(currency)}</span>
-          <input type="text" inputmode="decimal" value="${escapeHtml(value)}" data-exchange-currency="${escapeHtml(currency)}" ${currency === "TWD" ? "readonly" : ""} aria-label="1 ${escapeHtml(currency)} 可以換成多少 TWD" />
+          <input type="text" inputmode="decimal" value="${escapeHtml(value)}" data-exchange-currency="${escapeHtml(currency)}" ${currency === "TWD" ? "readonly" : ""} ${canManageTrip(trip) ? "" : "disabled"} aria-label="1 ${escapeHtml(currency)} 可以換成多少 TWD" />
         </label>
       `;
       }
@@ -7244,6 +7360,12 @@ exchangeRateList.addEventListener("keydown", (event) => {
   input.blur();
 });
 
+if (updateExchangeRatesButton) {
+  updateExchangeRatesButton.addEventListener("click", () => {
+    void updateDailyExchangeRates(currentTrip(), true);
+  });
+}
+
 expenseForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!canUseCollaborativeTools()) return;
@@ -7256,6 +7378,10 @@ expenseForm.addEventListener("submit", (event) => {
   const trip = currentTrip();
   const existingExpense = state.editingExpenseId ? trip.expenses.find((expense) => expense.id === state.editingExpenseId) : null;
   if (existingExpense && !canEditExpense(existingExpense, trip)) return;
+  const currency = expenseCurrencyInput.value;
+  const exchangeRate = existingExpense && existingExpense.currency === currency
+    ? existingExpense.exchangeRate
+    : normalizeExchangeRates(trip.exchangeRates)[currency] || 1;
   const payload = normalizeExpense({
     id: state.editingExpenseId || createId(),
     cloudId: existingExpense?.cloudId || null,
@@ -7263,11 +7389,12 @@ expenseForm.addEventListener("submit", (event) => {
     date: expenseDateInput.value,
     name: expenseNameInput.value.trim(),
     amount: expenseAmountInput.value,
-    currency: expenseCurrencyInput.value,
+    currency,
     category: expenseCategoryInput.value,
     payer: expensePayerInput.value,
     shareWith,
-    note: expenseNoteInput.value.trim()
+    note: expenseNoteInput.value.trim(),
+    exchangeRate
   });
 
   if (state.editingExpenseId) {

@@ -1533,6 +1533,18 @@ h2 {
   gap: 8px;
 }
 
+.exchange-rate-status {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.exchange-rate-status.is-error {
+  color: #9a3c20;
+}
+
 .exchange-rate-row {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
@@ -8692,6 +8704,7 @@ select {
   }
 
   .expense-add-button {
+    display: inline-flex;
     position: absolute;
     top: 75px;
     right: 0;

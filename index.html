@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=114" />
+    <link rel="stylesheet" href="./styles.css?v=115" />
   </head>
   <body>
     <main class="app-shell">
@@ -364,6 +364,8 @@
                   <h3>換算台幣</h3>
                   <p>請填「1 單位外幣可以換成多少 TWD」。例如 JPY 填 0.22，代表 1 JPY 約等於 0.22 TWD。輸入完成後點其他地方才會套用。</p>
                 </div>
+                <div class="exchange-rate-status" id="exchangeRateStatus" aria-live="polite"></div>
+                <button class="secondary-action" id="updateExchangeRatesButton" type="button">立即更新</button>
                 <div class="exchange-rate-list" id="exchangeRateList"></div>
               </section>
               <section class="expense-advanced-stats">
@@ -938,6 +940,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=117" type="module"></script>
+    <script src="./app.js?v=118" type="module"></script>
   </body>
 </html>
