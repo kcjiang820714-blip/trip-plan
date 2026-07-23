@@ -15,9 +15,12 @@ test("手機版主要 panel 不重複加入水平間距", () => {
   const mobileOverrides = css.match(/@media \(max-width: 679px\) \{([\s\S]*)\}\s*$/)?.[1] ?? "";
 
   for (const panelId of ["itineraryPanel", "bookingsPanel", "todosPanel", "expensesPanel"]) {
+    const panelRules = [...mobileOverrides.matchAll(new RegExp(`#${panelId}\\s*\\{([^}]*)\\}`, "g"))]
+      .map((match) => match[1])
+      .join("\n");
     assert.doesNotMatch(
-      mobileOverrides,
-      new RegExp(`#${panelId}[\\s\\S]*?padding-inline\\s*:`),
+      panelRules,
+      /padding-inline\s*:/,
       `#${panelId} 不應在手機覆寫中額外加入水平間距`,
     );
   }

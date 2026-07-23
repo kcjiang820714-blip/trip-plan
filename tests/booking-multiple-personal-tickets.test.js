@@ -73,7 +73,12 @@ test("儲存預訂時收集每張個人票券，而非只讀取單一票券欄�
 });
 
 test("預訂卡與快速取用逐張渲染個人票券，並以持有人篩選", () => {
-  const renderBookingsSource = functionSource("renderBookings");
+  const renderBookingsSource = [
+    functionSource("renderBookings"),
+    functionSource("renderBookingTicketActions"),
+    functionSource("renderBookingListCard"),
+    functionSource("renderUpcomingBookingFocus")
+  ].join("\n");
   const renderQuickTicketCardSource = functionSource("renderQuickTicketCard");
 
   assert.match(appSource, /function canViewPersonalTicket\(/, "應以集中規則判斷單張個人票券是否可見");
@@ -86,7 +91,11 @@ test("預訂卡與快速取用逐張渲染個人票券，並以持有人篩選",
 test("所有預訂都可保留共同附件，且個人票券仍獨立收集", () => {
   const syncFieldsSource = functionSource("syncBookingStayFields");
   const submitSource = appSource.match(/bookingForm\.addEventListener\("submit", async \(event\) => \{([\s\S]*?)\n\}\);/)?.[0] || "";
-  const renderBookingsSource = functionSource("renderBookings");
+  const renderBookingsSource = [
+    functionSource("renderBookings"),
+    functionSource("renderBookingListCard"),
+    functionSource("renderUpcomingBookingFocus")
+  ].join("\n");
 
   assert.match(syncFieldsSource, /isPersonalTicketBooking/, "只有交通、景點票券與活動才應顯示個人票券編輯器");
   assert.match(syncFieldsSource, /bookingAttachmentField\.hidden\s*=\s*false/, "票券與一般預訂都必須能加入共同圖片或附件");
@@ -223,7 +232,7 @@ test("個人票券附件以 personal-ticket 與 ticket id 精準開啟", () => {
 
   assert.equal(findAttachment("personal-ticket", "ticket-b", "same-id"), attachmentB);
   assert.equal(findAttachment("booking", "booking-a", "same-id"), null, "booking 類型不應跨進個人票券猜測附件");
-  assert.match(functionSource("renderBookings"), /data-open-attachment="personal-ticket"[\s\S]*?data-owner-id="\$\{escapeHtml\(ticket\.id\)\}"/);
+  assert.match(functionSource("renderBookingTicketActions"), /data-open-attachment="personal-ticket"[\s\S]*?data-owner-id="\$\{escapeHtml\(ticket\.id\)\}"/);
   assert.match(functionSource("renderQuickTicketCard"), /data-open-attachment="personal-ticket"[\s\S]*?data-owner-id="\$\{escapeHtml\(ticket\.id\)\}"/);
 });
 
