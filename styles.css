@@ -7455,6 +7455,40 @@ select {
   }
 }
 
+/* Desktop itinerary containment: navigation, marker, and expanded card share one grid. */
+@media (min-width: 1100px) {
+  #tripView[data-active-section="itinerary"] .trip-sticky-nav {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 380px !important;
+    gap: 28px !important;
+    width: min(100%, 1240px) !important;
+    max-width: 1240px !important;
+    margin: 0 auto !important;
+    padding: 0;
+  }
+
+  #tripView[data-active-section="itinerary"] .compact-day-navigation {
+    grid-column: 1;
+    width: 100%;
+    margin: 0;
+  }
+
+  #itineraryPanel .item-card::after {
+    content: none;
+  }
+
+  #itineraryPanel .itinerary-type-marker {
+    justify-self: center;
+  }
+
+  #itineraryPanel .item-details {
+    box-sizing: border-box;
+    width: calc(100% - 124px);
+    max-width: calc(100% - 124px);
+    margin: -1px 0 0 124px;
+  }
+}
+
 /* Final mobile cascade: the summary text stays in one readable column. */
 @media (max-width: 679px) {
   #itineraryPanel .item-summary-content {
