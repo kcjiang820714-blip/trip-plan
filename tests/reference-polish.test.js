@@ -27,12 +27,13 @@ test("行程日期導覽只保留左右按鈕與中央當日標籤", () => {
   assert.match(css, /\.compact-day-navigation\s*\{[^}]*grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+44px/s);
 });
 
-test("時間軸使用固定圖像 badge，而不是把分類名稱當成欄位", () => {
+test("時間軸使用固定單色 SVG badge，而不是把分類名稱當成欄位", () => {
   const visual = new Function(`${functionSource("getItineraryItemVisual")}\nreturn getItineraryItemVisual;`)();
-  assert.equal(visual({ type: "交通" }).icon, "🚆");
-  assert.equal(visual({ type: "餐廳" }).icon, "🍽");
-  assert.equal(visual({ type: "景點" }).icon, "⛩");
-  assert.match(css, /\.itinerary-type-marker\s*\{[\s\S]*?font-family:\s*"Apple Color Emoji"/);
+  assert.equal(visual({ type: "交通" }).icon, "transport");
+  assert.equal(visual({ type: "餐廳" }).icon, "food");
+  assert.equal(visual({ type: "景點" }).icon, "sight");
+  assert.match(app, /function renderItineraryTypeIcon\(/);
+  assert.match(css, /\.itinerary-type-marker svg\s*\{/);
 });
 
 test("預訂票券呈現只有一個主要出示按鈕，旅伴票券收在明細列", () => {

@@ -19,7 +19,7 @@ function functionSource(name) {
   throw new Error(`${name} 函式不完整`);
 }
 
-test("行程視覺 helper 映射類型圖示、照片與 fallback 且不改寫資料", () => {
+test("行程視覺 helper 映射單色圖示、照片與 fallback 且不改寫資料", () => {
   const getItineraryItemVisual = new Function(
     `${functionSource("getItineraryItemVisual")}
 return getItineraryItemVisual;`,
@@ -34,12 +34,12 @@ return getItineraryItemVisual;`,
   const snapshot = structuredClone(item);
 
   assert.deepEqual(getItineraryItemVisual(item), {
-    icon: "🍽",
+    icon: "food",
     tone: "food",
     imageSource: "data:image/jpeg;base64,y",
     imageAlt: "餐廳行程照片",
   });
-  assert.equal(getItineraryItemVisual({ type: "散步", attachments: [] }).icon, "🚶");
+  assert.equal(getItineraryItemVisual({ type: "散步", attachments: [] }).icon, "walk");
   assert.equal(getItineraryItemVisual({ type: "其他" }).tone, "other");
   assert.deepEqual(item, snapshot);
 });
