@@ -89,6 +89,16 @@ test("預訂 panel 同時提供手機全部分類與桌機中央、右側容器"
   assert.match(panel, /id="bookingChecklist"/);
 });
 
+test("預訂頁保留單一新增入口，手機與桌機都能清楚使用", () => {
+  const panel = html.match(/<section class="trip-section-panel" id="bookingsPanel"[\s\S]*?<\/section>\s*<section class="trip-section-panel" id="pdfPreviewPanel"/)?.[0] ?? "";
+
+  assert.match(panel, /id="addBookingButton"/);
+  assert.equal((panel.match(/id="addBookingButton"/g) ?? []).length, 1, "新增預訂按鈕只能有一個 DOM 節點");
+  assert.match(css, /#addBookingButton\s*\{[^}]*background:\s*var\(--ref-coral\)/s);
+  assert.match(css, /@media \(min-width:\s*1100px\)\s*\{[\s\S]*\.booking-desktop-heading\s*\{[^}]*justify-content:\s*space-between/s);
+  assert.match(app, /#addBookingButton"\)\?\.addEventListener\("click", \(\) => openBookingDialog\(\)\)/);
+});
+
 test("手機焦點卡與桌機三欄工作區符合參考版型", () => {
   assert.match(css, /#tripView\[data-active-section="bookings"\]\s+\.trip-appbar\s*\{[^}]*grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+44px/s);
   assert.match(css, /#tripView\[data-active-section="bookings"\]\s+\.trip-appbar\s+\.title-group\s*\{[^}]*text-align:\s*center/s);
