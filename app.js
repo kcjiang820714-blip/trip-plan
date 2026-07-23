@@ -2442,7 +2442,6 @@ function renderItineraryTimeline(day, focusItem) {
     .map(({ item, index }) => {
       const isExpanded = state.expandedItemId === item.id;
       const detailsId = `itemDetails${item.id}`;
-      const visualType = transportVisualType(item);
       const referenceVisual = getItineraryItemVisual(item);
       const sourceBooking = item.sourceBookingId
         ? trip.bookings.find((booking) => booking.id === item.sourceBookingId)
@@ -2451,7 +2450,7 @@ function renderItineraryTimeline(day, focusItem) {
       return `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
           <button
-            class="item-summary ${referenceVisual.imageSource ? "has-itinerary-photo" : "no-itinerary-photo"}"
+            class="item-summary"
             type="button"
             data-toggle-details="${escapeHtml(item.id)}"
             aria-expanded="${isExpanded}"
@@ -2464,8 +2463,6 @@ function renderItineraryTimeline(day, focusItem) {
               ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
               <span class="meta">⌖ ${escapeHtml(item.note || item.type || "行程")}</span>
             </span>
-            ${referenceVisual.imageSource ? `<span class="itinerary-card-photo has-image"><img src="${escapeHtml(referenceVisual.imageSource)}" alt="${escapeHtml(referenceVisual.imageAlt)}" loading="lazy" /></span>` : ""}
-            ${visualType ? `<span class="transport-visual is-${escapeHtml(visualType)}" aria-hidden="true"></span>` : ""}
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
