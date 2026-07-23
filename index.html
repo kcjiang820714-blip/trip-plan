@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=105" />
+    <link rel="stylesheet" href="./styles.css?v=106" />
   </head>
   <body>
     <main class="app-shell">
@@ -103,6 +103,35 @@
       </section>
 
       <section id="tripView" hidden>
+        <aside class="desktop-sidebar" aria-label="桌機旅程導覽">
+          <div class="desktop-brand" aria-label="旅．拾光">
+            <span class="desktop-brand-seal" aria-hidden="true">旅</span>
+            <strong>旅．拾光</strong>
+          </div>
+          <nav class="desktop-primary-nav" aria-label="主要功能">
+            <button class="desktop-nav-item is-active" type="button" data-trip-section="itinerary">
+              <span aria-hidden="true">⌂</span><strong>行程總覽</strong>
+            </button>
+            <button class="desktop-nav-item" type="button" data-trip-section="bookings">
+              <span aria-hidden="true">▣</span><strong>預訂與票券</strong>
+            </button>
+            <button class="desktop-nav-item" type="button" data-trip-section="expenses">
+              <span aria-hidden="true">▤</span><strong>旅費管理</strong>
+            </button>
+            <button class="desktop-nav-item" type="button" data-trip-section="todos">
+              <span aria-hidden="true">☑</span><strong>旅行清單</strong>
+            </button>
+            <button class="desktop-nav-item" type="button" data-desktop-trip-tools>
+              <span aria-hidden="true">⋯</span><strong>更多工具</strong>
+            </button>
+          </nav>
+          <div class="desktop-sidebar-footer">
+            <button class="desktop-nav-item" id="desktopEditTripButton" type="button">
+              <span aria-hidden="true">⚙</span><strong>設定</strong>
+            </button>
+          </div>
+        </aside>
+
         <header class="trip-appbar">
           <button class="icon-button" id="backToTripsButton" type="button" aria-label="回旅程清單" title="回旅程清單">
             ‹
@@ -154,46 +183,74 @@
         </nav>
 
         <section class="trip-section-panel" id="itineraryPanel" data-section-panel="itinerary">
-          <section class="day-header itinerary-day-heading">
-            <div class="itinerary-day-copy">
-              <p class="eyebrow" id="activeDate">Day 1</p>
-              <h2 id="activeDayTitle">抵達京都</h2>
-              <p class="itinerary-day-progress" id="dayProgressText">今天有 3 個行程</p>
-            </div>
-            <button class="day-weather-chip" id="dayWeatherChip" type="button" aria-controls="weatherPanel" aria-expanded="false">
-              天氣未設定
-            </button>
-          </section>
+          <div class="itinerary-main-column">
+            <section class="day-header itinerary-day-heading">
+              <div class="itinerary-day-copy">
+                <p class="eyebrow" id="activeDate">Day 1</p>
+                <h2 id="activeDayTitle">抵達京都</h2>
+                <p class="itinerary-day-progress" id="dayProgressText">今天有 3 個行程</p>
+              </div>
+              <button class="day-weather-chip" id="dayWeatherChip" type="button" aria-controls="weatherPanel" aria-expanded="false">
+                天氣未設定
+              </button>
+            </section>
 
-          <section class="weather-panel" id="weatherPanel" aria-label="今日天氣" hidden></section>
-          <section class="travel-day-panel" id="travelDayPanel" aria-label="下一個行程"></section>
-          <section class="quick-ticket-panel" id="quickTicketPanel" aria-label="今日票券" hidden></section>
-          <header class="itinerary-timeline-heading">
-            <div>
-              <p class="eyebrow">今日路線</p>
-              <h3>其他行程</h3>
-            </div>
-            <span id="timelineCount">0 筆</span>
-          </header>
-          <section class="timeline" id="timeline" aria-live="polite"></section>
-          <button class="timeline-add-button" id="addItemButton" type="button">＋ 新增行程</button>
+            <section class="weather-panel" id="weatherPanel" aria-label="今日天氣" hidden></section>
+            <section class="travel-day-panel" id="travelDayPanel" aria-label="下一個行程"></section>
+            <section class="quick-ticket-panel" id="quickTicketPanel" aria-label="今日票券" hidden></section>
+            <header class="itinerary-timeline-heading">
+              <div>
+                <p class="eyebrow">今日路線</p>
+                <h3>行程安排</h3>
+              </div>
+              <span id="timelineCount">0 筆</span>
+            </header>
+            <section class="timeline" id="timeline" aria-live="polite"></section>
+            <button class="timeline-add-button itinerary-mobile-add" id="addItemButton" type="button">＋ 新增行程</button>
+          </div>
+          <aside class="itinerary-side-column" aria-label="行程摘要">
+            <section class="itinerary-side-card" id="itineraryWeatherSummary"></section>
+            <section class="itinerary-side-card" id="itineraryStatsSummary"></section>
+          </aside>
         </section>
 
         <section class="trip-section-panel" id="bookingsPanel" data-section-panel="bookings" hidden>
-          <section class="day-header">
+          <header class="day-header booking-desktop-heading">
             <div>
-              <p class="eyebrow">預訂</p>
-              <h2 id="bookingSectionTitle">票券</h2>
+              <p class="eyebrow">TRAVEL RESERVATIONS</p>
+              <h2>預訂與票券</h2>
             </div>
-          </section>
-          <section class="booking-next-focus" id="bookingNextUpcoming" aria-live="polite" hidden></section>
+          </header>
           <nav class="sub-tabs" id="bookingSubTabs" aria-label="預訂分類">
-            <button class="sub-tab is-active" type="button" data-booking-group="票券">票券</button>
-            <button class="sub-tab" type="button" data-booking-group="交通">交通</button>
-            <button class="sub-tab" type="button" data-booking-group="餐廳">餐廳</button>
-            <button class="sub-tab" type="button" data-booking-group="住宿">住宿</button>
+            <button class="sub-tab is-active" type="button" data-booking-group="全部"><span aria-hidden="true">☰</span>全部</button>
+            <button class="sub-tab" type="button" data-booking-group="票券"><span aria-hidden="true">▣</span>票券</button>
+            <button class="sub-tab" type="button" data-booking-group="交通"><span aria-hidden="true">▰</span>交通</button>
+            <button class="sub-tab" type="button" data-booking-group="住宿"><span aria-hidden="true">▥</span>住宿</button>
+            <button class="sub-tab" type="button" data-booking-group="餐廳"><span aria-hidden="true">♜</span>餐廳</button>
           </nav>
-          <section class="utility-list" id="bookingList"></section>
+          <div class="booking-workspace">
+            <main class="booking-main-column">
+              <h2 class="sr-only" id="bookingSectionTitle">全部</h2>
+              <section class="booking-next-focus" id="bookingNextUpcoming" aria-live="polite" hidden></section>
+              <section class="utility-list" id="bookingList"></section>
+            </main>
+            <aside class="booking-side-column" aria-label="預訂摘要">
+              <section class="booking-side-card">
+                <header>
+                  <span aria-hidden="true">□</span>
+                  <h3>即將到來的預訂</h3>
+                </header>
+                <div id="bookingUpcomingSummary"></div>
+              </section>
+              <section class="booking-side-card booking-checklist-card">
+                <header>
+                  <span aria-hidden="true">☷</span>
+                  <h3>預訂檢查清單</h3>
+                </header>
+                <div id="bookingChecklist"></div>
+              </section>
+            </aside>
+          </div>
         </section>
 
         <section class="trip-section-panel" id="pdfPreviewPanel" data-section-panel="pdf" hidden>
@@ -212,34 +269,74 @@
         </section>
 
         <section class="trip-section-panel" id="todosPanel" data-section-panel="todos" hidden>
-          <section class="day-header">
+          <header class="todo-mobile-header">
             <div>
-              <p class="eyebrow">待辦事項</p>
-              <h2 id="todoSectionTitle">行前準備</h2>
+              <h2>待辦</h2>
+              <p id="todoProgressSummary">完成進度 0 / 0</p>
             </div>
-          </section>
-          <nav class="sub-tabs" id="todoSubTabs" aria-label="待辦分類">
+            <span class="todo-travel-mark" aria-hidden="true">🧳</span>
+          </header>
+          <header class="todo-desktop-header">
+            <h2>旅行清單</h2>
+          </header>
+          <nav class="sub-tabs todo-category-tabs" id="todoSubTabs" aria-label="待辦分類">
             <button class="sub-tab is-active" type="button" data-todo-group="行前準備">行前準備</button>
             <button class="sub-tab" type="button" data-todo-group="行李打包">行李打包</button>
             <button class="sub-tab" type="button" data-todo-group="購物清單">購物清單</button>
             <button class="sub-tab" type="button" data-todo-group="旅途中提醒">旅途中提醒</button>
           </nav>
-          <section class="todo-groups" id="todoGroups"></section>
+          <div class="todo-workspace">
+            <main class="todo-main-column">
+              <section class="todo-progress-card" id="todoProgressMobile" aria-label="待辦完成進度"></section>
+              <span class="sr-only" id="todoSectionTitle">行前準備</span>
+              <section class="todo-groups" id="todoGroups"></section>
+              <button class="todo-desktop-fab todo-add-button" id="addTodoButton" type="button" aria-label="新增待辦">
+                <span aria-hidden="true">＋</span><strong>新增待辦</strong>
+              </button>
+            </main>
+            <aside class="todo-side-column" aria-label="待辦摘要與快速操作">
+              <section class="todo-side-card" id="todoProgressSide"></section>
+              <section class="todo-side-card todo-quick-add-card">
+                <h3>快速新增</h3>
+                <p>新增待辦事項…</p>
+                <button class="todo-quick-add-button" id="todoQuickAddButton" type="button">新增待辦</button>
+              </section>
+              <section class="todo-side-card todo-upcoming-card">
+                <h3>即將到期</h3>
+                <div id="todoUpcomingList"></div>
+              </section>
+            </aside>
+          </div>
         </section>
 
         <section class="trip-section-panel" id="expensesPanel" data-section-panel="expenses" hidden>
-          <section class="day-header">
+          <header class="expense-mobile-header">
             <div>
-              <p class="eyebrow">記帳</p>
-              <h2 id="expenseSummary">尚無支出</h2>
+              <h2>記帳</h2>
+              <span class="sr-only" id="expenseSummary">尚無支出</span>
             </div>
-            <button class="secondary-action expense-add-button" id="addExpenseButton" type="button">＋ 新增支出</button>
-          </section>
-          <section class="expense-section">
-            <header class="expense-section-heading">
-              <p class="eyebrow">設定</p>
-              <h3>成員與匯率</h3>
-            </header>
+            <div class="expense-member-avatars" id="expenseMemberAvatars" aria-label="參與記帳成員"></div>
+          </header>
+          <header class="expense-desktop-header">
+            <div>
+              <h2>旅費管理</h2>
+              <div class="expense-member-switcher" id="expenseMemberSwitcher"></div>
+            </div>
+          </header>
+          <section class="expense-overview" id="expenseDashboard" aria-label="旅費摘要"></section>
+          <button class="secondary-action expense-add-button" id="addExpenseButton" type="button">＋ 新增支出</button>
+          <div class="expense-workspace">
+            <main class="expense-main-column">
+              <section class="expense-day-list" id="expenseList"></section>
+              <section class="expense-mobile-settlement" id="expenseMobileSettlement"></section>
+            </main>
+            <aside class="expense-side-column" aria-label="分類與結算摘要">
+              <section id="expenseCategorySide"></section>
+              <section id="expenseSettlementSide"></section>
+            </aside>
+          </div>
+          <details class="expense-settings-details">
+            <summary>成員、匯率與進階統計</summary>
             <div class="expense-settings-grid">
               <section class="expense-members">
                 <div>
@@ -263,22 +360,12 @@
                 </div>
                 <div class="exchange-rate-list" id="exchangeRateList"></div>
               </section>
+              <section class="expense-advanced-stats">
+                <p class="eyebrow">進階統計</p>
+                <div id="expenseAdvancedStats"></div>
+              </section>
             </div>
-          </section>
-          <section class="expense-section">
-            <header class="expense-section-heading">
-              <p class="eyebrow">分析</p>
-              <h3>統計與帳務總表</h3>
-            </header>
-            <section class="expense-dashboard" id="expenseDashboard"></section>
-          </section>
-          <section class="expense-section">
-            <header class="expense-section-heading">
-              <p class="eyebrow">明細</p>
-              <h3>每日帳目</h3>
-            </header>
-            <section class="expense-day-list" id="expenseList"></section>
-          </section>
+          </details>
         </section>
       </section>
 
@@ -838,6 +925,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=113" type="module"></script>
+    <script src="./app.js?v=114" type="module"></script>
   </body>
 </html>

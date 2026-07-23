@@ -182,7 +182,7 @@ const state = {
   activeExpenseStatsTab: "category",
   activeExpenseMember: null,
   activeTripSection: "itinerary",
-  activeBookingGroup: "票券",
+  activeBookingGroup: "全部",
   activeTodoGroup: "行前準備",
   editingItemIndex: null,
   editingTripId: null,
@@ -233,6 +233,8 @@ const dayWeatherChip = document.querySelector("#dayWeatherChip");
 const timelineCount = document.querySelector("#timelineCount");
 const dayTabs = document.querySelector("#dayTabs");
 const tripSectionTabs = document.querySelector("#tripSectionTabs");
+const desktopSidebar = document.querySelector(".desktop-sidebar");
+const desktopEditTripButton = document.querySelector("#desktopEditTripButton");
 const openPdfPreviewButton = document.querySelector("#openPdfPreviewButton");
 const pdfPreviewStage = document.querySelector("#pdfPreviewStage");
 const pdfImageControls = document.querySelector("#pdfImageControls");
@@ -242,16 +244,31 @@ const travelDayPanel = document.querySelector("#travelDayPanel");
 const weatherPanel = document.querySelector("#weatherPanel");
 const timeline = document.querySelector("#timeline");
 const quickTicketPanel = document.querySelector("#quickTicketPanel");
+const itineraryWeatherSummary = document.querySelector("#itineraryWeatherSummary");
+const itineraryStatsSummary = document.querySelector("#itineraryStatsSummary");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
 const bookingSectionTitle = document.querySelector("#bookingSectionTitle");
 const bookingNextUpcoming = document.querySelector("#bookingNextUpcoming");
 const bookingList = document.querySelector("#bookingList");
+const bookingUpcomingSummary = document.querySelector("#bookingUpcomingSummary");
+const bookingChecklist = document.querySelector("#bookingChecklist");
 const todoSubTabs = document.querySelector("#todoSubTabs");
 const todoSectionTitle = document.querySelector("#todoSectionTitle");
 const todoGroups = document.querySelector("#todoGroups");
+const todoProgressSummary = document.querySelector("#todoProgressSummary");
+const todoProgressMobile = document.querySelector("#todoProgressMobile");
+const todoProgressSide = document.querySelector("#todoProgressSide");
+const todoUpcomingList = document.querySelector("#todoUpcomingList");
+const todoQuickAddButton = document.querySelector("#todoQuickAddButton");
 const expenseList = document.querySelector("#expenseList");
 const expenseSummary = document.querySelector("#expenseSummary");
 const addExpenseButton = document.querySelector("#addExpenseButton");
+const expenseMemberAvatars = document.querySelector("#expenseMemberAvatars");
+const expenseMemberSwitcher = document.querySelector("#expenseMemberSwitcher");
+const expenseMobileSettlement = document.querySelector("#expenseMobileSettlement");
+const expenseCategorySide = document.querySelector("#expenseCategorySide");
+const expenseSettlementSide = document.querySelector("#expenseSettlementSide");
+const expenseAdvancedStats = document.querySelector("#expenseAdvancedStats");
 const memberChips = document.querySelector("#memberChips");
 const memberForm = document.querySelector("#memberForm");
 const memberNameInput = document.querySelector("#memberNameInput");
@@ -2209,10 +2226,15 @@ function renderDayWeatherChip(trip, dayDate) {
   const label = location
     ? `${weatherLocationTitle(location)} · ${forecast ? formatTemperatureRange(forecast) : "尚未更新"}`
     : "天氣未設定";
+  const displayLabel = forecast
+    ? `${Math.round(forecast.tempMax ?? forecast.tempMin ?? 0)}°C　${weatherCodeLabel(forecast.weatherCode)}`
+    : location
+      ? "尚未更新"
+      : "天氣未設定";
   const isExpanded = !weatherPanel.hidden;
   dayWeatherChip.innerHTML = `
     ${renderWeatherIcon(forecast?.weatherCode ?? null)}
-    <span>${escapeHtml(label)}</span>
+    <span>${escapeHtml(displayLabel)}</span>
     <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
   `;
   dayWeatherChip.setAttribute("aria-label", `${label}，展開今日天氣`);
@@ -2222,10 +2244,80 @@ function renderDayWeatherChip(trip, dayDate) {
 function renderItineraryContent() {
   const trip = currentTrip();
   const day = currentDay();
+  renderTravelDayPanel(null);
+  renderItineraryTimeline(day, null);
+  renderItinerarySideSummary(trip, day);
+}
+
+function getItineraryItemVisual(item) {
+  const sourceItem = item || {};
+  const type = sourceItem.type || "其他";
+  const typeVisuals = {
+    景點: { icon: "景", tone: "sight" },
+    餐廳: { icon: "餐", tone: "food" },
+    午餐: { icon: "餐", tone: "food" },
+    交通: { icon: "乘", tone: "transport" },
+    飛機: { icon: "飛", tone: "transport" },
+    住宿: { icon: "宿", tone: "stay" },
+    購物: { icon: "買", tone: "shop" },
+    散步: { icon: "步", tone: "walk" },
+    其他: { icon: "遊", tone: "other" }
+  };
+  const visual = typeVisuals[type] || typeVisuals.其他;
+  const image = (sourceItem.attachments || []).find((attachment) => {
+    const source = attachment?.dataUrl || attachment?.publicUrl || attachment?.url || "";
+    return String(attachment?.type || "").startsWith("image/") && Boolean(source);
+  });
+
+  return {
+    icon: visual.icon,
+    tone: visual.tone,
+    imageSource: image?.dataUrl || image?.publicUrl || image?.url || "",
+    imageAlt: `${type}行程照片`
+  };
+}
+
+function renderItinerarySideSummary(trip, day) {
+  if (!itineraryWeatherSummary || !itineraryStatsSummary) return;
+
   const dayDate = getActiveDayDateValue(trip);
-  const focus = selectItineraryFocus(day.items, dayDate, todayString(), getCurrentTimeValue());
-  renderTravelDayPanel(focus);
-  renderItineraryTimeline(day, focus.item);
+  const location = getWeatherLocationsForDate(trip, dayDate)[0] || null;
+  const forecast = location
+    ? getForecastForDate(trip.weatherForecasts?.[location.id] || null, dayDate)
+    : null;
+  const photoCount = trip.days.reduce(
+    (total, tripDay) =>
+      total +
+      tripDay.items.reduce(
+        (dayTotal, item) =>
+          dayTotal + (item.attachments || []).filter((attachment) => String(attachment.type || "").startsWith("image/")).length,
+        0,
+      ),
+    0,
+  );
+  const routeNames = day.items.slice(0, 5).map((item) => getItemTitle(item)).filter(Boolean);
+
+  itineraryWeatherSummary.innerHTML = `
+    <header><span aria-hidden="true">☁</span><h3>天氣預報</h3><small>${escapeHtml(location ? weatherLocationTitle(location) : "尚未設定")}</small></header>
+    <div class="itinerary-weather-now">
+      <strong>${escapeHtml(forecast ? formatTemperatureRange(forecast).split(" / ")[0] : "--°C")}</strong>
+      <span>${escapeHtml(forecast ? weatherCodeLabel(forecast.weatherCode) : "點選天氣膠囊設定")}</span>
+    </div>
+    <div class="itinerary-weather-days">
+      ${trip.days.slice(0, 3).map((tripDay, index) => `<span><small>Day ${index + 1}</small><strong>${escapeHtml(formatShortDate(tripDay.date))}</strong></span>`).join("")}
+    </div>
+  `;
+
+  itineraryStatsSummary.innerHTML = `
+    <header><h3>行程統計</h3></header>
+    <dl>
+      <div><dt><span aria-hidden="true">⌖</span>預計造訪景點</dt><dd>${countItems(trip)} 個</dd></div>
+      <div><dt><span aria-hidden="true">◉</span>今日安排</dt><dd>${day.items.length} 個</dd></div>
+      <div><dt><span aria-hidden="true">▣</span>預計拍照地點</dt><dd>${photoCount} 處</dd></div>
+      <div><dt><span aria-hidden="true">⌂</span>住宿晚數</dt><dd>${trip.bookings.filter((booking) => booking.type === "住宿").length} 晚</dd></div>
+    </dl>
+    ${routeNames.length ? `<p>${routeNames.map(escapeHtml).join("　·　")}</p>` : ""}
+  `;
 }
 
 function renderTravelDayPanel(focus) {
@@ -2235,16 +2327,12 @@ function renderTravelDayPanel(focus) {
   const item = focus?.item || null;
 
   if (!item) {
-    travelDayPanel.innerHTML = `
-      <section class="itinerary-focus-card is-empty">
-        <p class="eyebrow">下一個行程</p>
-        <h3>留一點空白，也是一種安排</h3>
-        <p>這一天還沒有行程，可以從下方新增第一站。</p>
-      </section>
-    `;
+    travelDayPanel.innerHTML = "";
+    travelDayPanel.hidden = true;
     return;
   }
 
+  travelDayPanel.hidden = false;
   travelDayPanel.innerHTML = `
     <article class="itinerary-focus-card">
       <header class="itinerary-focus-header">
@@ -2290,6 +2378,7 @@ function renderItineraryTimeline(day, focusItem) {
       const isExpanded = state.expandedItemId === item.id;
       const detailsId = `itemDetails${item.id}`;
       const visualType = transportVisualType(item);
+      const referenceVisual = getItineraryItemVisual(item);
       const sourceBooking = item.sourceBookingId
         ? trip.bookings.find((booking) => booking.id === item.sourceBookingId)
         : null;
@@ -2304,10 +2393,18 @@ function renderItineraryTimeline(day, focusItem) {
             aria-controls="${escapeHtml(detailsId)}"
           >
             <span class="time">${escapeHtml(item.time)}</span>
+            <span class="itinerary-type-marker is-${escapeHtml(referenceVisual.tone)}" aria-hidden="true">${escapeHtml(referenceVisual.icon)}</span>
             <span class="item-summary-content">
               <span class="item-title">${escapeHtml(getItemTitle(item))}</span>
               ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
-              <span class="meta">${escapeHtml(item.type)}</span>
+              <span class="meta">⌖ ${escapeHtml(item.note || item.type || "行程")}</span>
+            </span>
+            <span class="itinerary-card-photo ${referenceVisual.imageSource ? "has-image" : `is-${escapeHtml(referenceVisual.tone)}`}">
+              ${
+                referenceVisual.imageSource
+                  ? `<img src="${escapeHtml(referenceVisual.imageSource)}" alt="${escapeHtml(referenceVisual.imageAlt)}" loading="lazy" />`
+                  : `<i aria-hidden="true">${escapeHtml(referenceVisual.icon)}</i>`
+              }
             </span>
             ${visualType ? `<span class="transport-visual is-${escapeHtml(visualType)}" aria-hidden="true"></span>` : ""}
             <span class="expand-indicator" aria-hidden="true">⌄</span>
@@ -2957,6 +3054,18 @@ function getTripSectionPageName(section) {
   }[section] || "行程";
 }
 
+function getDesktopSectionMeta(section) {
+  const sections = {
+    itinerary: { title: "行程總覽", subtitle: "今天的路線與天氣" },
+    bookings: { title: "預訂與票券", subtitle: "集中查看交通、住宿與憑證" },
+    expenses: { title: "旅費管理", subtitle: "支出、分類與旅伴結算" },
+    todos: { title: "旅行清單", subtitle: "行前準備與旅途中提醒" },
+    pdf: { title: "旅行行程表", subtitle: "預覽與匯出 PDF" }
+  };
+
+  return sections[section] || sections.itinerary;
+}
+
 function renderTripSectionTabs() {
   const addButton = document.querySelector("[data-trip-section-add]");
   const canManage = canManageTrip();
@@ -2978,17 +3087,76 @@ function renderTripSectionTabs() {
 
   document.querySelectorAll("[data-trip-section]").forEach((button) => {
     button.classList.toggle("is-active", primaryTripSections.has(button.dataset.tripSection) && button.dataset.tripSection === state.activeTripSection);
+    button.setAttribute("aria-current", button.dataset.tripSection === state.activeTripSection ? "page" : "false");
   });
+
+  const sectionMeta = getDesktopSectionMeta(state.activeTripSection);
+  tripView.dataset.desktopTitle = sectionMeta.title;
+  tripView.dataset.desktopSubtitle = sectionMeta.subtitle;
 
   document.querySelectorAll("[data-section-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.sectionPanel !== state.activeTripSection;
   });
 }
 
+function getBookingReferencePresentation(booking, currentDate) {
+  const transport = booking?.transport || {};
+  const isTransport = booking?.type === "交通";
+  const typeMeta = isTransport
+    ? { group: "交通", icon: "▰", tone: "blue" }
+    : booking?.type === "住宿"
+      ? { group: "住宿", icon: "▥", tone: "green" }
+      : booking?.type === "餐廳"
+        ? { group: "餐廳", icon: "♜", tone: "coral" }
+        : { group: "票券", icon: "▣", tone: "blue" };
+  const date = isTransport ? transport.departureDate || booking?.date || "" : booking?.date || "";
+  const time = isTransport ? transport.departureTime || booking?.time || "" : booking?.time || "";
+  const route = isTransport
+    ? [transport.departurePlace || booking?.place, transport.arrivalPlace].filter(Boolean).join(" → ")
+    : booking?.place || "";
+  const service = isTransport
+    ? [transport.mode, transport.company, transport.number].filter(Boolean).join(" · ")
+    : booking?.type === "住宿"
+      ? "入住"
+      : booking?.type || "預訂";
+
+  return {
+    ...typeMeta,
+    date,
+    dateLabel: date && date === currentDate ? "今天" : date,
+    time,
+    endTime: isTransport ? transport.arrivalTime || "" : "",
+    route,
+    service
+  };
+}
+
+function buildBookingChecklist(bookings) {
+  const list = Array.isArray(bookings) ? bookings : [];
+  const transportBookings = list.filter((booking) => booking?.type === "交通");
+  const stayBookings = list.filter((booking) => booking?.type === "住宿");
+  const restaurantBookings = list.filter((booking) => booking?.type === "餐廳");
+  const attractionBookings = list.filter((booking) => !["交通", "住宿", "餐廳"].includes(booking?.type));
+  const hasTicket = (booking) => Boolean(
+    booking?.ticketUrl ||
+    booking?.attachments?.length ||
+    booking?.personalTickets?.some((ticket) => ticket?.ticketUrl || ticket?.attachments?.length)
+  );
+
+  return [
+    { label: "確認所有交通票券", done: transportBookings.length > 0 && transportBookings.every(hasTicket) },
+    { label: "住宿入住資訊", done: stayBookings.length > 0 && stayBookings.every((booking) => booking?.date && booking?.place) },
+    { label: "餐廳預約確認", done: restaurantBookings.length > 0 && restaurantBookings.every((booking) => booking?.date && booking?.time && booking?.place) },
+    { label: "景點門票／體驗活動", done: attractionBookings.length > 0 && attractionBookings.every(hasTicket) }
+  ];
+}
+
 function renderBookings() {
   const trip = currentTrip();
   const visibleBookings = trip.bookings.filter((booking) => canViewBookingTicket(booking, trip));
-  const bookings = visibleBookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
+  const bookings = state.activeBookingGroup === "全部"
+    ? visibleBookings
+    : visibleBookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
   const nextUpcomingBooking = findNextUpcomingBooking(visibleBookings, todayString(), getCurrentTimeValue());
   bookingSectionTitle.textContent = state.activeBookingGroup;
   bookingSubTabs.querySelectorAll("[data-booking-group]").forEach((button) => {
@@ -2998,46 +3166,39 @@ function renderBookings() {
   bookingNextUpcoming.innerHTML = nextUpcomingBooking
     ? renderUpcomingBookingFocus(nextUpcomingBooking, trip)
     : "";
+  bookingUpcomingSummary.innerHTML = renderBookingUpcomingSummary(visibleBookings);
+  bookingChecklist.innerHTML = renderBookingChecklist(visibleBookings);
 
   if (bookings.length === 0) {
-    bookingList.innerHTML = `<div class="empty-state">這裡還沒有${escapeHtml(state.activeBookingGroup)}預訂。</div>`;
+    const groupLabel = state.activeBookingGroup === "全部" ? "" : state.activeBookingGroup;
+    bookingList.innerHTML = `<div class="empty-state">這裡還沒有${escapeHtml(groupLabel)}預訂。</div>`;
     return;
   }
 
-  bookingList.innerHTML = bookings.map((booking) => renderBookingListCard(booking, trip)).join("");
+  bookingList.innerHTML = bookings
+    .slice()
+    .sort((left, right) => {
+      const leftSchedule = `${getBookingScheduleDate(left) || "9999-12-31"} ${getBookingScheduleTime(left) || "23:59"}`;
+      const rightSchedule = `${getBookingScheduleDate(right) || "9999-12-31"} ${getBookingScheduleTime(right) || "23:59"}`;
+      return leftSchedule.localeCompare(rightSchedule);
+    })
+    .map((booking) => renderBookingListCard(booking, trip))
+    .join("");
 }
 
 function getBookingFocusDetails(booking) {
-  const transport = booking.transport || {};
-  const isTransport = booking.type === "交通";
-  const date = getBookingScheduleDate(booking);
-  const time = getBookingScheduleTime(booking);
-  const route = isTransport
-    ? [transport.departurePlace || booking.place, transport.arrivalPlace].filter(Boolean).join(" → ")
-    : booking.place;
-  const service = isTransport
-    ? [transport.mode, transport.company, transport.number].filter(Boolean).join(" · ")
-    : booking.type === "住宿"
-    ? "入住"
-    : booking.type;
-
-  return {
-    date,
-    time,
-    route,
-    service
-  };
+  return getBookingReferencePresentation(booking, todayString());
 }
 
-function renderBookingTicketActions(booking, trip, actionClass = "text-button") {
+function renderBookingTicketActions(booking, trip, actionClass = "text-button", actionLabel = "出示電子票券") {
   const visibleTickets = (booking.personalTickets || []).filter((ticket) => canViewPersonalTicket(ticket, booking, trip));
   const personalTicketActions = visibleTickets.map((ticket) => {
     const holder = ticket.visibility === "shared" ? "所有旅伴" : ticket.ticketHolderName || "旅程建立者";
     const buttons = ticket.ticketUrl
-      ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示電子票券</button>`
+      ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">${escapeHtml(actionLabel)}</button>`
       : (ticket.attachments || []).map((attachment) => `
           <button class="${actionClass}" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">
-            出示 ${escapeHtml(attachment.name || "票券")}
+            ${escapeHtml(actionLabel === "出示電子票券" ? `出示 ${attachment.name || "票券"}` : actionLabel)}
           </button>
         `).join("");
 
@@ -3050,45 +3211,42 @@ function renderBookingTicketActions(booking, trip, actionClass = "text-button") 
     `;
   }).join("");
   const legacyTicketAction = visibleTickets.length === 0 && !booking.personalTickets?.length && normalizeTicketUrl(booking.ticketUrl)
-    ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">出示電子票券</button>`
+    ? `<button class="${actionClass}" type="button" data-open-ticket-url="${escapeHtml(booking.ticketUrl)}">${escapeHtml(actionLabel)}</button>`
     : "";
 
   return personalTicketActions || legacyTicketAction;
 }
 
-function renderBookingAttachmentActions(booking, actionClass = "text-button") {
+function renderBookingAttachmentActions(booking, actionClass = "text-button", actionLabel = "") {
   return (booking.attachments || []).map((attachment) => `
     <button class="${actionClass}" type="button" data-open-attachment="booking" data-owner-id="${escapeHtml(booking.id)}" data-attachment-id="${escapeHtml(attachment.id)}">
-      查看 ${escapeHtml(attachment.name || "附件")}
+      ${escapeHtml(actionLabel || `查看 ${attachment.name || "附件"}`)}
     </button>
   `).join("");
 }
 
 function renderUpcomingBookingFocus(booking, trip) {
   const details = getBookingFocusDetails(booking);
-  const ticketActions = renderBookingTicketActions(booking, trip, "booking-focus-primary");
-  const attachmentActions = renderBookingAttachmentActions(booking, "booking-focus-secondary");
+  const ticketActions = renderBookingTicketActions(booking, trip, "booking-focus-primary", "開啟票券");
+  const attachmentActions = renderBookingAttachmentActions(booking, "booking-focus-secondary", ticketActions ? "查看附件" : "開啟票券");
+  const hasOpenAction = Boolean(ticketActions || attachmentActions);
 
   return `
-    <article class="booking-focus-card">
+    <article class="booking-focus-card booking-tone-${escapeHtml(details.tone)}">
       <header class="booking-focus-header">
-        <span class="booking-focus-kicker">NEXT · 下一個預訂</span>
-        <span class="booking-focus-type">${escapeHtml(booking.type)}</span>
+        <span class="booking-focus-kicker">${escapeHtml(details.dateLabel || "日期未定")}</span>
+        <strong class="booking-focus-time">${escapeHtml(details.time || "整日")}</strong>
       </header>
       <div class="booking-focus-title">
         <p>${escapeHtml(details.service || "預訂")}</p>
         <h2>${escapeHtml(booking.name || "未命名預訂")}</h2>
       </div>
-      <div class="booking-focus-journey">
-        <div class="booking-focus-schedule">
-          <span>${escapeHtml(details.date || "日期未定")}</span>
-          <strong class="booking-focus-time">${escapeHtml(details.time || "整日")}</strong>
-        </div>
-        <div class="booking-focus-route">
-          <span aria-hidden="true">⌖</span>
-          <strong>${escapeHtml(details.route || "地點待確認")}</strong>
-        </div>
+      <div class="booking-focus-route">
+        <span aria-hidden="true">⌖</span>
+        <strong>${escapeHtml(details.route || "地點待確認")}</strong>
       </div>
+      ${hasOpenAction ? `<span class="booking-focus-qr" aria-hidden="true"></span>` : ""}
+      <span class="booking-focus-illustration" aria-hidden="true">${escapeHtml(details.icon)}</span>
       ${booking.code ? `
         <p class="booking-focus-code">
           <span>訂位代碼</span>
@@ -3098,7 +3256,7 @@ function renderUpcomingBookingFocus(booking, trip) {
       <div class="booking-focus-actions">
         ${ticketActions}
         ${attachmentActions}
-        ${canManageTrip(trip) ? `<button class="booking-focus-edit" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯預訂</button>` : ""}
+        ${canManageTrip(trip) ? `<button class="booking-focus-edit" type="button" data-edit-booking="${escapeHtml(booking.id)}" aria-label="編輯 ${escapeHtml(booking.name || "預訂")}">編輯</button>` : ""}
       </div>
     </article>
   `;
@@ -3108,19 +3266,30 @@ function renderBookingListCard(booking, trip) {
   const details = getBookingFocusDetails(booking);
   const coverImage = getPrimaryImageAttachment(booking.attachments);
   const ticketActions = renderBookingTicketActions(booking, trip);
+  const dateParts = (details.date || "").split("-");
+  const shortDate = dateParts.length === 3 ? `${Number(dateParts[1])}/${Number(dateParts[2])}` : details.date;
+  const weekday = details.date
+    ? new Intl.DateTimeFormat("zh-TW", { weekday: "short", timeZone: "Asia/Taipei" }).format(new Date(`${details.date}T12:00:00+08:00`))
+    : "";
 
   return `
-    <article class="utility-card booking-card ${coverImage ? "has-cover" : ""}">
+    <article class="utility-card booking-card booking-tone-${escapeHtml(details.tone)} ${coverImage ? "has-cover" : ""}">
+      <div class="booking-timeline-stamp">
+        <strong>${escapeHtml(shortDate || "未定")}</strong>
+        <span>${escapeHtml(weekday)}</span>
+      </div>
+      <span class="booking-type-icon" aria-hidden="true">${escapeHtml(details.icon)}</span>
       ${coverImage ? renderBookingCover(coverImage, booking.id) : ""}
       <div class="booking-card-main">
         <header class="booking-card-header">
           <div class="booking-card-labels">
-            <span class="meta">${escapeHtml(booking.type)}</span>
-            ${details.date ? `<span class="booking-list-date">${escapeHtml(details.date)}</span>` : ""}
+            <span class="meta">${escapeHtml(details.service || booking.type)}</span>
+            <span class="booking-confirmed">已確認</span>
           </div>
           <h3>${escapeHtml(booking.name || "未命名預訂")}</h3>
         </header>
         <div class="booking-list-summary">
+          ${details.dateLabel ? `<strong>${escapeHtml(details.dateLabel)}</strong>` : ""}
           ${details.time ? `<strong>${escapeHtml(details.time)}</strong>` : ""}
           ${details.route ? `<span>${escapeHtml(details.route)}</span>` : ""}
         </div>
@@ -3129,10 +3298,60 @@ function renderBookingListCard(booking, trip) {
         ${renderAttachmentGallery(booking.attachments, "booking", booking.id, coverImage?.id)}
         <div class="card-actions booking-list-actions">
           ${ticketActions}
-          ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit-booking="${escapeHtml(booking.id)}">編輯</button>` : ""}
+          ${renderBookingAttachmentActions(booking)}
+          ${canManageTrip(trip) ? `<button class="booking-row-edit" type="button" data-edit-booking="${escapeHtml(booking.id)}" aria-label="編輯 ${escapeHtml(booking.name || "預訂")}">›</button>` : ""}
         </div>
       </div>
     </article>
+  `;
+}
+
+function renderBookingUpcomingSummary(bookings) {
+  const upcoming = (bookings || [])
+    .filter((booking) => getBookingScheduleDate(booking))
+    .slice()
+    .sort((left, right) => {
+      const leftSchedule = `${getBookingScheduleDate(left)} ${getBookingScheduleTime(left) || "23:59"}`;
+      const rightSchedule = `${getBookingScheduleDate(right)} ${getBookingScheduleTime(right) || "23:59"}`;
+      return leftSchedule.localeCompare(rightSchedule);
+    })
+    .slice(0, 4);
+
+  if (!upcoming.length) return `<p class="booking-side-empty">尚無即將到來的預訂。</p>`;
+
+  return `
+    <div class="booking-upcoming-list">
+      ${upcoming.map((booking) => {
+        const details = getBookingFocusDetails(booking);
+        const dateParts = (details.date || "").split("-");
+        const shortDate = dateParts.length === 3 ? `${Number(dateParts[1])}/${Number(dateParts[2])}` : details.date;
+        return `
+          <article>
+            <time>${escapeHtml(shortDate || "未定")}</time>
+            <span class="booking-side-icon booking-tone-${escapeHtml(details.tone)}" aria-hidden="true">${escapeHtml(details.icon)}</span>
+            <div>
+              <strong>${escapeHtml(booking.name || "未命名預訂")}</strong>
+              <small>${escapeHtml([details.time, details.route].filter(Boolean).join(" · ") || details.service)}</small>
+            </div>
+            ${canManageTrip(currentTrip()) ? `<button type="button" data-edit-booking="${escapeHtml(booking.id)}" aria-label="編輯 ${escapeHtml(booking.name || "預訂")}">›</button>` : `<span aria-hidden="true">›</span>`}
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderBookingChecklist(bookings) {
+  return `
+    <div class="booking-checklist">
+      ${buildBookingChecklist(bookings).map((item) => `
+        <div class="${item.done ? "is-done" : ""}">
+          <span aria-hidden="true">${item.done ? "✓" : ""}</span>
+          <strong>${escapeHtml(item.label)}</strong>
+          <i aria-hidden="true">›</i>
+        </div>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -3740,65 +3959,166 @@ function shortText(value, maxLength) {
   return `${text.slice(0, maxLength - 1)}…`;
 }
 
+function getTodoProgress(todos = []) {
+  const total = todos.length;
+  const done = todos.filter((todo) => Boolean(todo.done)).length;
+  const pending = total - done;
+
+  return {
+    total,
+    done,
+    pending,
+    percent: total > 0 ? Math.round((done / total) * 100) : 0
+  };
+}
+
+function todoPrimaryDate(todo) {
+  return todo?.date || todo?.dueDate || "";
+}
+
+function buildTodoSections(todos = [], activeGroup = "", todayIso = "") {
+  const visibleTodos = todos.filter((todo) => !activeGroup || todo.group === activeGroup);
+
+  return {
+    departure: visibleTodos.filter((todo) => {
+      const date = todoPrimaryDate(todo);
+      return Boolean(date) && date !== todayIso;
+    }),
+    today: visibleTodos.filter((todo) => todoPrimaryDate(todo) === todayIso),
+    optional: visibleTodos.filter((todo) => !todoPrimaryDate(todo))
+  };
+}
+
+function findUpcomingTodos(todos = [], todayIso = "", limit = 3) {
+  return todos
+    .filter((todo) => !todo.done)
+    .filter((todo) => {
+      const date = todoPrimaryDate(todo);
+      return Boolean(date) && (!todayIso || date >= todayIso);
+    })
+    .map((todo, index) => ({ todo, index, date: todoPrimaryDate(todo) }))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index)
+    .slice(0, Math.max(0, limit))
+    .map(({ todo }) => todo);
+}
+
 function renderTodos() {
   const trip = currentTrip();
-  const todos = trip.todos.filter((todo) => todo.group === state.activeTodoGroup);
-  const doneCount = todos.filter((todo) => todo.done).length;
+  const progress = getTodoProgress(trip.todos);
+  const todayIso = new Date().toLocaleDateString("sv-SE");
+  const sections = buildTodoSections(trip.todos, state.activeTodoGroup, todayIso);
+  const upcomingTodos = findUpcomingTodos(trip.todos, todayIso, 3);
+  const canAddTodo = canUseCollaborativeTools(trip);
   todoSectionTitle.textContent = state.activeTodoGroup;
+  todoProgressSummary.textContent = `完成進度 ${progress.done} / ${progress.total}`;
   todoSubTabs.querySelectorAll("[data-todo-group]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.todoGroup === state.activeTodoGroup);
   });
 
-  if (todos.length === 0) {
-    todoGroups.innerHTML = `<div class="empty-state">這裡還沒有${escapeHtml(state.activeTodoGroup)}項目。</div>`;
-    return;
-  }
+  const addTodoButton = document.querySelector("#addTodoButton");
+  addTodoButton.hidden = !canAddTodo;
+  todoQuickAddButton.hidden = !canAddTodo;
+
+  todoProgressMobile.innerHTML = `
+    <div class="todo-progress-copy">
+      <span>完成進度</span>
+      <strong>${progress.done}<small>/ ${progress.total}</small></strong>
+    </div>
+    <div class="todo-progress-ring" style="--todo-progress: ${progress.percent}" aria-label="已完成 ${progress.percent}%">
+      <span aria-hidden="true">▣</span>
+    </div>
+  `;
+
+  todoProgressSide.innerHTML = `
+    <h3>完成進度</h3>
+    <div class="todo-side-progress">
+      <div class="todo-progress-ring" style="--todo-progress: ${progress.percent}">
+        <strong>${progress.percent}%</strong>
+        <small>${progress.done} / ${progress.total}</small>
+      </div>
+    </div>
+    <div class="todo-progress-legend">
+      <span><i class="is-done"></i>已完成 ${progress.done}</span>
+      <span><i class="is-active"></i>進行中 0</span>
+      <span><i></i>待完成 ${progress.pending}</span>
+    </div>
+  `;
+
+  todoUpcomingList.innerHTML = upcomingTodos.length
+    ? upcomingTodos
+        .map((todo) => {
+          const date = todoPrimaryDate(todo);
+          const dayDiff = Math.round((Date.parse(date) - Date.parse(todayIso)) / 86400000);
+          const relativeLabel = dayDiff === 0 ? "今天" : dayDiff === 1 ? "明天" : `${dayDiff} 天後`;
+          return `
+            <button class="todo-upcoming-row" type="button" data-edit-todo="${escapeHtml(todo.id)}">
+              <time datetime="${escapeHtml(date)}">${escapeHtml(date.slice(5).replace("-", "/"))}</time>
+              <span><strong>${escapeHtml(todo.text)}</strong><small>${escapeHtml(todoSecondColumnValue(todo))}</small></span>
+              <em>${escapeHtml(relativeLabel)}</em>
+            </button>
+          `;
+        })
+        .join("")
+    : `<p class="todo-upcoming-empty">目前沒有即將到期的待辦。</p>`;
+
+  const renderTodoRow = (todo) => `
+    <article class="todo-list-row ${todo.done ? "is-done" : ""}">
+      <label class="todo-list-check">
+        <input type="checkbox" data-toggle-todo="${escapeHtml(todo.id)}" ${todo.done ? "checked" : ""} />
+        <span aria-hidden="true"></span>
+      </label>
+      <span class="todo-list-title">
+        <strong>${escapeHtml(todo.text)}</strong>
+        ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
+      </span>
+      <span class="todo-list-detail">${escapeHtml(todoSecondColumnValue(todo))}</span>
+      <span class="todo-list-owner">${escapeHtml(todo.group)}</span>
+      ${
+        canEditTodo(todo, trip)
+          ? `<button class="todo-row-action" type="button" data-edit-todo="${escapeHtml(todo.id)}" aria-label="編輯 ${escapeHtml(todo.text)}">›</button>`
+          : `<span class="todo-row-action is-disabled" aria-hidden="true">›</span>`
+      }
+    </article>
+  `;
+
+  const desktopSectionDefinitions = [
+    { className: "todo-section-departure", icon: "▣", title: "出發前", todos: sections.departure },
+    { className: "todo-section-today", icon: "☀", title: "本日", todos: sections.today },
+    { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
+  ];
+  const mobileScheduledTodos = trip.todos.filter(
+    (todo) => todo.group === state.activeTodoGroup && Boolean(todoPrimaryDate(todo))
+  );
+  const mobileSectionDefinitions = [
+    { className: "todo-section-today", icon: "☀", title: "今天要完成", todos: mobileScheduledTodos },
+    { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
+  ];
+  const sectionDefinitions = window.matchMedia("(max-width: 679px)").matches
+    ? mobileSectionDefinitions
+    : desktopSectionDefinitions;
 
   todoGroups.innerHTML = `
-    <section class="todo-group">
-      <header>
-        <div>
-          <p class="eyebrow">${escapeHtml(state.activeTodoGroup)}</p>
-          <h3>${doneCount}/${todos.length} 完成</h3>
-        </div>
-      </header>
-      <div class="todo-table" role="table" aria-label="${escapeHtml(state.activeTodoGroup)}待辦">
-        <div class="todo-table-row todo-table-head" role="row">
-          <span>項目</span>
-          <span>${escapeHtml(todoSecondColumnLabel(state.activeTodoGroup))}</span>
-          <span>${escapeHtml(todoThirdColumnLabel(state.activeTodoGroup))}</span>
-          <span>狀態</span>
-          <span></span>
-        </div>
-        ${todos
-          .map(
-            (todo) => `
-              <article class="todo-table-row ${todo.done ? "is-done" : ""}" role="row">
-                <label class="todo-cell todo-main-cell">
-                  <input type="checkbox" data-toggle-todo="${todo.id}" ${todo.done ? "checked" : ""} />
-                  <span class="todo-title-stack">
-                    <strong>${escapeHtml(todo.text)}</strong>
-                    ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
-                  </span>
-                </label>
-                <span class="todo-cell todo-detail-cell todo-second-cell">${escapeHtml(todoSecondColumnValue(todo))}</span>
-                <span class="todo-cell todo-detail-cell todo-third-cell">${escapeHtml(todoThirdColumnValue(todo))}</span>
-                <span class="todo-cell todo-status-cell">
-                  <span class="todo-status ${todo.done ? "is-complete" : ""}">${todo.done ? "完成" : "未完成"}</span>
-                </span>
-                <span class="todo-cell todo-action-cell">
-                ${
-                  canEditTodo(todo, trip)
-                    ? `<button class="text-button todo-edit-button" type="button" data-edit-todo="${escapeHtml(todo.id)}">編輯</button>`
-                    : ""
-                }
-                </span>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-    </section>
+    ${sectionDefinitions
+      .map(
+        (section) => `
+          <section class="todo-list-section ${section.className}">
+            <header>
+              <span aria-hidden="true">${section.icon}</span>
+              <h3>${section.title}</h3>
+              <small>${section.todos.length}</small>
+              <i aria-hidden="true">⌃</i>
+            </header>
+            <div class="todo-list-table">
+              ${
+                section.todos.length
+                  ? section.todos.map(renderTodoRow).join("")
+                  : `<div class="todo-section-empty">這個分組目前沒有待辦。</div>`
+              }
+            </div>
+          </section>
+        `
+      )
+      .join("")}
   `;
 }
 
@@ -3836,23 +4156,245 @@ function todoThirdColumnValue(todo) {
   return todo.place || "未設定";
 }
 
+function buildExpenseCategoryBreakdown(expenses = []) {
+  const totals = new Map();
+
+  expenses.forEach((expense) => {
+    const amountTwd = Number(expense.amountTwd) || 0;
+    if (amountTwd <= 0) return;
+    const category = String(expense.category || "其他").trim() || "其他";
+    const current = totals.get(category) || { category, totalTwd: 0, count: 0 };
+    totals.set(category, {
+      category,
+      totalTwd: current.totalTwd + amountTwd,
+      count: current.count + 1
+    });
+  });
+
+  const totalTwd = Array.from(totals.values()).reduce((total, item) => total + item.totalTwd, 0);
+  return Array.from(totals.values())
+    .sort((a, b) => b.totalTwd - a.totalTwd)
+    .map((item) => ({
+      ...item,
+      percent: totalTwd > 0 ? Number(((item.totalTwd / totalTwd) * 100).toFixed(1)) : 0
+    }));
+}
+
+function expenseCategoryMeta(category) {
+  const normalized = String(category || "其他");
+  if (normalized.includes("餐") || normalized.includes("食")) return { icon: "🍴", tone: "food" };
+  if (normalized.includes("交通") || normalized.includes("車")) return { icon: "▣", tone: "transport" };
+  if (normalized.includes("景點") || normalized.includes("門票")) return { icon: "⌂", tone: "sight" };
+  if (normalized.includes("購物")) return { icon: "⌑", tone: "shopping" };
+  if (normalized.includes("住宿")) return { icon: "▰", tone: "stay" };
+  return { icon: "•••", tone: "other" };
+}
+
+function expenseMemberInitial(member) {
+  return Array.from(String(member || "旅")).slice(-1)[0] || "旅";
+}
+
+function expenseViewerName(trip) {
+  const ownSharedMember = currentSharedMember(trip);
+  if (ownSharedMember) return sharedMemberDisplayName(ownSharedMember);
+  const members = expenseMemberNames(trip);
+  return members.includes("我") ? "我" : members[0] || "我";
+}
+
+function renderExpenseMemberNavigation(trip) {
+  const members = expenseMemberNames(trip);
+  const viewer = expenseViewerName(trip);
+  const avatar = (member, index, extraClass = "") => `
+    <span class="expense-avatar expense-avatar-${(index % 5) + 1} ${extraClass}" title="${escapeHtml(member)}" aria-label="${escapeHtml(member)}">
+      ${escapeHtml(expenseMemberInitial(member))}
+    </span>
+  `;
+
+  expenseMemberAvatars.innerHTML = `
+    ${members.slice(0, 3).map((member, index) => avatar(member, index)).join("")}
+    ${members.length > 3 ? `<span class="expense-avatar expense-avatar-more">+${members.length - 3}</span>` : ""}
+  `;
+  expenseMemberSwitcher.innerHTML = members
+    .map(
+      (member, index) => `
+        <span class="expense-member-option ${member === viewer ? "is-current" : ""}">
+          ${avatar(member, index, "expense-avatar-small")}
+          ${escapeHtml(member === viewer ? "你" : member)}
+        </span>
+      `
+    )
+    .join("");
+}
+
+function expenseCategoryBreakdown(trip) {
+  return buildExpenseCategoryBreakdown(
+    trip.expenses.map((expense) => ({
+      category: expense.category,
+      amountTwd: convertToTwd(expense.amount, expense.currency, trip)
+    }))
+  );
+}
+
+function expenseDonutGradient(categories) {
+  let cursor = 0;
+  const segments = categories.map((category, index) => {
+    const start = cursor;
+    cursor += category.percent;
+    return `${pieColor(index)} ${start}% ${cursor}%`;
+  });
+  return segments.length ? `conic-gradient(${segments.join(", ")})` : "conic-gradient(#e7e3db 0 100%)";
+}
+
+function renderExpenseCategoryLegend(categories, showAmounts = false) {
+  if (!categories.length) return `<p class="expense-category-empty">尚無分類資料</p>`;
+  return `
+    <div class="expense-category-legend">
+      ${categories
+        .map(
+          (category, index) => `
+            <div>
+              <span><i style="background:${pieColor(index)}"></i>${escapeHtml(category.category)}</span>
+              ${showAmounts ? `<strong>${escapeHtml(formatTwd(category.totalTwd))}</strong>` : ""}
+              <b>${escapeHtml(`${category.percent}%`)}</b>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderExpenseOverview(trip, totalTwd, ledger, settlements, categories) {
+  const members = expenseMemberNames(trip);
+  const average = members.length ? totalTwd / members.length : 0;
+  const unsettled = settlements.reduce((total, settlement) => total + settlement.amount, 0);
+
+  return `
+    <section class="expense-mobile-summary-card">
+      <div class="expense-mobile-total">
+        <span>總支出</span>
+        <strong>${escapeHtml(formatTwd(totalTwd))}</strong>
+        <small>♟ ${members.length} 人參與</small>
+      </div>
+      <div class="expense-mobile-category">
+        <div class="expense-category-donut" style="background:${expenseDonutGradient(categories)}" aria-label="支出分類圓餅圖"></div>
+        ${renderExpenseCategoryLegend(categories.slice(0, 5))}
+      </div>
+    </section>
+    <section class="expense-summary-grid">
+      <article class="expense-summary-card expense-summary-total">
+        <span class="expense-summary-icon">▱</span>
+        <div><small>總支出</small><strong>${escapeHtml(formatTwd(totalTwd))}</strong></div>
+      </article>
+      <article class="expense-summary-card">
+        <span class="expense-summary-icon">♙</span>
+        <div><small>每人平均</small><strong>${escapeHtml(formatTwd(average))}</strong></div>
+      </article>
+      <article class="expense-summary-card expense-summary-unsettled">
+        <span class="expense-summary-icon">¥</span>
+        <div><small>待結算</small><strong>${escapeHtml(formatTwd(unsettled))}</strong></div>
+      </article>
+    </section>
+  `;
+}
+
+function renderExpenseCategoryCard(categories) {
+  return `
+    <article class="expense-category-card">
+      <h3>支出分類占比</h3>
+      <div class="expense-category-card-body">
+        <div class="expense-category-donut expense-category-donut-large" style="background:${expenseDonutGradient(categories)}" aria-label="支出分類圓餅圖"></div>
+        ${renderExpenseCategoryLegend(categories, true)}
+      </div>
+    </article>
+  `;
+}
+
+function renderExpenseSettlementCard(trip, settlements) {
+  const viewer = expenseViewerName(trip);
+  if (!settlements.length) {
+    return `
+      <article class="expense-settlement-card is-settled">
+        <header><h3>結算建議</h3><small>帳務已平衡</small></header>
+        <p>目前沒有需要轉帳的款項。</p>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="expense-settlement-card">
+      <header><h3>結算建議</h3><small>負數表示應收回</small></header>
+      <div class="expense-settlement-list">
+        ${settlements
+          .map((settlement, index) => {
+            const from = settlement.from === viewer ? "你" : settlement.from;
+            const to = settlement.to === viewer ? "你" : settlement.to;
+            return `
+              <div class="expense-settlement-row ${index === 0 ? "is-primary" : ""}">
+                <div class="expense-settlement-copy">
+                  <strong>${escapeHtml(from)} 應支付給 <em>${escapeHtml(to)}</em></strong>
+                  <span>
+                    <i class="expense-avatar expense-avatar-small expense-avatar-${(index % 5) + 1}">${escapeHtml(expenseMemberInitial(settlement.from))}</i>
+                    ${escapeHtml(settlement.from)} <b>⟶</b>
+                    <i class="expense-avatar expense-avatar-small expense-avatar-${((index + 1) % 5) + 1}">${escapeHtml(expenseMemberInitial(settlement.to))}</i>
+                    ${escapeHtml(settlement.to)}
+                  </span>
+                </div>
+                <strong class="expense-settlement-amount">${escapeHtml(formatTwd(settlement.amount))}</strong>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+      <p class="expense-settlement-note">以上建議已考慮所有支出與每人分攤，可透過轉帳或現金進行結算。</p>
+    </article>
+  `;
+}
+
+function renderExpenseAdvancedSummary(ledger) {
+  return `
+    ${renderMemberLedgerList(ledger)}
+    <div class="ledger-table">
+      <div class="ledger-row ledger-head">
+        <span>成員</span><span>已付</span><span>應分攤</span><span>差額</span>
+      </div>
+      ${Object.entries(ledger)
+        .map(
+          ([member, entry]) => `
+            <div class="ledger-row">
+              <span>${escapeHtml(member)}</span>
+              <span>${escapeHtml(formatTwd(entry.paid))}</span>
+              <span>${escapeHtml(formatTwd(entry.share))}</span>
+              <strong class="${entry.balance >= 0 ? "is-positive" : "is-negative"}">${escapeHtml(formatTwd(entry.balance))}</strong>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function renderExpenses() {
   const trip = currentTrip();
   renderMembers();
   renderExchangeRates();
-
-  if (trip.expenses.length === 0) {
-    expenseSummary.textContent = "尚無支出";
-    expenseDashboard.innerHTML = `<div class="empty-state">新增支出後，這裡會自動顯示每個人的分攤與結算狀態。</div>`;
-    expenseList.innerHTML = `<div class="empty-state">還沒有支出。可以依日期記錄品項、金額、貨幣和分類。</div>`;
-    return;
-  }
+  renderExpenseMemberNavigation(trip);
 
   const totalTwd = trip.expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
-  expenseSummary.textContent = `${trip.expenses.length} 筆支出 · 合計 ${formatTwd(totalTwd)}`;
+  const ledger = calculateExpenseLedger(trip);
+  const settlements = calculateSettlements(ledger);
+  const categories = expenseCategoryBreakdown(trip);
+  const settlementMarkup = renderExpenseSettlementCard(trip, settlements);
 
-  expenseDashboard.innerHTML = renderExpenseDashboard(trip);
-  expenseList.innerHTML = renderExpenseDayTabs(trip);
+  expenseSummary.textContent = trip.expenses.length
+    ? `${trip.expenses.length} 筆支出 · 合計 ${formatTwd(totalTwd)}`
+    : "尚無支出";
+  expenseDashboard.innerHTML = renderExpenseOverview(trip, totalTwd, ledger, settlements, categories);
+  expenseList.innerHTML = renderExpenseDateGroups(trip);
+  expenseCategorySide.innerHTML = renderExpenseCategoryCard(categories);
+  expenseSettlementSide.innerHTML = settlementMarkup;
+  expenseMobileSettlement.innerHTML = settlementMarkup;
+  expenseAdvancedStats.innerHTML = renderExpenseAdvancedSummary(ledger);
 }
 
 function groupExpensesByDate(trip) {
@@ -3867,75 +4409,65 @@ function groupExpensesByDate(trip) {
     }, {});
 }
 
-function renderExpenseDayTabs(trip) {
+function renderExpenseDateGroups(trip) {
   const groups = groupExpensesByDate(trip);
   const dates = Object.keys(groups);
-  const activeDate = dates.includes(state.activeExpenseDate) ? state.activeExpenseDate : dates[0];
-  state.activeExpenseDate = activeDate;
-  const expenses = groups[activeDate] || [];
+  if (!dates.length) {
+    return `<div class="empty-state">還沒有支出。新增第一筆後，會依日期整理在這裡。</div>`;
+  }
 
   return `
-    <section class="expense-day-tabs-card">
-      <nav class="expense-date-tabs" aria-label="每日帳目">
-        ${dates
-          .map((date) => {
-            const dayTotal = groups[date].reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
-            return `
-              <button class="expense-date-tab ${date === activeDate ? "is-active" : ""}" type="button" data-expense-date="${escapeHtml(date)}">
-                <strong>${escapeHtml(date)}</strong>
-                <span>${escapeHtml(formatTwd(dayTotal))}</span>
-              </button>
-            `;
-          })
-          .join("")}
-      </nav>
-      ${renderExpenseDayCard(activeDate, expenses, trip)}
+    <section class="expense-table-card">
+      <div class="expense-table-head" aria-hidden="true">
+        <span>日期</span><span>支出項目</span><span>付款人</span><span>金額</span>
+      </div>
+      ${dates.map((date) => renderExpenseDayCard(date, groups[date], trip)).join("")}
     </section>
   `;
 }
 
 function renderExpenseDayCard(date, expenses, trip) {
-  const dayTotals = expenses.reduce((result, expense) => {
-    result[expense.currency] = (result[expense.currency] || 0) + expense.amount;
-    return result;
-  }, {});
-  const dayTwd = expenses.reduce((total, expense) => total + convertToTwd(expense.amount, expense.currency, trip), 0);
+  const dateLabel = date === "未填日期" ? date : formatShortDate(date).replace("（", "（週");
 
   return `
-    <section class="expense-day-card">
+    <section class="expense-date-group">
       <header>
-        <div>
-          <p class="eyebrow">${escapeHtml(date)}</p>
-          <h3>${escapeHtml(formatTwd(dayTwd))}</h3>
-          <small>${Object.entries(dayTotals)
-            .map(([currency, total]) => `${escapeHtml(currency)} ${formatAmount(total)}`)
-            .join(" · ")}</small>
-        </div>
-        <span>${expenses.length} 筆</span>
+        <span aria-hidden="true">▣</span>
+        <h3>${escapeHtml(dateLabel)}</h3>
       </header>
       <div class="expense-entry-list">
         ${expenses
-          .map(
-            (expense) => `
+          .map((expense, index) => {
+            const visual = expenseCategoryMeta(expense.category);
+            return `
               <article class="expense-entry">
+                <span class="expense-entry-date">${index === 0 ? escapeHtml(dateLabel) : ""}</span>
+                <span class="expense-category-icon expense-category-${visual.tone}" aria-hidden="true">${visual.icon}</span>
                 <div class="expense-entry-main">
-                  <span class="expense-category">${escapeHtml(expense.category)}</span>
-                  <strong>${escapeHtml(expense.name)}</strong>
-                  <small>${escapeHtml(expense.payer)} 付款 · ${escapeHtml(expense.shareWith.join("、"))} 分攤</small>
+                  <strong>${escapeHtml(expense.category || "其他")}</strong>
+                  <span>${escapeHtml(expense.name)}</span>
                   ${expense.note ? `<small>${escapeHtml(expense.note)}</small>` : ""}
+                  <span class="expense-mobile-payer">
+                    <i class="expense-avatar expense-avatar-small">${escapeHtml(expenseMemberInitial(expense.payer))}</i>
+                    由 <em>${escapeHtml(expense.payer)}</em> 支付
+                  </span>
+                </div>
+                <div class="expense-entry-payer">
+                  <i class="expense-avatar expense-avatar-small">${escapeHtml(expenseMemberInitial(expense.payer))}</i>
+                  <span>${escapeHtml(expense.payer)}</span>
                 </div>
                 <div class="expense-entry-amount">
                   <strong>${escapeHtml(expense.currency)} ${formatAmount(expense.amount)}</strong>
                   <span data-expense-twd="${escapeHtml(expense.id)}">約 ${escapeHtml(formatTwd(convertToTwd(expense.amount, expense.currency, trip)))}</span>
-                  ${
-                    !canEditExpense(expense, trip)
-                      ? ""
-                      : `<button class="text-button expense-edit-button" type="button" data-edit-expense="${escapeHtml(expense.id)}">編輯</button>`
-                  }
                 </div>
+                ${
+                  !canEditExpense(expense, trip)
+                    ? `<span class="expense-row-action" aria-hidden="true">›</span>`
+                    : `<button class="expense-row-action" type="button" data-edit-expense="${escapeHtml(expense.id)}" aria-label="編輯 ${escapeHtml(expense.name)}">›</button>`
+                }
               </article>
-            `
-          )
+            `;
+          })
           .join("")}
       </div>
     </section>
@@ -5619,6 +6151,10 @@ document.querySelector("#addTodoButton")?.addEventListener("click", () => {
   if (isReadonly) return;
   openTodoDialog();
 });
+todoQuickAddButton?.addEventListener("click", () => {
+  if (!canUseCollaborativeTools()) return;
+  openTodoDialog();
+});
 addExpenseButton?.addEventListener("click", () => openExpenseDialog());
 exportButton.addEventListener("click", () => {
   if (!isReadonly) exportLibrary();
@@ -6022,6 +6558,25 @@ tripSectionTabs.addEventListener("click", (event) => {
   }
 });
 
+desktopSidebar?.addEventListener("click", (event) => {
+  const sectionButton = event.target.closest("[data-trip-section]");
+  if (sectionButton) {
+    state.activeTripSection = sectionButton.dataset.tripSection;
+    renderTrip();
+    rememberViewState(captureViewState());
+    return;
+  }
+
+  if (!event.target.closest("[data-desktop-trip-tools]")) return;
+  state.activeTripSection = "pdf";
+  renderTrip();
+  rememberViewState(captureViewState());
+});
+
+desktopEditTripButton?.addEventListener("click", () => {
+  if (canManageTrip()) openTripDialog(currentTrip().id);
+});
+
 travelDayPanel?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-focus-next-item]");
   if (!button) return;
@@ -6091,6 +6646,7 @@ function handleBookingClick(event) {
 
 bookingList.addEventListener("click", handleBookingClick);
 bookingNextUpcoming.addEventListener("click", handleBookingClick);
+bookingUpcomingSummary?.addEventListener("click", handleBookingClick);
 
 quickTicketPanel?.addEventListener("click", (event) => {
   const ticketButton = event.target.closest("[data-open-ticket-url]");
@@ -6415,6 +6971,12 @@ todoGroups.addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit-todo]");
   if (!button) return;
   event.preventDefault();
+  openTodoDialog(button.dataset.editTodo);
+});
+
+todoUpcomingList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-todo]");
+  if (!button) return;
   openTodoDialog(button.dataset.editTodo);
 });
 
