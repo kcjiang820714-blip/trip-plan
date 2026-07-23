@@ -38,10 +38,10 @@ test("679px 以下保留四個面板的單欄手機操作規則", () => {
 });
 
 test("預訂可標示下一筆，記帳在摘要後有新增入口", () => {
-  assert.match(html, /id="bookingNextUpcoming"[\s\S]*id="bookingSubTabs"/);
+  assert.match(html, /id="bookingSubTabs"[\s\S]*id="bookingNextUpcoming"/);
   assert.match(app, /booking-focus-card/);
   assert.match(app, /renderUpcomingBookingFocus/);
-  assert.doesNotMatch(functionSource("renderBookings"), /\.sort\(/);
+  assert.match(functionSource("renderBookings"), /bookings\s*\.slice\(\)\s*\.sort\(/);
   const expensePanel = html.match(/<section class="trip-section-panel" id="expensesPanel"[\s\S]*?<\/section>\s*<\/section>\s*<section class="install-panel"/)?.[0] ?? "";
   assert.match(expensePanel, /<h2>記帳<\/h2>\s*<span class="sr-only" id="expenseSummary">尚無支出<\/span>/);
   assert.match(expensePanel, /id="expenseDashboard"[\s\S]*<button class="secondary-action expense-add-button" id="addExpenseButton"/);
