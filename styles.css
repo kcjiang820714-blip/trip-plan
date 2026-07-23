@@ -6843,6 +6843,11 @@ select {
   font-weight: 900;
 }
 
+.itinerary-type-marker svg {
+  width: 21px;
+  height: 21px;
+}
+
 .itinerary-type-marker.is-food {
   color: #779784;
 }
@@ -6882,8 +6887,18 @@ select {
 
   #tripView[data-active-section="itinerary"] #tripTitle {
     font-family: var(--ref-serif);
-    font-size: 1.62rem;
-    letter-spacing: 0.05em;
+    min-width: 0;
+    font-size: clamp(0.82rem, 4.2vw, 1.22rem);
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: visible;
+    overflow-wrap: normal;
+  }
+
+  #tripView[data-active-section="itinerary"] #tripTitle.is-long-title {
+    font-size: clamp(0.64rem, 3.2vw, 0.94rem);
+    letter-spacing: 0;
   }
 
   #tripView[data-active-section="itinerary"] .trip-appbar-actions {
@@ -7006,13 +7021,39 @@ select {
   }
 
   #itineraryPanel .day-weather-chip {
-    min-height: 46px;
-    max-width: 122px;
-    border: 1px solid var(--ref-line);
-    background: var(--ref-surface);
-    color: var(--ref-ink);
-    padding: 8px 12px;
+    display: grid;
+    grid-template-columns: auto auto auto;
+    align-items: center;
+    min-height: 42px;
+    min-width: 92px;
+    max-width: 142px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ref-blue-soft);
+    color: #315f78;
+    padding: 7px 10px;
     box-shadow: 0 5px 14px rgba(43, 50, 49, 0.07);
+  }
+
+  #itineraryPanel .day-weather-chip .weather-icon {
+    display: none;
+  }
+
+  #itineraryPanel .day-weather-chip-label {
+    color: inherit;
+    font-size: 0.82rem;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  #itineraryPanel .day-weather-chip-value {
+    display: none;
+  }
+
+  #itineraryPanel .day-weather-chip i {
+    margin-left: 3px;
+    color: inherit;
+    font-size: 0.9rem;
   }
 
   #itineraryPanel .itinerary-timeline-heading {
@@ -7024,10 +7065,12 @@ select {
   }
 
   #itineraryPanel .timeline {
+    --itinerary-axis: 35px;
     position: relative;
     display: grid;
     gap: 18px;
-    padding: 0 0 12px 42px;
+    overflow: visible;
+    padding: 0 0 12px 62px;
   }
 
   #itineraryPanel .timeline::before {
@@ -7035,7 +7078,7 @@ select {
     position: absolute;
     top: 22px;
     bottom: 24px;
-    left: 18px;
+    left: var(--itinerary-axis);
     width: 2px;
     background: #8da093;
   }
@@ -7056,11 +7099,24 @@ select {
 
   #itineraryPanel .item-summary {
     display: grid;
-    grid-template-columns: 60px minmax(0, 1fr) 88px 16px;
+    grid-template-columns: minmax(0, 1fr) 88px 24px;
+    grid-template-areas:
+      "time photo arrow"
+      "content photo arrow"
+      "meta photo arrow";
     align-items: center;
-    gap: 6px;
-    min-height: 144px;
-    padding: 12px 10px;
+    gap: 5px 10px;
+    min-height: 136px;
+    padding: 15px 13px 15px 16px;
+  }
+
+  #itineraryPanel .item-summary.no-itinerary-photo,
+  #itineraryPanel .item-summary:not(:has(.itinerary-card-photo)) {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    grid-template-areas:
+      "time arrow"
+      "content arrow"
+      "meta arrow";
   }
 
   #itineraryPanel .item-summary::before {
@@ -7070,33 +7126,49 @@ select {
   #itineraryPanel .itinerary-type-marker {
     position: absolute;
     top: 18px;
-    left: -66px;
+    left: calc(var(--itinerary-axis) - 83px);
     width: 42px;
     height: 42px;
+    border-width: 1.5px;
     box-shadow: 0 0 0 5px var(--ref-paper);
   }
 
   #itineraryPanel .time {
+    grid-area: time;
     align-self: start;
-    justify-items: start;
-    padding: 7px 0 0;
+    padding: 0;
     color: var(--ref-blue);
-    font-size: 1.45rem;
-    font-weight: 650;
+    font-size: 1.2rem;
+    font-weight: 760;
+    line-height: 1.1;
   }
 
   #itineraryPanel .item-summary-content {
-    align-self: stretch;
-    align-content: center;
-    gap: 9px;
-    padding: 4px 0;
+    grid-area: content;
+    align-self: start;
+    display: block;
+    min-width: 0;
+    padding: 0;
   }
 
   #itineraryPanel .item-title {
+    display: -webkit-box;
+    overflow: hidden;
     color: var(--ref-ink);
     font-family: var(--ref-serif);
-    font-size: 1.35rem;
-    letter-spacing: 0.02em;
+    font-size: clamp(1.06rem, 5.05vw, 1.24rem);
+    font-weight: 750;
+    letter-spacing: 0;
+    line-height: 1.28;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  #itineraryPanel .item-title.is-long-item-title {
+    font-size: clamp(0.7rem, 2.9vw, 0.84rem);
+    line-height: 1.34;
   }
 
   #itineraryPanel .item-content-preview {
@@ -7104,6 +7176,7 @@ select {
   }
 
   #itineraryPanel .meta {
+    grid-area: meta;
     margin: 0;
     background: transparent;
     color: var(--ref-green);
@@ -7118,12 +7191,13 @@ select {
   }
 
   #itineraryPanel .itinerary-card-photo {
-    grid-column: 3;
+    grid-area: photo;
+    align-self: center;
   }
 
   #itineraryPanel .expand-indicator {
-    grid-column: 4;
-    width: 18px;
+    grid-area: arrow;
+    width: 24px;
     height: 40px;
     background: transparent;
     color: var(--ref-ink);
@@ -7176,6 +7250,119 @@ select {
 
   .trip-section-add {
     display: none;
+  }
+
+  #itineraryPanel .item-details .card-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  #itineraryPanel .item-details .card-actions > * {
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    margin: 0;
+    text-align: center;
+  }
+}
+
+.itinerary-shared-ticket {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(136px, max-content);
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid rgba(85, 127, 152, 0.2);
+  border-radius: 12px;
+  background: var(--ref-blue-soft);
+  padding: 10px 12px;
+}
+
+.itinerary-shared-ticket-label {
+  color: #315f78;
+  font-size: 0.78rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.itinerary-shared-ticket p {
+  min-width: 0;
+  margin: 0;
+  color: #5d7076;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.itinerary-shared-ticket-action {
+  display: grid;
+  justify-items: stretch;
+}
+
+.itinerary-shared-ticket button {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border-color: rgba(49, 95, 120, 0.32);
+  background: var(--ref-surface);
+  color: #315f78;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+@media (max-width: 679px) {
+  .compact-day-current {
+    display: grid;
+    gap: 2px;
+    justify-items: center;
+    padding: 4px 2px;
+  }
+
+  .compact-day-current > span {
+    font-size: clamp(0.9rem, 4vw, 1.08rem);
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .compact-day-current small {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--ref-muted);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 760;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .itinerary-shared-ticket {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .itinerary-shared-ticket-action {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1100px) {
+  #itineraryPanel .item-summary.no-itinerary-photo,
+  #itineraryPanel .item-summary:not(:has(.itinerary-card-photo)) {
+    grid-template-columns: 82px 46px minmax(0, 1fr) 28px;
+  }
+
+  #itineraryPanel .item-title {
+    display: -webkit-box;
+    overflow: hidden;
+    line-height: 1.28;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .itinerary-shared-ticket {
+    grid-template-columns: max-content minmax(0, 1fr) 156px;
   }
 }
 
@@ -10014,4 +10201,107 @@ select {
   .todo-list-row:has(.todo-product-thumbnail) .todo-list-detail { grid-column: 4; grid-row: 1; }
   .todo-list-row:has(.todo-product-thumbnail) .todo-list-owner { display: inline-grid; grid-column: 5; grid-row: 1; }
   .todo-list-row:has(.todo-product-thumbnail) .todo-row-action { grid-column: 6; grid-row: 1; }
+}
+
+/* Itinerary reliability override: must remain after legacy alignment rules. */
+@media (max-width: 679px) {
+  #itineraryPanel .timeline {
+    --itinerary-axis: 35px;
+    overflow: visible;
+    padding-left: 62px;
+  }
+
+  #itineraryPanel .timeline::before {
+    left: var(--itinerary-axis);
+  }
+
+  #itineraryPanel .item-summary {
+    grid-template-columns: minmax(0, 1fr) 88px 24px;
+    grid-template-areas:
+      "time photo arrow"
+      "content photo arrow"
+      "meta photo arrow";
+    gap: 5px 10px;
+    min-height: 136px;
+    padding: 15px 13px 15px 16px;
+  }
+
+  #itineraryPanel .item-summary.no-itinerary-photo,
+  #itineraryPanel .item-summary:not(:has(.itinerary-card-photo)) {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    grid-template-areas:
+      "time arrow"
+      "content arrow"
+      "meta arrow";
+  }
+
+  #itineraryPanel .time {
+    grid-area: time;
+    align-self: start;
+    padding: 0;
+    font-size: 1.2rem;
+    line-height: 1.1;
+  }
+
+  #itineraryPanel .item-summary-content {
+    grid-area: content;
+    display: block;
+    align-self: start;
+    min-width: 0;
+    padding: 0;
+  }
+
+  #itineraryPanel .item-title {
+    display: -webkit-box;
+    grid-area: auto;
+    overflow: hidden;
+    font-size: clamp(1.06rem, 5.05vw, 1.24rem);
+    line-height: 1.28;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  #itineraryPanel .item-title.is-long-item-title {
+    font-size: clamp(0.7rem, 2.9vw, 0.84rem);
+    line-height: 1.34;
+  }
+
+  #itineraryPanel .item-summary .meta {
+    grid-area: meta;
+    align-self: start;
+  }
+
+  #itineraryPanel .itinerary-card-photo {
+    display: grid;
+    grid-area: photo;
+    grid-column: auto;
+    grid-row: auto;
+    width: 88px;
+    min-width: 88px;
+    aspect-ratio: 1 / 1.24;
+  }
+
+  #itineraryPanel .itinerary-type-marker {
+    top: 18px;
+    left: calc(var(--itinerary-axis) - 83px);
+  }
+
+  #itineraryPanel .expand-indicator {
+    grid-area: arrow;
+  }
+}
+
+@media (min-width: 1100px) {
+  #itineraryPanel .item-summary.no-itinerary-photo,
+  #itineraryPanel .item-summary:not(:has(.itinerary-card-photo)) {
+    grid-template-columns: 82px 48px minmax(0, 1fr) 26px;
+    grid-template-areas: "time marker content arrow";
+  }
+
+  #itineraryPanel .item-summary.no-itinerary-photo .itinerary-type-marker,
+  #itineraryPanel .item-summary:not(:has(.itinerary-card-photo)) .itinerary-type-marker {
+    grid-area: marker;
+  }
 }

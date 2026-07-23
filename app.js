@@ -453,7 +453,9 @@ function normalizeLibrary(library) {
   return {
     trips: library.trips.map((trip) => {
       const dateRange = normalizeTripDates(trip);
-      const days = Array.isArray(trip.days) && trip.days.length > 0 ? trip.days.map(normalizeDay) : createBlankDays(dateRange.dayCount, dateRange.startDate);
+      const days = Array.isArray(trip.days) && trip.days.length > 0
+        ? trip.days.map((day, index) => normalizeDay(day, index, dateRange.startDate))
+        : createBlankDays(dateRange.dayCount, dateRange.startDate);
 
       return {
         id: trip.id || createId(),
@@ -824,10 +826,15 @@ function normalizeExpense(expense) {
   };
 }
 
-function normalizeDay(day, index) {
+function normalizeDay(day, index, tripStartDate = "") {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(day.date || "")
+    ? day.date
+    : tripStartDate
+      ? addDays(tripStartDate, index)
+      : "";
   return {
     title: day.title || `Day ${index + 1}`,
-    date: day.date || `第 ${index + 1} 天`,
+    date,
     items: Array.isArray(day.items) ? day.items.map(normalizeItem) : []
   };
 }
@@ -837,6 +844,7 @@ function normalizeItem(item) {
     id: item.id || createId(),
     sourceBookingId: item.sourceBookingId || "",
     bookingSourceSummary: item.bookingSourceSummary || "",
+    title: item.title || "",
     time: item.time || "",
     place: item.place || "",
     type: item.type || "",
@@ -898,6 +906,7 @@ function mapBookingToItineraryItem(booking) {
   return normalizeItem({
     sourceBookingId: booking?.id || "",
     bookingSourceSummary: summary,
+    title: booking?.name || route,
     time: isTransport ? firstTransportSegment.departureTime : booking?.time || "",
     place: isTransport ? route || booking?.name || "" : booking?.name || booking?.place || "",
     type,
@@ -1014,7 +1023,7 @@ function parseDateRange(value) {
 function createBlankDays(count, startDate = null) {
   return Array.from({ length: count }, (_, index) => ({
     title: `第 ${index + 1} 天`,
-    date: startDate ? formatShortDate(addDays(startDate, index)) : `Day ${index + 1}`,
+    date: startDate ? addDays(startDate, index) : "",
     items: []
   }));
 }
@@ -1023,7 +1032,7 @@ function syncTripDayDates(trip) {
   trip.days = trip.days.map((day, index) => ({
     ...day,
     title: day.title || `第 ${index + 1} 天`,
-    date: formatShortDate(addDays(trip.startDate, index))
+    date: addDays(trip.startDate, index)
   }));
 }
 
@@ -2128,20 +2137,28 @@ function renderScrollableDayTabs(trip, activeDayIndex) {
     .join("");
 }
 
-function formatCompactDayLabel(day, dayIndex) {
-  const date = new Date(`${day?.date || ""}T12:00:00+08:00`);
+function formatCompactDayLabel(day, dayIndex, tripStartDate = "") {
+  const rawDate = /^\d{4}-\d{2}-\d{2}$/.test(day?.date || "") ? day.date : tripStartDate;
+  const date = new Date(`${rawDate || ""}T12:00:00+08:00`);
   const isValid = !Number.isNaN(date.getTime());
   const dateLabel = isValid
     ? new Intl.DateTimeFormat("zh-TW", { month: "numeric", day: "numeric", weekday: "short", timeZone: "Asia/Taipei" })
       .format(date)
       .replace("週", "週")
-    : "日期未定";
-  return `Day ${dayIndex + 1}・${dateLabel}`;
+    : String(day?.date || "日期未定");
+  const dayTitle = String(day?.title || "").trim();
+  return {
+    primary: `Day ${dayIndex + 1}・${dateLabel}`,
+    title: dayTitle
+  };
 }
 
 function renderCompactDayNavigation(trip, activeDayIndex) {
   const day = trip?.days?.[activeDayIndex];
-  if (dayCurrentLabel) dayCurrentLabel.textContent = formatCompactDayLabel(day, activeDayIndex);
+  const label = formatCompactDayLabel(day, activeDayIndex, trip?.startDate || "");
+  if (dayCurrentLabel) {
+    dayCurrentLabel.innerHTML = `<span>${escapeHtml(label.primary)}</span>${label.title ? `<small data-day-nav-title>${escapeHtml(label.title)}</small>` : ""}`;
+  }
   if (dayPreviousButton) dayPreviousButton.disabled = activeDayIndex <= 0;
   if (dayNextButton) dayNextButton.disabled = activeDayIndex >= (trip?.days?.length || 1) - 1;
 }
@@ -2213,7 +2230,10 @@ function renderTrip() {
   if (!trip) return;
 
   state.activeDayIndex = Math.min(state.activeDayIndex, trip.days.length - 1);
-  if (tripTitle) tripTitle.textContent = trip.title;
+  if (tripTitle) {
+    tripTitle.textContent = trip.title;
+    tripTitle.classList.toggle("is-long-title", Array.from(String(trip.title || "")).length > 14);
+  }
   tripDates.textContent = trip.dates;
   tripSummary.textContent = `${trip.days.length} 天，${countItems(trip)} 個行程`;
   renderTripSectionTabs();
@@ -2264,7 +2284,8 @@ function renderDayWeatherChip(trip, dayDate) {
   const isExpanded = !weatherPanel.hidden;
   dayWeatherChip.innerHTML = `
     ${renderWeatherIcon(forecast?.weatherCode ?? null)}
-    <span>${escapeHtml(displayLabel)}</span>
+    <span class="day-weather-chip-label">天氣</span>
+    <span class="day-weather-chip-value">${escapeHtml(displayLabel)}</span>
     <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
   `;
   dayWeatherChip.setAttribute("aria-label", `${label}，展開今日天氣`);
@@ -2283,15 +2304,15 @@ function getItineraryItemVisual(item) {
   const sourceItem = item || {};
   const type = sourceItem.type || "其他";
   const typeVisuals = {
-    景點: { icon: "⛩", tone: "sight" },
-    餐廳: { icon: "🍽", tone: "food" },
-    午餐: { icon: "🍽", tone: "food" },
-    交通: { icon: "🚆", tone: "transport" },
-    飛機: { icon: "✈️", tone: "transport" },
-    住宿: { icon: "🛏", tone: "stay" },
-    購物: { icon: "🛍", tone: "shop" },
-    散步: { icon: "🚶", tone: "walk" },
-    其他: { icon: "✦", tone: "other" }
+    景點: { icon: "sight", tone: "sight" },
+    餐廳: { icon: "food", tone: "food" },
+    午餐: { icon: "food", tone: "food" },
+    交通: { icon: "transport", tone: "transport" },
+    飛機: { icon: "plane", tone: "transport" },
+    住宿: { icon: "stay", tone: "stay" },
+    購物: { icon: "shop", tone: "shop" },
+    散步: { icon: "walk", tone: "walk" },
+    其他: { icon: "other", tone: "other" }
   };
   const visual = typeVisuals[type] || typeVisuals.其他;
   const image = (sourceItem.attachments || []).find((attachment) => {
@@ -2305,6 +2326,20 @@ function getItineraryItemVisual(item) {
     imageSource: image?.dataUrl || image?.publicUrl || image?.url || "",
     imageAlt: `${type}行程照片`
   };
+}
+
+function renderItineraryTypeIcon(icon) {
+  const paths = {
+    sight: '<path d="M3 20h18M5 20v-7l7-6 7 6v7M8 12h8M10 20v-4h4v4" />',
+    food: '<path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M16 3v18M16 3c3 1 4 4 4 7h-4" />',
+    transport: '<rect x="5" y="3" width="14" height="15" rx="3" /><path d="M8 21l2-3m4 0 2 3M8 8h.01M16 8h.01M5 14h14" />',
+    plane: '<path d="M21 16l-8-3V5a2 2 0 0 0-4 0v8l-7 3v2l7-1v4l2 1 2-1v-4l8 1z" />',
+    stay: '<path d="M3 19v-8m0 5h18M5 16V9h7a4 4 0 0 1 4 4v3M6 11h4" />',
+    shop: '<path d="M4 8h16l-1 12H5L4 8Zm2 0 1-4h10l1 4M9 12h6" />',
+    walk: '<circle cx="12" cy="4" r="2" /><path d="m10 21 1-7-3 2-2-2m6-6 2 4 3 1m-6-5-2 4 2 2 3-2" />',
+    other: '<path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" />'
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[icon] || paths.other}</svg>`;
 }
 
 function renderItinerarySideSummary(trip, day) {
@@ -2416,26 +2451,20 @@ function renderItineraryTimeline(day, focusItem) {
       return `
         <article class="item-card" data-type="${escapeHtml(item.type)}">
           <button
-            class="item-summary"
+            class="item-summary ${referenceVisual.imageSource ? "has-itinerary-photo" : "no-itinerary-photo"}"
             type="button"
             data-toggle-details="${escapeHtml(item.id)}"
             aria-expanded="${isExpanded}"
             aria-controls="${escapeHtml(detailsId)}"
           >
             <span class="time">${escapeHtml(item.time)}</span>
-            <span class="itinerary-type-marker is-${escapeHtml(referenceVisual.tone)}" aria-hidden="true">${escapeHtml(referenceVisual.icon)}</span>
+            <span class="itinerary-type-marker is-${escapeHtml(referenceVisual.tone)}" aria-hidden="true">${renderItineraryTypeIcon(referenceVisual.icon)}</span>
             <span class="item-summary-content">
-              <span class="item-title">${escapeHtml(getItemTitle(item))}</span>
+              <span class="item-title ${Array.from(getItemTitle(item) || "").length > 18 ? "is-long-item-title" : ""}">${escapeHtml(getItemTitle(item))}</span>
               ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
               <span class="meta">⌖ ${escapeHtml(item.note || item.type || "行程")}</span>
             </span>
-            <span class="itinerary-card-photo ${referenceVisual.imageSource ? "has-image" : `is-${escapeHtml(referenceVisual.tone)}`}">
-              ${
-                referenceVisual.imageSource
-                  ? `<img src="${escapeHtml(referenceVisual.imageSource)}" alt="${escapeHtml(referenceVisual.imageAlt)}" loading="lazy" />`
-                  : `<i aria-hidden="true">${escapeHtml(referenceVisual.icon)}</i>`
-              }
-            </span>
+            ${referenceVisual.imageSource ? `<span class="itinerary-card-photo has-image"><img src="${escapeHtml(referenceVisual.imageSource)}" alt="${escapeHtml(referenceVisual.imageAlt)}" loading="lazy" /></span>` : ""}
             ${visualType ? `<span class="transport-visual is-${escapeHtml(visualType)}" aria-hidden="true"></span>` : ""}
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
@@ -3587,10 +3616,13 @@ function renderBookingSourceAttachments(item, booking) {
     <section class="booking-source-attachments">
       ${booking.attachments?.length ? `<p>預訂共同圖片與附件</p>${renderAttachmentGallery(booking.attachments, "booking", booking.id)}` : ""}
       ${sharedTickets.map((ticket) => `
-        <div class="card-actions booking-shared-ticket">
-          <span>共同票券</span>
-          ${ticket.ticketUrl ? `<button class="text-button" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示共同票券</button>` : ""}
-          ${!ticket.ticketUrl ? (ticket.attachments || []).map((attachment) => `<button class="text-button" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示 ${escapeHtml(attachment.name || "共同票券")}</button>`).join("") : ""}
+        <div class="itinerary-shared-ticket">
+          <span class="itinerary-shared-ticket-label">共同票券</span>
+          <p>所有旅伴皆可出示這張票券</p>
+          <div class="itinerary-shared-ticket-action">
+            ${ticket.ticketUrl ? `<button class="secondary-action" type="button" data-open-ticket-url="${escapeHtml(ticket.ticketUrl)}">出示共同票券</button>` : ""}
+            ${!ticket.ticketUrl ? (ticket.attachments || []).slice(0, 1).map((attachment) => `<button class="secondary-action" type="button" data-open-attachment="personal-ticket" data-owner-id="${escapeHtml(ticket.id)}" data-attachment-id="${escapeHtml(attachment.id)}">出示共同票券</button>`).join("") : ""}
+          </div>
         </div>
       `).join("")}
     </section>
@@ -5067,6 +5099,7 @@ function countItems(trip) {
 }
 
 function getItemTitle(item) {
+  if (item.title) return item.title;
   if (item.type === "交通") {
     const first = item.transportSegments[0];
     const last = item.transportSegments[item.transportSegments.length - 1];
