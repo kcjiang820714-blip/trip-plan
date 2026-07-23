@@ -34,12 +34,12 @@ return getItineraryItemVisual;`,
   const snapshot = structuredClone(item);
 
   assert.deepEqual(getItineraryItemVisual(item), {
-    icon: "餐",
+    icon: "🍽",
     tone: "food",
     imageSource: "data:image/jpeg;base64,y",
     imageAlt: "餐廳行程照片",
   });
-  assert.equal(getItineraryItemVisual({ type: "散步", attachments: [] }).icon, "步");
+  assert.equal(getItineraryItemVisual({ type: "散步", attachments: [] }).icon, "🚶");
   assert.equal(getItineraryItemVisual({ type: "其他" }).tone, "other");
   assert.deepEqual(item, snapshot);
 });
