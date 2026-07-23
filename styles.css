@@ -8541,8 +8541,26 @@ select {
   }
 
   .expense-mobile-summary-card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "total"
+      "category";
     margin-right: -2px;
     margin-left: -2px;
+  }
+
+  .expense-mobile-total {
+    grid-area: total;
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--ref-line);
+    padding: 0 0 18px;
+  }
+
+  .expense-mobile-category {
+    grid-area: category;
+    grid-template-columns: 96px minmax(0, 1fr);
+    padding: 18px 0 0;
   }
 
   .expense-settlement-note {
@@ -8705,6 +8723,8 @@ select {
 
   .expense-add-button {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     position: absolute;
     top: 75px;
     right: 0;
@@ -8847,13 +8867,13 @@ select {
 
   .expense-category-card-body {
     display: grid;
-    grid-template-columns: 170px minmax(0, 1fr);
+    grid-template-columns: 124px minmax(0, 1fr);
     align-items: center;
-    gap: 22px;
+    gap: 16px;
   }
 
   .expense-category-donut-large {
-    max-width: 170px;
+    max-width: 124px;
   }
 
   .expense-category-donut-large::after {
@@ -8865,9 +8885,15 @@ select {
   }
 
   .expense-category-card .expense-category-legend > div {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(44px, 1fr) auto auto;
     gap: 14px;
     font-size: 0.76rem;
+  }
+
+  .expense-category-card .expense-category-legend span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .expense-category-card .expense-category-legend strong {
