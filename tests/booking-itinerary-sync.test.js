@@ -267,7 +267,7 @@ test("行程詳細卡只連結顯示預訂共同附件，絕不帶入個人票�
 });
 
 test("行程渲染會取得來源預訂並使用共用附件渲染器", () => {
-  const renderTripSource = requiredFunction("renderTrip");
+  const renderTripSource = requiredFunction("renderItineraryTimeline");
 
   assert.match(renderTripSource, /renderBookingSourceAttachments\(/, "詳細卡應顯示來源預訂的共同附件");
   assert.match(renderTripSource, /sourceBookingId/, "渲染時應以行程卡保存的來源 ID 找預訂");

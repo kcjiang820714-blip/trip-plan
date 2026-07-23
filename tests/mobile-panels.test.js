@@ -27,7 +27,8 @@ test("679px 以下保留四個面板的單欄手機操作規則", () => {
   assert.match(mobile, /#itineraryPanel\s*\{[^}]*display:\s*flex/);
   assert.match(mobile, /\.travel-day-panel\s*\{[^}]*order:\s*2/);
   assert.match(mobile, /\.quick-ticket-panel\s*\{[^}]*order:\s*3/);
-  assert.match(mobile, /\.timeline\s*\{[^}]*order:\s*4/);
+  assert.match(mobile, /\.itinerary-timeline-heading\s*\{[^}]*order:\s*4/);
+  assert.match(mobile, /\.timeline\s*\{[^}]*order:\s*5/);
   assert.match(mobile, /\.sub-tabs\s*\{[^}]*overflow-x:\s*auto/);
   assert.match(mobile, /\.booking-cover\s*\{[^}]*aspect-ratio:\s*16\s*\/\s*9/);
   assert.match(mobile, /\.todo-main-cell input\s*\{[^}]*width:\s*24px/);

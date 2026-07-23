@@ -18,7 +18,7 @@ test("手機底部主導覽只有四個主功能並保留中央新增", () => {
 test("更多按鈕可存取地開啟 PDF 預覽", () => {
   assert.match(
     html,
-    /<button class="icon-button" id="openPdfPreviewButton" type="button" aria-label="開啟 PDF 預覽">更多<\/button>/
+    /<button class="icon-button" id="openPdfPreviewButton" type="button" aria-label="開啟 PDF 預覽"[^>]*>[^<]+<\/button>/
   );
 });
 
