@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=115" />
+    <link rel="stylesheet" href="./styles.css?v=116" />
   </head>
   <body>
     <main class="app-shell">
@@ -778,6 +778,15 @@
         <label>
           項目
           <input id="todoTextInput" placeholder="護照、轉接頭、藥品" required />
+        </label>
+
+        <label>
+          顯示分組
+          <select id="todoScheduleInput">
+            <option value="departure">出發前</option>
+            <option value="today">本日</option>
+            <option value="optional" selected>可選</option>
+          </select>
         </label>
 
         <section class="todo-detail-fields" id="todoPrepFields">

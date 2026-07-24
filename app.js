@@ -385,6 +385,7 @@ const todoForm = document.querySelector("#todoForm");
 const todoDialogTitle = document.querySelector("#todoDialogTitle");
 const todoGroupInput = document.querySelector("#todoGroupInput");
 const todoTextInput = document.querySelector("#todoTextInput");
+const todoScheduleInput = document.querySelector("#todoScheduleInput");
 const todoPrepFields = document.querySelector("#todoPrepFields");
 const todoDueDateInput = document.querySelector("#todoDueDateInput");
 const todoPriorityInput = document.querySelector("#todoPriorityInput");
@@ -785,6 +786,7 @@ function normalizeTodo(todo) {
     ownerId: todo.ownerId || todo.owner_id || null,
     group: todo.group || "行前準備",
     text: todo.text || "",
+    schedule: ["departure", "today", "optional"].includes(todo.schedule || cloudDetails.schedule) ? (todo.schedule || cloudDetails.schedule) : "",
     note: todo.notePlain ?? todo.plainNote ?? todo.noteText ?? cloudDetails.note ?? (todo.note || ""),
     quantity: todo.quantity ?? cloudDetails.quantity ?? "",
     unit: todo.unit || cloudDetails.unit || "",
@@ -818,6 +820,7 @@ function formatTodoCloudNote(todo) {
   return JSON.stringify({
     __todoDetails: true,
     note: todo.note || "",
+    schedule: todo.schedule || "",
     quantity: todo.quantity || "",
     unit: todo.unit || "",
     dueDate: todo.dueDate || "",
@@ -4087,16 +4090,20 @@ function todoPrimaryDate(todo) {
   return todo?.date || todo?.dueDate || "";
 }
 
+function todoSchedule(todo, todayIso = "") {
+  if (["departure", "today", "optional"].includes(todo?.schedule)) return todo.schedule;
+  const date = todoPrimaryDate(todo);
+  if (!date) return "optional";
+  return date === todayIso ? "today" : "departure";
+}
+
 function buildTodoSections(todos = [], activeGroup = "", todayIso = "") {
   const visibleTodos = todos.filter((todo) => !activeGroup || todo.group === activeGroup);
 
   return {
-    departure: visibleTodos.filter((todo) => {
-      const date = todoPrimaryDate(todo);
-      return Boolean(date) && date !== todayIso;
-    }),
-    today: visibleTodos.filter((todo) => todoPrimaryDate(todo) === todayIso),
-    optional: visibleTodos.filter((todo) => !todoPrimaryDate(todo))
+    departure: visibleTodos.filter((todo) => todoSchedule(todo, todayIso) === "departure"),
+    today: visibleTodos.filter((todo) => todoSchedule(todo, todayIso) === "today"),
+    optional: visibleTodos.filter((todo) => todoSchedule(todo, todayIso) === "optional")
   };
 }
 
@@ -4202,11 +4209,9 @@ function renderTodos() {
     { className: "todo-section-today", icon: "☀", title: "本日", todos: sections.today },
     { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
   ];
-  const mobileScheduledTodos = trip.todos.filter(
-    (todo) => todo.group === state.activeTodoGroup && Boolean(todoPrimaryDate(todo))
-  );
+  const mobileScheduledTodos = [...sections.departure, ...sections.today];
   const mobileSectionDefinitions = [
-    { className: "todo-section-today", icon: "☀", title: "今天要完成", todos: mobileScheduledTodos },
+    { className: "todo-section-today", icon: "☀", title: "出發前與本日", todos: mobileScheduledTodos },
     { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
   ];
   const sectionDefinitions = window.matchMedia("(max-width: 679px)").matches
@@ -5018,6 +5023,7 @@ function openTodoDialog(todoId = null) {
   deleteTodoButton.hidden = !todo;
   todoGroupInput.value = todo?.group || state.activeTodoGroup;
   todoTextInput.value = todo?.text || "";
+  todoScheduleInput.value = todo ? todoSchedule(todo, todayString()) : "optional";
   todoDueDateInput.value = todo?.dueDate || "";
   todoPriorityInput.value = todo?.priority || "";
   todoQuantityInput.value = todo?.quantity || "";
@@ -7167,6 +7173,7 @@ todoForm.addEventListener("submit", async (event) => {
     ownerId: existingTodo?.ownerId || state.cloudUser?.id || null,
     group: todoGroupInput.value,
     text: todoTextInput.value.trim(),
+    schedule: todoScheduleInput.value,
     dueDate: todoGroupInput.value === "行前準備" ? todoDueDateInput.value : "",
     priority: todoGroupInput.value === "行前準備" ? todoPriorityInput.value : "",
     quantity: ["行李打包", "購物清單"].includes(todoGroupInput.value) ? todoQuantityInput.value : "",
