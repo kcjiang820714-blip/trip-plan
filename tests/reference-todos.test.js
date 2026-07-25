@@ -126,13 +126,76 @@ test("待辦渲染保留分類、勾選與編輯權限入口，並產生三個�
 
 test("手機購物待辦以不可換行金額單位呈現，長品名保留截斷空間", () => {
   const renderTodos = functionSource("renderTodos");
-  const mobileProductDetail = css.match(
+  const amountRuleIndex = css.indexOf(".todo-list-amount");
+  const mobileRules = css.slice(
+    css.lastIndexOf("@media (max-width: 679px) {", amountRuleIndex),
+    css.indexOf("\n}\n", amountRuleIndex) + 3,
+  );
+  const mobileProductDetail = mobileRules.match(
     /\.todo-list-row:has\(\.todo-product-thumbnail\) \.todo-list-detail\s*\{([^}]*)\}/,
   )?.[1] ?? "";
 
   assert.match(renderTodos, /class="todo-list-amount"/);
-  assert.match(css, /\.todo-list-amount\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.match(mobileRules, /\.todo-list-amount\s*\{[^}]*white-space:\s*nowrap/s);
   assert.doesNotMatch(mobileProductDetail, /overflow-wrap:\s*anywhere/);
+});
+
+test("購物待辦同時有數量與金額時，渲染會保留數量和不可換行金額", () => {
+  const todo = { id: "shopping-1", group: "購物清單", text: "長品名商品", quantity: 2, unit: "個", amount: 2090, currency: "JPY", attachments: [] };
+  const todoGroups = { innerHTML: "" };
+  const renderTodos = new Function(
+    "currentTrip",
+    "state",
+    "getTodoProgress",
+    "buildTodoSections",
+    "findUpcomingTodos",
+    "canUseCollaborativeTools",
+    "todoSectionTitle",
+    "todoProgressSummary",
+    "todoSubTabs",
+    "document",
+    "todoQuickAddButton",
+    "todoProgressMobile",
+    "todoProgressSide",
+    "todoUpcomingList",
+    "todoGroups",
+    "window",
+    "getPrimaryImageAttachment",
+    "escapeHtml",
+    "getAttachmentSource",
+    "todoPrimaryDate",
+    "canEditTodo",
+    `${functionSource("formatAmount")}
+${functionSource("todoSecondColumnValue")}
+${functionSource("renderTodos")}
+return renderTodos;`,
+  )(
+    () => ({ todos: [todo] }),
+    { activeTodoGroup: "購物清單" },
+    () => ({ done: 0, total: 1, pending: 1, percent: 0 }),
+    () => ({ departure: [todo], today: [], optional: [] }),
+    () => [],
+    () => true,
+    { textContent: "" },
+    { textContent: "" },
+    { querySelectorAll: () => [] },
+    { querySelector: () => ({ hidden: false }) },
+    { hidden: false },
+    { innerHTML: "" },
+    { innerHTML: "" },
+    { innerHTML: "" },
+    todoGroups,
+    { matchMedia: () => ({ matches: true }) },
+    () => null,
+    (value) => String(value),
+    () => "",
+    () => "",
+    () => false,
+  );
+
+  renderTodos();
+
+  assert.match(todoGroups.innerHTML, /<span class="todo-list-detail">2 個 · <span class="todo-list-amount">JPY 2,090<\/span><\/span>/);
 });
 
 test("待辦手機與桌機版型符合參考圖斷點", () => {
