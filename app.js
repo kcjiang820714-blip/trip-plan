@@ -4194,7 +4194,11 @@ function renderTodos() {
         <strong>${escapeHtml(todo.text)}</strong>
         ${todo.note ? `<small>${escapeHtml(todo.note)}</small>` : ""}
       </span>
-      <span class="todo-list-detail">${escapeHtml(todoSecondColumnValue(todo))}</span>
+      <span class="todo-list-detail">${
+        todo.group === "購物清單" && todo.amount
+          ? `${todo.quantity ? `${escapeHtml(formatAmount(todo.quantity))}${todo.unit ? ` ${escapeHtml(todo.unit)}` : ""} · ` : ""}<span class="todo-list-amount">${escapeHtml(todo.currency || "TWD")} ${escapeHtml(formatAmount(todo.amount))}</span>`
+          : escapeHtml(todoSecondColumnValue(todo))
+      }</span>
       <span class="todo-list-owner">${escapeHtml(todo.group)}</span>
       ${
         canEditTodo(todo, trip)
@@ -4322,11 +4326,16 @@ function expenseViewerName(trip) {
   return members.includes("我") ? "我" : members[0] || "我";
 }
 
+function expenseMemberAvatarClass(trip, member) {
+  const index = expenseMemberNames(trip).indexOf(member);
+  return `expense-avatar-${(index >= 0 ? index : 0) % 5 + 1}`;
+}
+
 function renderExpenseMemberNavigation(trip) {
   const members = expenseMemberNames(trip);
   const viewer = expenseViewerName(trip);
   const avatar = (member, index, extraClass = "") => `
-    <span class="expense-avatar expense-avatar-${(index % 5) + 1} ${extraClass}" title="${escapeHtml(member)}" aria-label="${escapeHtml(member)}">
+    <span class="expense-avatar ${expenseMemberAvatarClass(trip, member)} ${extraClass}" title="${escapeHtml(member)}" aria-label="${escapeHtml(member)}">
       ${escapeHtml(expenseMemberInitial(member))}
     </span>
   `;
@@ -4562,6 +4571,7 @@ function renderExpenseDayCard(date, expenses, trip) {
         ${expenses
           .map((expense, index) => {
             const visual = expenseCategoryMeta(expense.category);
+            const payerAvatarClass = expenseMemberAvatarClass(trip, expense.payer);
             return `
               <article class="expense-entry">
                 <span class="expense-entry-date">${index === 0 ? escapeHtml(dateLabel) : ""}</span>
@@ -4571,12 +4581,12 @@ function renderExpenseDayCard(date, expenses, trip) {
                   <span>${escapeHtml(expense.name)}</span>
                   ${expense.note ? `<small>${escapeHtml(expense.note)}</small>` : ""}
                   <span class="expense-mobile-payer">
-                    <i class="expense-avatar expense-avatar-small">${escapeHtml(expenseMemberInitial(expense.payer))}</i>
+                    <i class="expense-avatar ${payerAvatarClass} expense-avatar-small">${escapeHtml(expenseMemberInitial(expense.payer))}</i>
                     由 <em>${escapeHtml(expense.payer)}</em> 支付
                   </span>
                 </div>
                 <div class="expense-entry-payer">
-                  <i class="expense-avatar expense-avatar-small">${escapeHtml(expenseMemberInitial(expense.payer))}</i>
+                  <i class="expense-avatar ${payerAvatarClass} expense-avatar-small">${escapeHtml(expenseMemberInitial(expense.payer))}</i>
                   <span>${escapeHtml(expense.payer)}</span>
                 </div>
                 <div class="expense-entry-amount">
