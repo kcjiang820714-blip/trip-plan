@@ -124,6 +124,17 @@ test("待辦渲染保留分類、勾選與編輯權限入口，並產生三個�
   assert.match(renderTodos, /data-edit-todo=/);
 });
 
+test("手機購物待辦以不可換行金額單位呈現，長品名保留截斷空間", () => {
+  const renderTodos = functionSource("renderTodos");
+  const mobileProductDetail = css.match(
+    /\.todo-list-row:has\(\.todo-product-thumbnail\) \.todo-list-detail\s*\{([^}]*)\}/,
+  )?.[1] ?? "";
+
+  assert.match(renderTodos, /class="todo-list-amount"/);
+  assert.match(css, /\.todo-list-amount\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.doesNotMatch(mobileProductDetail, /overflow-wrap:\s*anywhere/);
+});
+
 test("待辦手機與桌機版型符合參考圖斷點", () => {
   assert.match(css, /\.todo-mobile-header\s*\{[^}]*display:\s*flex/s);
   assert.match(css, /\.todo-add-button\s*\{[^}]*width:\s*100%/s);
