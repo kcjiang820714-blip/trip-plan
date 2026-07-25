@@ -42,6 +42,20 @@ return buildExpenseCategoryBreakdown;`,
   assert.deepEqual(expenses, snapshot);
 });
 
+test("付款人頭像色碼與頁首成員頭像一致，未知付款人安全使用預設色", () => {
+  const expenseMemberAvatarClass = new Function(
+    `function expenseMemberNames(trip) { return trip.members; }
+${functionSource("expenseMemberAvatarClass")}
+return expenseMemberAvatarClass;`,
+  )();
+  const trip = { members: ["晨", "智", "娘"] };
+
+  assert.equal(expenseMemberAvatarClass(trip, "晨"), "expense-avatar-1");
+  assert.equal(expenseMemberAvatarClass(trip, "智"), "expense-avatar-2");
+  assert.equal(expenseMemberAvatarClass(trip, "娘"), "expense-avatar-3");
+  assert.equal(expenseMemberAvatarClass(trip, "未知付款人"), "expense-avatar-1");
+});
+
 test("記帳 panel 保留設定並提供手機摘要、桌機主欄與右欄容器", () => {
   const panel = html.match(/<section class="trip-section-panel" id="expensesPanel"[\s\S]*?<\/section>\s*<\/section>\s*<section class="install-panel"/)?.[0] ?? "";
 
