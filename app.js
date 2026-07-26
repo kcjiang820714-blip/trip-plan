@@ -804,7 +804,7 @@ function normalizeTodo(todo) {
 }
 
 function resolveTodoVisibility(existingTodo) {
-  if (!existingTodo) return "shared";
+  if (!existingTodo) return "private";
   return existingTodo.visibility || "private";
 }
 
