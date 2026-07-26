@@ -803,6 +803,11 @@ function normalizeTodo(todo) {
   };
 }
 
+function resolveTodoVisibility(existingTodo) {
+  if (!existingTodo) return "shared";
+  return existingTodo.visibility || "private";
+}
+
 function parseTodoDetails(note) {
   if (!note || typeof note !== "string") return { note: "" };
 
@@ -7196,7 +7201,7 @@ todoForm.addEventListener("submit", async (event) => {
     note: todoNoteInput.value.trim(),
     attachments: todoGroupInput.value === "購物清單" ? [...keptAttachments, ...newAttachments] : [],
     done: existingTodo?.done || false,
-    visibility: existingTodo?.visibility || "private"
+    visibility: resolveTodoVisibility(existingTodo)
   };
   const todo = normalizeTodo(todoData);
 
