@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   getAvailableBookingDates,
   getBookingScheduleDateForTabs,
+  renderBookingDateTabs,
   resolveActiveBookingDate,
   splitBookingsByDate,
 } from "../booking-date-tabs.js";
@@ -55,4 +56,24 @@ test("新分類或失效日期選最早日期，有效日期則保持選取", ()
 
 test("沒有可用日期時回傳空字串", () => {
   assert.equal(resolveActiveBookingDate([], "2026-07-03"), "");
+});
+
+test("日期頁籤輸出可點選且標示目前選取日期", () => {
+  const markup = renderBookingDateTabs(["2026-07-01", "2026-07-02"], "2026-07-02");
+
+  assert.match(markup, /data-booking-date="2026-07-01"/);
+  assert.match(markup, />7\/2（週四）</);
+  assert.match(markup, /data-booking-date="2026-07-02"[^>]*aria-pressed="true"/);
+});
+
+test("依分類取得日期後，日期清單只包含該分類目前日期的卡片", () => {
+  const allDates = getAvailableBookingDates(bookings);
+  const ticketDates = getAvailableBookingDates(ticketBookings);
+  const activeAllDate = "2026-07-03";
+  const activeTicketDate = "2026-07-03";
+
+  assert.deepEqual(allDates, ["2026-07-01", "2026-07-02", "2026-07-03"]);
+  assert.deepEqual(ticketDates, ["2026-07-03"]);
+  assert.equal(splitBookingsByDate(bookings, activeAllDate).scheduled.length, 2);
+  assert.equal(splitBookingsByDate(ticketBookings, activeTicketDate).scheduled.length, 2);
 });

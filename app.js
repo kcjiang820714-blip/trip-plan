@@ -1,5 +1,6 @@
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
 import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
+import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=1";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -186,6 +187,7 @@ const state = {
   activeExpenseMember: null,
   activeTripSection: "itinerary",
   activeBookingGroup: "全部",
+  activeBookingDate: "",
   activeTodoGroup: "行前準備",
   editingItemIndex: null,
   editingTripId: null,
@@ -253,6 +255,7 @@ const quickTicketPanel = document.querySelector("#quickTicketPanel");
 const itineraryWeatherSummary = document.querySelector("#itineraryWeatherSummary");
 const itineraryStatsSummary = document.querySelector("#itineraryStatsSummary");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
+const bookingDateTabs = document.querySelector("#bookingDateTabs");
 const bookingSectionTitle = document.querySelector("#bookingSectionTitle");
 const bookingNextUpcoming = document.querySelector("#bookingNextUpcoming");
 const bookingList = document.querySelector("#bookingList");
@@ -1169,6 +1172,7 @@ function captureViewState() {
     activeDayIndex: state.activeDayIndex,
     activeTripSection: state.activeTripSection,
     activeBookingGroup: state.activeBookingGroup,
+    activeBookingDate: state.activeBookingDate,
     activeTodoGroup: state.activeTodoGroup,
     activeExpenseDate: state.activeExpenseDate
   };
@@ -1198,6 +1202,7 @@ function restoreViewState(viewState) {
       dayIndex: Math.min(viewState.activeDayIndex, trip.days.length - 1),
       section: viewState.activeTripSection,
       bookingGroup: viewState.activeBookingGroup,
+      activeBookingDate: viewState.activeBookingDate,
       todoGroup: viewState.activeTodoGroup,
       expenseDate: viewState.activeExpenseDate
     });
@@ -3290,11 +3295,18 @@ function renderBookings() {
   const bookings = state.activeBookingGroup === "全部"
     ? visibleBookings
     : visibleBookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
+  const availableDates = getAvailableBookingDates(bookings);
+  state.activeBookingDate = resolveActiveBookingDate(availableDates, state.activeBookingDate);
+  const { scheduled, undated } = splitBookingsByDate(bookings, state.activeBookingDate);
   const nextUpcomingBooking = findNextUpcomingBooking(visibleBookings, todayString(), getCurrentTimeValue());
   bookingSectionTitle.textContent = state.activeBookingGroup;
   bookingSubTabs.querySelectorAll("[data-booking-group]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.bookingGroup === state.activeBookingGroup);
   });
+  bookingDateTabs.hidden = availableDates.length === 0;
+  bookingDateTabs.innerHTML = availableDates.length > 0
+    ? renderBookingDateTabs(availableDates, state.activeBookingDate)
+    : "";
   bookingNextUpcoming.hidden = !nextUpcomingBooking;
   bookingNextUpcoming.innerHTML = nextUpcomingBooking
     ? renderUpcomingBookingFocus(nextUpcomingBooking, trip)
@@ -3308,7 +3320,7 @@ function renderBookings() {
     return;
   }
 
-  bookingList.innerHTML = bookings
+  const renderBookingCards = (items) => items
     .slice()
     .sort((left, right) => {
       const leftSchedule = `${getBookingScheduleDate(left) || "9999-12-31"} ${getBookingScheduleTime(left) || "23:59"}`;
@@ -3317,6 +3329,13 @@ function renderBookings() {
     })
     .map((booking) => renderBookingListCard(booking, trip))
     .join("");
+
+  bookingList.innerHTML = `${renderBookingCards(scheduled)}${undated.length > 0 ? `
+    <section class="booking-undated-section" aria-labelledby="bookingUndatedTitle">
+      <h3 id="bookingUndatedTitle">日期未定</h3>
+      ${renderBookingCards(undated)}
+    </section>
+  ` : ""}`;
 }
 
 function getBookingFocusDetails(booking) {
@@ -5393,6 +5412,7 @@ function showTrip(tripId, options = {}) {
   state.activeDayIndex = Math.max(0, Math.min(options.dayIndex ?? 0, trip.days.length - 1));
   state.activeTripSection = options.section || "itinerary";
   state.activeBookingGroup = options.bookingGroup || state.activeBookingGroup;
+  state.activeBookingDate = options.activeBookingDate || "";
   state.activeTodoGroup = options.todoGroup || state.activeTodoGroup;
   state.activeExpenseDate = options.expenseDate || null;
   landingView.hidden = true;
@@ -6892,6 +6912,15 @@ bookingSubTabs.addEventListener("click", (event) => {
   const button = event.target.closest("[data-booking-group]");
   if (!button) return;
   state.activeBookingGroup = button.dataset.bookingGroup;
+  state.activeBookingDate = "";
+  renderBookings();
+  rememberViewState(captureViewState());
+});
+
+bookingDateTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-booking-date]");
+  if (!button) return;
+  state.activeBookingDate = button.dataset.bookingDate;
   renderBookings();
   rememberViewState(captureViewState());
 });
