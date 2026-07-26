@@ -1,4 +1,4 @@
-import { JMA_MUNICIPALITY_AREAS } from "./jma-municipality-areas.js?v=156";
+import { JMA_MUNICIPALITY_AREAS } from "./jma-municipality-areas.js?v=157";
 
 // Official source, retrieved 2026-07-27: https://www.jma.go.jp/bosai/common/const/area.json
 // Values are endpoint codes mapped to the official forecast-area (class10) codes.

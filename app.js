@@ -2,7 +2,7 @@ import { createAttemptGuard, createSyncCoordinator } from "./sync-gate.js?v=1";
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
 import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
 import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=3";
-import { fetchWeatherForecast } from "./weather-provider.js?v=156";
+import { fetchWeatherForecast } from "./weather-provider.js?v=157";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -2806,7 +2806,7 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
               </div>
               ${renderWeatherPeriods(periods)}
               <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
-              <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
+              <small>${renderWeatherUpdatedLabel(cachedForecast)}</small>
             `
             : `<p class="weather-empty">${escapeHtml(weatherDisplayText(statusText || weatherEmptyMessage(location, cachedForecast)))}</p>`
         }
@@ -3098,11 +3098,16 @@ function formatWeatherNumber(value, unit) {
   return value === null ? "--" : `${Math.round(value)}${unit}`;
 }
 
-function weatherUpdatedLabel(forecast) {
-  if (!forecast?.fetchedAt) return "尚未更新";
+function renderWeatherUpdatedLabel(forecast) {
+  if (!forecast?.fetchedAt) return escapeHtml("尚未更新");
   const updated = new Date(forecast.fetchedAt);
-  if (Number.isNaN(updated.getTime())) return "已使用上次成功抓取的資料";
-  return `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · 資料來源：${forecast.source || "Open-Meteo"}`;
+  if (Number.isNaN(updated.getTime())) return escapeHtml("已使用上次成功抓取的資料");
+  const updatedLabel = `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+  const source = forecast.source || "Open-Meteo";
+  if (source === "日本氣象廳") {
+    return `${escapeHtml(updatedLabel)} · 資料來源：<a href="https://www.jma.go.jp/bosai/forecast/" target="_blank" rel="noopener noreferrer">日本氣象廳（本 App 已加工）</a>`;
+  }
+  return `${escapeHtml(updatedLabel)} · 資料來源：${escapeHtml(source || "Open-Meteo")}`;
 }
 
 function compactWeatherUpdatedLabel(forecast) {
@@ -7844,7 +7849,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=156").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=157").then((registration) => registration.update());
 }
 
 populateTimeOptions();
