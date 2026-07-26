@@ -1,3 +1,4 @@
+import { createSyncCoordinator } from "./sync-gate.js?v=1";
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
 import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
 import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=3";
@@ -212,6 +213,11 @@ state.activeTripId = state.library.trips[0]?.id || null;
 const landingView = document.querySelector("#landingView");
 const homeView = document.querySelector("#homeView");
 const tripView = document.querySelector("#tripView");
+const appShell = document.querySelector("#appShell");
+const syncGate = document.querySelector("#syncGate");
+const syncGateTitle = document.querySelector("#syncGateTitle");
+const syncGateMessage = document.querySelector("#syncGateMessage");
+const syncGateRetryButton = document.querySelector("#syncGateRetryButton");
 const tripList = document.querySelector("#tripList");
 const cloudAuthForm = document.querySelector("#cloudAuthForm");
 const cloudEmailInput = document.querySelector("#cloudEmailInput");
@@ -436,6 +442,34 @@ let cloudSaveTimer = null;
 const pendingTodoSyncIds = new Set();
 let exchangeRateUpdatePromise = null;
 const exchangeRateUpdateStatuses = new Map();
+
+function setSyncGate(gateState = { phase: "idle" }) {
+  if (isReadonly || !syncGate || !appShell) return;
+
+  const isLoading = gateState.phase === "loading";
+  const isError = gateState.phase === "error";
+  const isVisible = isLoading || isError;
+  syncGate.hidden = !isVisible;
+  syncGate.classList.toggle("is-error", isError);
+  appShell.inert = isVisible;
+  appShell.toggleAttribute("aria-hidden", isVisible);
+
+  if (isLoading) {
+    syncGateTitle.textContent = "正在與 Supabase 同步旅行資料…";
+    syncGateMessage.textContent = "";
+    syncGateRetryButton.hidden = true;
+    return;
+  }
+
+  if (isError) {
+    syncGateTitle.textContent = "無法完成 Supabase 同步";
+    syncGateMessage.textContent = "請確認網路連線與 Supabase 設定後，再重新同步。";
+    syncGateRetryButton.hidden = false;
+    queueMicrotask(() => syncGateRetryButton.focus());
+  }
+}
+
+const syncCoordinator = createSyncCoordinator({ onStateChange: setSyncGate });
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -1275,6 +1309,7 @@ function renderCloudStatus() {
 async function initCloudSync() {
   if (isReadonly) return;
 
+  setSyncGate({ phase: "loading" });
   try {
     renderCloudStatus();
     const client = await getSupabaseClient();
@@ -1287,18 +1322,38 @@ async function initCloudSync() {
       const previousUserId = state.cloudUser?.id || null;
       const nextUser = session?.user || null;
       const nextUserId = nextUser?.id || null;
+      if (event === "SIGNED_OUT") syncCoordinator.invalidate();
       state.cloudUser = nextUser;
       renderCloudStatus();
-      if (state.cloudUser && event === "SIGNED_IN" && nextUserId !== previousUserId) loadCloudLibrary();
+      if (state.cloudUser && event === "SIGNED_IN" && nextUserId !== previousUserId) {
+        requestInitialCloudSync(nextUserId).catch(() => {});
+      }
     });
 
     renderCloudStatus();
-    if (state.cloudUser) await loadCloudLibrary();
+    if (state.cloudUser) {
+      await requestInitialCloudSync(state.cloudUser.id);
+    } else {
+      setSyncGate({ phase: "idle" });
+    }
   } catch (error) {
-    state.cloudReady = false;
-    state.cloudError = `雲端功能暫時無法載入：${error.message}`;
+    state.cloudError = "雲端功能暫時無法載入，請確認網路與 Supabase 設定。";
     renderCloudStatus();
+    setSyncGate({ phase: "error" });
   }
+}
+
+function requestInitialCloudSync(userId, options = {}) {
+  if (!userId || isReadonly) {
+    setSyncGate({ phase: "idle" });
+    return Promise.resolve();
+  }
+
+  return syncCoordinator.request(
+    userId,
+    ({ isCurrent }) => loadCloudLibraryForAttempt({ userId, isCurrent }),
+    options,
+  );
 }
 
 function toCloudTripPayload(trip) {
@@ -1552,52 +1607,71 @@ async function updateTripMemberDisplayNameById(memberId, displayName) {
   return fromCloudTripMember(Array.isArray(data) ? data[0] : data);
 }
 
-async function loadCloudLibrary() {
-  if (!state.cloudUser) return;
+async function loadCloudLibraryForAttempt({ userId, isCurrent }) {
+  const canCommit = () => isCurrent() && state.cloudUser?.id === userId;
+  if (!canCommit()) return;
 
   try {
     const viewState = captureViewState();
     state.cloudSyncing = true;
     renderCloudStatus();
     const client = await getSupabaseClient();
+    if (!canCommit()) return;
     const { data, error } = await client
       .from("trips")
       .select("id,owner_id,title,start_date,end_date,data,updated_at")
       .order("updated_at", { ascending: false });
+    if (!canCommit()) return;
     if (error) throw error;
 
     if (Array.isArray(data) && data.length > 0) {
       const localTripsBeforeCloudOverwrite = state.library.trips;
-      state.library = { trips: data.map(fromCloudTrip) };
-      await loadCloudCollaborativeData(client, state.library.trips);
+      const cloudLibrary = { trips: data.map(fromCloudTrip) };
+      await loadCloudCollaborativeData(client, cloudLibrary.trips);
+      if (!canCommit()) return;
       const pendingTodoIdsBeforeCloudOverwrite = new Set(pendingTodoSyncIds);
-      state.library.trips = mergeUnpublishedPrivateTodos(
+      const mergedTrips = mergeUnpublishedPrivateTodos(
         localTripsBeforeCloudOverwrite,
-        state.library.trips,
-        state.cloudUser.id,
+        cloudLibrary.trips,
+        userId,
         pendingTodoIdsBeforeCloudOverwrite
       );
+      if (!canCommit()) return;
+      state.library = { trips: mergedTrips };
+      if (!canCommit()) return;
       pendingTodoIdsBeforeCloudOverwrite.forEach((todoId) => pendingTodoSyncIds.delete(todoId));
       const activeTrip = state.library.trips.find((trip) => trip.id === viewState.activeTripId);
+      if (!canCommit()) return;
       state.activeTripId = activeTrip?.id || state.library.trips[0]?.id || null;
+      if (!canCommit()) return;
       state.activeDayIndex = activeTrip ? Math.min(viewState.activeDayIndex, activeTrip.days.length - 1) : 0;
+      if (!canCommit()) return;
       state.activeTripSection = viewState.activeTripSection;
+      if (!canCommit()) return;
       state.activeBookingGroup = viewState.activeBookingGroup || state.activeBookingGroup;
+      if (!canCommit()) return;
       state.activeTodoGroup = viewState.activeTodoGroup || state.activeTodoGroup;
+      if (!canCommit()) return;
       state.activeExpenseDate = viewState.activeExpenseDate || state.activeExpenseDate;
+      if (!canCommit()) return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+      if (!canCommit()) return;
       render();
+      if (!canCommit()) return;
       restoreViewState(viewState);
     } else {
-      state.cloudSyncing = false;
-      await saveCloudLibrary();
-      state.cloudSyncing = true;
+      await saveCloudLibrary({ allowWhileSyncing: true, throwOnError: true });
+      if (!canCommit()) return;
     }
 
+    if (!canCommit()) return;
     state.cloudError = "";
   } catch (error) {
-    state.cloudError = `雲端讀取失敗：${error.message}`;
+    if (!canCommit()) return;
+    state.cloudError = "雲端讀取失敗，請確認網路與 Supabase 設定。";
+    throw error;
   } finally {
+    if (!canCommit()) return;
     state.cloudSyncing = false;
     renderCloudStatus();
   }
@@ -1739,9 +1813,10 @@ function formatAttachmentUploadError(error) {
   return formatCloudSaveError(error).replace("雲端儲存失敗：", "附件上傳失敗：");
 }
 
-async function saveCloudLibrary() {
-  if (!state.cloudUser || !state.cloudReady || state.cloudSyncing) return;
+async function saveCloudLibrary({ allowWhileSyncing = false, throwOnError = false } = {}) {
+  if (!state.cloudUser || !state.cloudReady || (state.cloudSyncing && !allowWhileSyncing)) return;
 
+  let failure = null;
   try {
     state.cloudSyncing = true;
     renderCloudStatus();
@@ -1768,11 +1843,16 @@ async function saveCloudLibrary() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
     state.cloudError = "";
   } catch (error) {
-    state.cloudError = formatCloudSaveError(error);
+    failure = error;
+    state.cloudError = throwOnError
+      ? "雲端儲存失敗，請確認網路與 Supabase 設定。"
+      : formatCloudSaveError(error);
   } finally {
     state.cloudSyncing = false;
     renderCloudStatus();
   }
+
+  if (failure && throwOnError) throw failure;
 }
 
 async function upsertCloudRow(client, table, cloudId, payload) {
@@ -6464,7 +6544,11 @@ cloudAuthForm.addEventListener("submit", async (event) => {
     state.cloudUser = data.user;
     cloudPasswordInput.value = "";
     renderCloudStatus();
-    await loadCloudLibrary();
+    try {
+      await requestInitialCloudSync(data.user.id);
+    } catch {
+      // 同步問題由閘門顯示安全訊息與重試按鈕，不把服務端細節顯示在 alert。
+    }
   } catch (error) {
     alert(`登入失敗：${error.message}`);
   }
@@ -6488,7 +6572,11 @@ cloudSignUpButton.addEventListener("click", async () => {
     cloudPasswordInput.value = "";
     renderCloudStatus();
     if (data.session) {
-      await saveCloudLibrary();
+      try {
+        await requestInitialCloudSync(data.user.id);
+      } catch {
+        // 同步問題由閘門處理；帳號已建立，使用者可安全地重試同步。
+      }
       alert("註冊完成，已開始雲端同步。");
     } else {
       alert("註冊完成。請先到信箱確認 Email，再回來登入。");
@@ -6501,6 +6589,7 @@ cloudSignUpButton.addEventListener("click", async () => {
 cloudSignOutButton.addEventListener("click", async () => {
   if (isReadonly) return;
 
+  syncCoordinator.invalidate();
   try {
     const client = await getSupabaseClient();
     await client.auth.signOut();
@@ -6509,6 +6598,11 @@ cloudSignOutButton.addEventListener("click", async () => {
     state.cloudError = "";
     renderCloudStatus();
   }
+});
+
+syncGateRetryButton?.addEventListener("click", () => {
+  const userId = state.cloudUser?.id;
+  if (userId) requestInitialCloudSync(userId, { retry: true }).catch(() => {});
 });
 
 cloudSyncButton.addEventListener("click", async () => {
@@ -7671,8 +7765,15 @@ if ("serviceWorker" in navigator) {
 
 populateTimeOptions();
 saveLibrary();
-render();
 renderReadonlyMode();
-restoreInitialViewState();
-initCloudSync();
+if (isReadonly) {
+  render();
+  restoreInitialViewState();
+} else {
+  setSyncGate({ phase: "loading" });
+  initCloudSync().finally(() => {
+    render();
+    restoreInitialViewState();
+  });
+}
 startTravelModeTimer();

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createSyncCoordinator } from "../sync-gate.js";
 
 function deferred() {
@@ -11,6 +12,22 @@ function deferred() {
   });
   return { promise, resolve, reject };
 }
+
+test("同步閘門提供必要 DOM、樣式與同步入口", async () => {
+  const [html, styles, app] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id="syncGate"/);
+  assert.match(html, /正在與 Supabase 同步旅行資料…/);
+  assert.match(html, /id="syncGateRetryButton"/);
+  assert.match(styles, /\.sync-gate/);
+  assert.match(styles, /prefers-reduced-motion/);
+  assert.match(app, /requestInitialCloudSync/);
+  assert.match(app, /createSyncCoordinator/);
+});
 
 test("同一使用者的同步會共用同一個 promise", async () => {
   let resolveWork;
@@ -98,6 +115,32 @@ test("invalidate 後未完成同步不再是目前世代", async () => {
     attemptId: 2,
     error: "",
   });
+});
+
+test("登出或切換使用者後，舊世代不得提交旅行資料", async () => {
+  const userAWork = deferred();
+  const userBWork = deferred();
+  const coordinator = createSyncCoordinator();
+  let commitLibraryCalls = 0;
+
+  const userA = coordinator.request("user-a", async ({ isCurrent }) => {
+    await userAWork.promise;
+    if (!isCurrent()) return;
+    commitLibraryCalls += 1;
+  });
+  const userB = coordinator.request("user-b", async ({ isCurrent }) => {
+    await userBWork.promise;
+    if (!isCurrent()) return;
+    commitLibraryCalls += 1;
+  }, { retry: true });
+
+  userAWork.resolve();
+  await userA;
+  assert.equal(commitLibraryCalls, 0);
+
+  userBWork.resolve();
+  await userB;
+  assert.equal(commitLibraryCalls, 1);
 });
 
 test("目前世代失敗時保留安全的錯誤訊息", async () => {
