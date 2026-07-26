@@ -276,4 +276,3 @@ git commit -m "chore: cache Supabase sync gate"
 - 驗收 5、6：Task 2 的 readonly/signout guard 與不變更 Supabase 實作邊界。
 - 驗收 7：Task 2 HTML、inert、aria、focus、reduced motion。
 - 驗收 8：Task 3 版本／precache test、syntax、完整 node test 與正式發布前 UI 證據。
-
