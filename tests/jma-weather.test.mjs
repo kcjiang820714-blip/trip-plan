@@ -102,6 +102,14 @@ test("儲存的官方區碼追溯 fixture 與分區表一致", async () => {
   }
 });
 
+test("精簡官方行政區階層保留 142/375/1805 筆完整性", async () => {
+  const hierarchy = JSON.parse(await readFile(new URL("./fixtures/jma-area-hierarchy-2026-07-27.json", import.meta.url), "utf8"));
+  assert.equal(hierarchy.sourceUrl, "https://www.jma.go.jp/bosai/common/const/area.json");
+  assert.equal(Object.keys(hierarchy.class10s).length, 142);
+  assert.equal(Object.keys(hierarchy.class15s).length, 375);
+  assert.equal(Object.keys(hierarchy.class20s).length, 1805);
+});
+
 test("廣域行政區不能覆蓋函館、小笠原、北九州與舞鶴的精確座標", () => {
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Hokkaido", latitude: 41.7687, longitude: 140.7291 })?.areaCode, "017010");
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Tokyo", latitude: 27.0944, longitude: 142.1917 })?.areaCode, "130040");
