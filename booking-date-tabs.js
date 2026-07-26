@@ -1,3 +1,16 @@
+function isValidIsoCalendarDate(date) {
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return false;
+  }
+
+  const [year, month, day] = date.split("-").map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+
+  return calendarDate.getUTCFullYear() === year
+    && calendarDate.getUTCMonth() === month - 1
+    && calendarDate.getUTCDate() === day;
+}
+
 export function getBookingScheduleDateForTabs(booking = {}) {
   return booking.type === "交通"
     ? booking.transport?.departureDate || booking.date || ""
@@ -9,7 +22,7 @@ export function getAvailableBookingDates(bookings = []) {
     ...new Set(
       bookings
         .map(getBookingScheduleDateForTabs)
-        .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)),
+        .filter(isValidIsoCalendarDate),
     ),
   ].sort();
 }
@@ -32,7 +45,7 @@ export function splitBookingsByDate(bookings = [], activeDate = "") {
       )
     : [];
   const undated = bookings.filter(
-    (booking) => !getBookingScheduleDateForTabs(booking),
+    (booking) => !isValidIsoCalendarDate(getBookingScheduleDateForTabs(booking)),
   );
   return { scheduled, undated };
 }

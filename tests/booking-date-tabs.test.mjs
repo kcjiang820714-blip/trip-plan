@@ -75,6 +75,39 @@ test("只有日期未定預訂時隱藏日期頁籤但保留未定卡片", () =>
   assert.deepEqual(splitBookingsByDate(onlyUndated, "").undated, onlyUndated);
 });
 
+test("格式錯誤的既有日期不產生頁籤且保留在日期未定", () => {
+  const legacyBooking = { type: "餐廳", date: "2026/07/03", name: "舊資料" };
+
+  assert.deepEqual(getAvailableBookingDates([legacyBooking]), []);
+  assert.deepEqual(splitBookingsByDate([legacyBooking], "").undated, [legacyBooking]);
+});
+
+test("不存在的日曆日期不產生頁籤且保留在日期未定", () => {
+  const impossibleBooking = { type: "住宿", date: "2026-02-31", name: "不存在日期" };
+
+  assert.deepEqual(getAvailableBookingDates([impossibleBooking]), []);
+  assert.deepEqual(splitBookingsByDate([impossibleBooking], "").undated, [impossibleBooking]);
+});
+
+test("混合有效與無效日期時只篩選有效卡片並保留無效交通出發日", () => {
+  const validBooking = { type: "票券", date: "2026-07-03", name: "有效票券" };
+  const invalidBooking = { type: "餐廳", date: "2026/07/03", name: "格式錯誤" };
+  const invalidTransport = {
+    type: "交通",
+    date: "2026-07-02",
+    name: "日期錯誤的交通",
+    transport: { departureDate: "2026-02-31" },
+  };
+  const mixedBookings = [validBooking, invalidBooking, invalidTransport];
+
+  assert.deepEqual(getAvailableBookingDates(mixedBookings), ["2026-07-03"]);
+  assert.deepEqual(splitBookingsByDate(mixedBookings, "2026-07-03").scheduled, [validBooking]);
+  assert.deepEqual(splitBookingsByDate(mixedBookings, "2026-07-03").undated, [
+    invalidBooking,
+    invalidTransport,
+  ]);
+});
+
 test("Service Worker 預快取目前頁面載入的樣式、程式與日期頁籤模組", async () => {
   const listeners = new Map();
   const precache = { name: "", assets: [] };
