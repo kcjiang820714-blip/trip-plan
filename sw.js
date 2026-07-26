@@ -1,9 +1,9 @@
-const CACHE_NAME = "trip-notebook-v144";
+const CACHE_NAME = "trip-notebook-v145";
 const APP_ASSETS = [
   "./",
   "./index.html",
   "./styles.css?v=116",
-  "./app.js?v=119",
+  "./app.js?v=120",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-192.png",
