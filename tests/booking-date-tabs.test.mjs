@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+import vm from "node:vm";
 
 import {
   getAvailableBookingDates,
@@ -56,6 +58,67 @@ test("新分類或失效日期選最早日期，有效日期則保持選取", ()
 
 test("沒有可用日期時回傳空字串", () => {
   assert.equal(resolveActiveBookingDate([], "2026-07-03"), "");
+});
+
+test("空分類沒有日期頁籤且沒有作用中日期", () => {
+  const availableDates = getAvailableBookingDates([]);
+
+  assert.deepEqual(availableDates, []);
+  assert.equal(resolveActiveBookingDate(availableDates, "2026-07-03"), "");
+});
+
+test("只有日期未定預訂時隱藏日期頁籤但保留未定卡片", () => {
+  const onlyUndated = [{ type: "餐廳", name: "尚未選定餐廳" }];
+
+  assert.deepEqual(getAvailableBookingDates(onlyUndated), []);
+  assert.deepEqual(splitBookingsByDate(onlyUndated, "").scheduled, []);
+  assert.deepEqual(splitBookingsByDate(onlyUndated, "").undated, onlyUndated);
+});
+
+test("Service Worker 預快取目前頁面載入的樣式、程式與日期頁籤模組", async () => {
+  const listeners = new Map();
+  const precache = { name: "", assets: [] };
+  const [indexHtml, appSource, serviceWorker] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../sw.js", import.meta.url), "utf8"),
+  ]);
+  const context = {
+    self: {
+      addEventListener(name, listener) {
+        listeners.set(name, listener);
+      },
+      skipWaiting() {},
+    },
+    caches: {
+      async open(name) {
+        precache.name = name;
+        return {
+          async addAll(assets) {
+            precache.assets = assets;
+          },
+        };
+      },
+    },
+  };
+  vm.runInNewContext(serviceWorker, context);
+  const installEvent = {
+    waitUntil(promise) {
+      this.done = promise;
+    },
+  };
+
+  listeners.get("install")(installEvent);
+  await installEvent.done;
+
+  const styleUrl = indexHtml.match(/href="(\.\/styles\.css\?v=\d+)"/)?.[1];
+  const appUrl = indexHtml.match(/src="(\.\/app\.js\?v=\d+)"/)?.[1];
+  const dateTabsUrl = appSource.match(/from "(\.\/booking-date-tabs\.js\?v=\d+)"/)?.[1];
+
+  assert.match(precache.name, /^trip-notebook-v\d+$/);
+  assert.ok(precache.assets.includes(styleUrl));
+  assert.ok(precache.assets.includes(appUrl));
+  assert.ok(precache.assets.includes(dateTabsUrl));
 });
 
 test("日期頁籤輸出可點選且標示目前選取日期", () => {

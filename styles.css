@@ -9812,6 +9812,70 @@ select {
   box-shadow: 0 8px 18px rgba(243, 101, 75, 0.2);
 }
 
+.booking-date-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 3px 0;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.booking-date-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.booking-date-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid rgba(85, 127, 152, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 254, 250, 0.74);
+  color: var(--ref-blue);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 820;
+  letter-spacing: 0.02em;
+  padding: 7px 13px;
+  white-space: nowrap;
+}
+
+.booking-date-tab:hover {
+  border-color: var(--ref-blue);
+  background: var(--ref-blue-soft);
+}
+
+.booking-date-tab:focus-visible {
+  outline: 3px solid rgba(85, 127, 152, 0.35);
+  outline-offset: 2px;
+}
+
+.booking-date-tab.is-active {
+  border-color: var(--ref-blue);
+  background: var(--ref-blue);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(85, 127, 152, 0.22);
+}
+
+.booking-undated-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--ref-line);
+  padding-top: 22px;
+}
+
+.booking-undated-section h3 {
+  margin: 0;
+  color: var(--ref-muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
 .booking-focus-card {
   position: relative;
   display: grid;
@@ -10169,6 +10233,12 @@ select {
     scroll-padding-inline: 16px;
   }
 
+  #bookingsPanel .booking-date-tabs {
+    margin: 0 -16px 10px;
+    padding: 3px 16px 7px;
+    scroll-padding-inline: 16px;
+  }
+
   .booking-workspace {
     order: 1;
   }
@@ -10284,6 +10354,10 @@ select {
   #bookingsPanel .sub-tabs {
     margin-bottom: 22px;
     overflow: visible;
+  }
+
+  #bookingsPanel .booking-date-tabs {
+    margin: -10px 0 26px;
   }
 
   #bookingsPanel .sub-tab {
