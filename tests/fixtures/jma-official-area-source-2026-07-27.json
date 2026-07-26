@@ -3,6 +3,7 @@
   "retrievedAt": "2026-07-27T00:00:00+09:00",
   "forecastEndpointsVerifiedAt": "2026-07-27T00:00:00+09:00",
   "forecastEndpointCount": 56,
+  "class20MunicipalityCount": 1805,
   "forecastUrlPattern": "https://www.jma.go.jp/bosai/forecast/data/forecast/<forecastAreaCode>.json",
   "purpose": "JMA 實際 forecast endpoint 與 class10 預報區碼追溯資料；014030 與 460040 是 area.json 的 office 組織碼，不是可請求 URL。",
   "officeSamples": {

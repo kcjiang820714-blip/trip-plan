@@ -1,3 +1,5 @@
+import { JMA_MUNICIPALITY_AREAS } from "./jma-municipality-areas.js";
+
 // Official source, retrieved 2026-07-27: https://www.jma.go.jp/bosai/common/const/area.json
 // Values are endpoint codes mapped to the official forecast-area (class10) codes.
 export const JMA_OFFICE_FORECAST_AREAS = {
@@ -29,6 +31,18 @@ export const JMA_FORECAST_AREAS = CITY_AREA_ROWS.map(([name, englishName, foreca
 export const JMA_CLASS10_FORECAST_AREAS = Object.entries(JMA_OFFICE_FORECAST_AREAS)
   .flatMap(([forecastAreaCode, areaCodes]) => areaCodes.map((areaCode) => ({ forecastAreaCode, areaCode, temperatureAreaCode: "", prefecture: areaCode })));
 
+const CLASS10_BY_CODE = new Map(JMA_CLASS10_FORECAST_AREAS.map((area) => [area.areaCode, area]));
+const MUNICIPALITY_AREA_CODES_BY_NAME = new Map();
+for (const [japaneseName, englishName, areaCode] of JMA_MUNICIPALITY_AREAS) {
+  for (const name of [japaneseName, englishName, stripMunicipalitySuffix(japaneseName), stripMunicipalitySuffix(englishName)]) {
+    const normalized = normalizeText(name);
+    if (!normalized) continue;
+    const codes = MUNICIPALITY_AREA_CODES_BY_NAME.get(normalized) || new Set();
+    codes.add(areaCode);
+    MUNICIPALITY_AREA_CODES_BY_NAME.set(normalized, codes);
+  }
+}
+
 const JMA_FORECAST_BASE_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast";
 const WMO_SEVERITY = [95, 73, 63, 45, 3, 0];
 
@@ -50,6 +64,9 @@ export function resolveJmaForecastArea(location) {
   );
   if (textualMatches.length === 1) return publicArea(textualMatches[0]);
   if (textualMatches.length > 1) return null;
+
+  const municipalityCodes = new Set([...candidates].flatMap((candidate) => [...(MUNICIPALITY_AREA_CODES_BY_NAME.get(candidate) || [])]));
+  if (municipalityCodes.size === 1) return publicArea(CLASS10_BY_CODE.get([...municipalityCodes][0]));
 
   const latitude = Number(location?.latitude);
   const longitude = Number(location?.longitude);
@@ -143,6 +160,12 @@ function normalizeLocationText(value) {
 
 function normalizeText(value) {
   return String(value || "").normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase("en-US");
+}
+
+function stripMunicipalitySuffix(value) {
+  return String(value || "")
+    .replace(/\s+(City|Town|Village)$/iu, "")
+    .replace(/[市町村]$/u, "");
 }
 
 function findSeries(timeSeries, areaCode, field) {

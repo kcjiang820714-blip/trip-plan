@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { JMA_MUNICIPALITY_AREAS } from "../jma-municipality-areas.js";
 
 import {
   JMA_FORECAST_AREAS,
@@ -56,6 +57,14 @@ test("東京、大阪、福岡以精確城市或座標唯一對應官方預報�
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", latitude: 0, longitude: 0 }), null);
 });
 
+test("官方市町村資料讓新地點不帶 jmaAreaCode 仍能唯一對應 class10", () => {
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "Asahikawa" })?.areaCode, "012010");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "Niseko" })?.areaCode, "016030");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "宮古島市" })?.areaCode, "473000");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "Nishihara" }), null);
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "不存在的城市", latitude: 35.0, longitude: 135.0 }), null);
+});
+
 test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區", () => {
   assert.equal(prefecturalCapitals.length, 47);
   for (const [city, forecastAreaCode] of prefecturalCapitals) {
@@ -87,6 +96,7 @@ test("儲存的官方區碼追溯 fixture 與分區表一致", async () => {
   assert.equal(fixture.sourceUrl, "https://www.jma.go.jp/bosai/common/const/area.json");
   assert.match(fixture.retrievedAt, /^2026-07-27T/);
   assert.equal(fixture.forecastEndpointCount, Object.keys(JMA_OFFICE_FORECAST_AREAS).length);
+  assert.equal(fixture.class20MunicipalityCount, JMA_MUNICIPALITY_AREAS.length);
   for (const [officeCode, areaCodes] of Object.entries(fixture.officeSamples)) {
     assert.deepEqual(JMA_OFFICE_FORECAST_AREAS[officeCode], areaCodes);
   }
