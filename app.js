@@ -1,3 +1,5 @@
+import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
+
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const VIEW_STATE_KEY = "trip-notebook-view-state-v1";
@@ -427,6 +429,7 @@ const closeAttachmentViewerButton = document.querySelector("#closeAttachmentView
 let activeAttachmentUrl = null;
 let supabaseClient = null;
 let cloudSaveTimer = null;
+const pendingTodoSyncIds = new Set();
 let exchangeRateUpdatePromise = null;
 const exchangeRateUpdateStatuses = new Map();
 
@@ -1151,9 +1154,9 @@ function createId() {
   return `trip-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function saveLibrary() {
+function saveLibrary({ scheduleCloud = true } = {}) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
-  scheduleCloudSave();
+  if (scheduleCloud) scheduleCloudSave();
 }
 
 function captureViewState() {
@@ -1558,8 +1561,17 @@ async function loadCloudLibrary() {
     if (error) throw error;
 
     if (Array.isArray(data) && data.length > 0) {
+      const localTripsBeforeCloudOverwrite = state.library.trips;
       state.library = { trips: data.map(fromCloudTrip) };
       await loadCloudCollaborativeData(client, state.library.trips);
+      const pendingTodoIdsBeforeCloudOverwrite = new Set(pendingTodoSyncIds);
+      state.library.trips = mergeUnpublishedPrivateTodos(
+        localTripsBeforeCloudOverwrite,
+        state.library.trips,
+        state.cloudUser.id,
+        pendingTodoIdsBeforeCloudOverwrite
+      );
+      pendingTodoIdsBeforeCloudOverwrite.forEach((todoId) => pendingTodoSyncIds.delete(todoId));
       const activeTrip = state.library.trips.find((trip) => trip.id === viewState.activeTripId);
       state.activeTripId = activeTrip?.id || state.library.trips[0]?.id || null;
       state.activeDayIndex = activeTrip ? Math.min(viewState.activeDayIndex, activeTrip.days.length - 1) : 0;
@@ -1764,6 +1776,43 @@ async function upsertCloudRow(client, table, cloudId, payload) {
   const { data, error } = await query;
   if (error) throw error;
   return data?.id || cloudId || null;
+}
+
+function canImmediatelySyncTodo(trip) {
+  return Boolean(state.cloudUser && state.cloudReady && trip?.cloudId);
+}
+
+async function saveCloudTodo(trip, todo) {
+  if (!canImmediatelySyncTodo(trip)) return null;
+
+  try {
+    const client = await getSupabaseClient();
+    const cloudId = await upsertTodoImmediately({
+      client,
+      trip,
+      todo,
+      currentUserId: state.cloudUser.id,
+      toPayload: toCloudTodoPayload,
+      upsertCloudRow
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+    state.cloudError = "";
+    return cloudId;
+  } catch (error) {
+    if (!isMissingCloudTableError(error)) state.cloudError = formatCloudSaveError(error);
+    scheduleCloudSave();
+    renderCloudStatus();
+    return null;
+  }
+}
+
+function saveTodoAndSync(trip, todo) {
+  const shouldSyncImmediately = canImmediatelySyncTodo(trip);
+  saveLibrary({ scheduleCloud: !shouldSyncImmediately });
+  if (shouldSyncImmediately) {
+    pendingTodoSyncIds.add(todo.id);
+    void saveCloudTodo(trip, todo);
+  }
 }
 
 async function saveCloudCollaborativeData(client, trip) {
@@ -7210,7 +7259,7 @@ todoForm.addEventListener("submit", async (event) => {
 
   try {
     await uploadOwnerAttachmentsBeforeLocalSave(trip, "todo", todo.id, todo.attachments);
-    saveLibrary();
+    saveTodoAndSync(trip, todo);
     deleteRemovedAttachmentsFromCloud(removedAttachments);
   } catch (error) {
     if (previousTodo) Object.assign(existingTodo, previousTodo);
@@ -7230,7 +7279,7 @@ todoGroups.addEventListener("change", (event) => {
   const todo = currentTrip().todos.find((item) => item.id === checkbox.dataset.toggleTodo);
   if (!todo) return;
   todo.done = checkbox.checked;
-  saveLibrary();
+  saveTodoAndSync(currentTrip(), todo);
   renderTodos();
 });
 
