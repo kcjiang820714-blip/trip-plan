@@ -76,6 +76,17 @@ test("完整市町村名稱優先於短別名，且 1805 筆官方名稱不會�
   }
 });
 
+test("app 形狀的 name, admin1, country 仍先以完整市町村解析", () => {
+  const cases = [["Fukushima Town, Hokkaido, Japan", "017010"], ["Asahikawa City, Hokkaido, Japan", "012010"], ["Amami City, Kagoshima, Japan", "460040"]];
+  for (const [name, areaCode] of cases) assert.equal(resolveJmaForecastArea({ countryCode: "JP", name, admin1: name.split(",")[1].trim(), country: "Japan" })?.areaCode, areaCode, name);
+  for (const [japaneseName, englishName, areaCode] of JMA_MUNICIPALITY_AREAS) {
+    for (const name of [`${japaneseName}, Japan`, `${englishName}, Japan`]) {
+      const resolved = resolveJmaForecastArea({ countryCode: "JP", name, admin1: "Japan", country: "Japan" });
+      assert.ok(!resolved || resolved.areaCode === areaCode, `${name}: ${resolved?.areaCode}`);
+    }
+  }
+});
+
 test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區", () => {
   assert.equal(prefecturalCapitals.length, 47);
   for (const [city, forecastAreaCode] of prefecturalCapitals) {

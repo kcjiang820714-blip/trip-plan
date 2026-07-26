@@ -58,10 +58,13 @@ export function resolveJmaForecastArea(location) {
     if (saved.length === 1) return publicArea(saved[0]);
   }
 
-  const fullName = normalizeText(location?.name);
-  const fullMunicipalityCodes = MUNICIPALITY_AREA_CODES_BY_NAME.get(fullName) || new Set();
-  if (hasMunicipalitySuffix(location?.name)) {
-    return fullMunicipalityCodes.size === 1 ? publicArea(CLASS10_BY_CODE.get([...fullMunicipalityCodes][0])) : null;
+  const nameParts = String(location?.name || "").split(/[，,]/u).map((part) => part.trim()).filter(Boolean);
+  const fullMunicipalityNames = Array.from({ length: nameParts.length }, (_, index) => nameParts.slice(0, nameParts.length - index).join(", "));
+  for (const fullMunicipalityName of fullMunicipalityNames) {
+    const fullMunicipalityCodes = MUNICIPALITY_AREA_CODES_BY_NAME.get(normalizeText(fullMunicipalityName)) || new Set();
+    if (hasMunicipalitySuffix(fullMunicipalityName)) {
+      return fullMunicipalityCodes.size === 1 ? publicArea(CLASS10_BY_CODE.get([...fullMunicipalityCodes][0])) : null;
+    }
   }
 
   const candidates = new Set(normalizeLocationText(location?.name));
