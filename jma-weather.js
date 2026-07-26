@@ -32,8 +32,16 @@ export const JMA_CLASS10_FORECAST_AREAS = Object.entries(JMA_OFFICE_FORECAST_ARE
   .flatMap(([forecastAreaCode, areaCodes]) => areaCodes.map((areaCode) => ({ forecastAreaCode, areaCode, temperatureAreaCode: "", prefecture: areaCode })));
 
 const CLASS10_BY_CODE = new Map(JMA_CLASS10_FORECAST_AREAS.map((area) => [area.areaCode, area]));
+const MUNICIPALITY_EXACT_AREA_CODES_BY_NAME = new Map();
 const MUNICIPALITY_AREA_CODES_BY_NAME = new Map();
 for (const [japaneseName, englishName, areaCode] of JMA_MUNICIPALITY_AREAS) {
+  for (const name of [japaneseName, englishName]) {
+    const normalized = normalizeText(name);
+    if (!normalized) continue;
+    const exactCodes = MUNICIPALITY_EXACT_AREA_CODES_BY_NAME.get(normalized) || new Set();
+    exactCodes.add(areaCode);
+    MUNICIPALITY_EXACT_AREA_CODES_BY_NAME.set(normalized, exactCodes);
+  }
   for (const name of [japaneseName, englishName, stripMunicipalitySuffix(japaneseName), stripMunicipalitySuffix(englishName)]) {
     const normalized = normalizeText(name);
     if (!normalized) continue;
@@ -60,11 +68,16 @@ export function resolveJmaForecastArea(location) {
 
   const nameParts = String(location?.name || "").split(/[，,]/u).map((part) => part.trim()).filter(Boolean);
   const fullMunicipalityNames = Array.from({ length: nameParts.length }, (_, index) => nameParts.slice(0, nameParts.length - index).join(", "));
+  // A reverse-geocoding result may contain a complete municipality followed by its
+  // prefecture/country.  Check every full prefix before trying short city aliases:
+  // e.g. "Sasebo City (Uku Area), Nagasaki, Japan" must not become "Nagasaki".
+  const hasLocationContext = nameParts.length > 1 || Boolean(location?.admin1 || location?.country);
   for (const fullMunicipalityName of fullMunicipalityNames) {
-    const fullMunicipalityCodes = MUNICIPALITY_AREA_CODES_BY_NAME.get(normalizeText(fullMunicipalityName)) || new Set();
-    if (hasMunicipalitySuffix(fullMunicipalityName)) {
-      return fullMunicipalityCodes.size === 1 ? publicArea(CLASS10_BY_CODE.get([...fullMunicipalityCodes][0])) : null;
-    }
+    const fullMunicipalityCodes = MUNICIPALITY_EXACT_AREA_CODES_BY_NAME.get(normalizeText(fullMunicipalityName)) || new Set();
+    if (fullMunicipalityCodes.size === 1) return publicArea(CLASS10_BY_CODE.get([...fullMunicipalityCodes][0]));
+    // A bare ambiguous word such as "Yamagata" remains eligible for the curated
+    // city alias below. With app-provided context, ambiguity must stay unresolved.
+    if (fullMunicipalityCodes.size > 1 && (hasLocationContext || hasMunicipalitySuffix(fullMunicipalityName))) return null;
   }
 
   const candidates = new Set(normalizeLocationText(location?.name));

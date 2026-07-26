@@ -76,15 +76,36 @@ test("完整市町村名稱優先於短別名，且 1805 筆官方名稱不會�
   }
 });
 
-test("app 形狀的 name, admin1, country 仍先以完整市町村解析", () => {
+test("app 形狀的 name, admin1, country 仍先以完整市町村解析", async () => {
   const cases = [["Fukushima Town, Hokkaido, Japan", "017010"], ["Asahikawa City, Hokkaido, Japan", "012010"], ["Amami City, Kagoshima, Japan", "460040"]];
   for (const [name, areaCode] of cases) assert.equal(resolveJmaForecastArea({ countryCode: "JP", name, admin1: name.split(",")[1].trim(), country: "Japan" })?.areaCode, areaCode, name);
+  const hierarchy = JSON.parse(await readFile(new URL("./fixtures/jma-area-hierarchy-2026-07-27.json", import.meta.url), "utf8"));
+  const prefectures = ["Hokkaido", "Aomori", "Iwate", "Miyagi", "Akita", "Yamagata", "Fukushima", "Ibaraki", "Tochigi", "Gunma", "Saitama", "Chiba", "Tokyo", "Kanagawa", "Niigata", "Toyama", "Ishikawa", "Fukui", "Yamanashi", "Nagano", "Gifu", "Shizuoka", "Aichi", "Mie", "Shiga", "Kyoto", "Osaka", "Hyogo", "Nara", "Wakayama", "Tottori", "Shimane", "Okayama", "Hiroshima", "Yamaguchi", "Tokushima", "Kagawa", "Ehime", "Kochi", "Fukuoka", "Saga", "Nagasaki", "Kumamoto", "Oita", "Miyazaki", "Kagoshima", "Okinawa"];
+  const municipalityContexts = new Map();
+  for (const [jisCode, municipality] of Object.entries(hierarchy.class20s)) {
+    const class10Code = hierarchy.class15s[municipality.parent].parent;
+    const prefecture = prefectures[Number(jisCode.slice(0, 2)) - 1];
+    for (const municipalityName of [municipality.name, municipality.enName]) {
+      const rows = municipalityContexts.get(municipalityName) || [];
+      rows.push({ areaCode: class10Code, prefecture });
+      municipalityContexts.set(municipalityName, rows);
+    }
+  }
   for (const [japaneseName, englishName, areaCode] of JMA_MUNICIPALITY_AREAS) {
-    for (const name of [`${japaneseName}, Japan`, `${englishName}, Japan`]) {
-      const resolved = resolveJmaForecastArea({ countryCode: "JP", name, admin1: "Japan", country: "Japan" });
+    for (const municipalityName of [japaneseName, englishName]) {
+      const contexts = municipalityContexts.get(municipalityName).filter((context) => context.areaCode === areaCode);
+      assert.equal(contexts.length, 1, `官方階層找不到唯一都道府縣：${municipalityName}`);
+      const { prefecture } = contexts[0];
+      const name = `${municipalityName}, ${prefecture}, Japan`;
+      const resolved = resolveJmaForecastArea({ countryCode: "JP", name, admin1: prefecture, country: "Japan" });
       assert.ok(!resolved || resolved.areaCode === areaCode, `${name}: ${resolved?.areaCode}`);
     }
   }
+});
+
+test("市內分區與括號名不會被都道府縣短別名劫持", () => {
+  const cases = [["郡山市湖南, Fukushima, Japan", "070030"], ["松本市松本, Nagano, Japan", "200020"], ["田辺市龍神, Wakayama, Japan", "300020"], ["Sasebo City (Uku Area), Nagasaki, Japan", "420040"], ["対馬市上対馬, Nagasaki, Japan", "420030"], ["Saikai City (Enoshima and Tairashima), Nagasaki, Japan", "420040"]];
+  for (const [name, areaCode] of cases) assert.equal(resolveJmaForecastArea({ countryCode: "JP", name, admin1: name.split(",")[1].trim(), country: "Japan" })?.areaCode, areaCode, name);
 });
 
 test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區", () => {
