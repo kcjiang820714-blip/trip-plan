@@ -4264,12 +4264,12 @@ function renderTodos() {
 
   const desktopSectionDefinitions = [
     { className: "todo-section-departure", icon: "▣", title: "出發前", todos: sections.departure },
-    { className: "todo-section-today", icon: "☀", title: "本日", todos: sections.today },
+    { className: "todo-section-today", icon: "☀", title: "旅行中", todos: sections.today },
     { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
   ];
   const mobileScheduledTodos = [...sections.departure, ...sections.today];
   const mobileSectionDefinitions = [
-    { className: "todo-section-today", icon: "☀", title: "出發前與本日", todos: mobileScheduledTodos },
+    { className: "todo-section-today", icon: "☀", title: "出發前與旅行中", todos: mobileScheduledTodos },
     { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
   ];
   const sectionDefinitions = window.matchMedia("(max-width: 679px)").matches
