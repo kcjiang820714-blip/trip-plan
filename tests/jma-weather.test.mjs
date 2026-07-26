@@ -1,13 +1,20 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  JMA_FORECAST_AREAS,
+  JMA_OFFICE_FORECAST_AREAS,
   buildJmaForecastUrl,
   isJapanLocation,
   mapJmaWeatherToWmo,
   parseJmaForecast,
   resolveJmaForecastArea,
 } from "../jma-weather.js";
+
+const prefecturalCapitals = [
+  ["Sapporo", "016000"], ["Aomori", "020000"], ["Morioka", "030000"], ["Sendai", "040000"], ["Akita", "050000"], ["Yamagata", "060000"], ["Fukushima", "070000"], ["Mito", "080000"], ["Utsunomiya", "090000"], ["Maebashi", "100000"], ["Saitama", "110000"], ["Chiba", "120000"], ["Tokyo", "130000"], ["Yokohama", "140000"], ["Niigata", "150000"], ["Toyama", "160000"], ["Kanazawa", "170000"], ["Fukui", "180000"], ["Kofu", "190000"], ["Nagano", "200000"], ["Gifu", "210000"], ["Shizuoka", "220000"], ["Nagoya", "230000"], ["Tsu", "240000"], ["Otsu", "250000"], ["Kyoto", "260000"], ["Osaka", "270000"], ["Kobe", "280000"], ["Nara", "290000"], ["Wakayama", "300000"], ["Tottori", "310000"], ["Matsue", "320000"], ["Okayama", "330000"], ["Hiroshima", "340000"], ["Yamaguchi", "350000"], ["Tokushima", "360000"], ["Takamatsu", "370000"], ["Matsuyama", "380000"], ["Kochi", "390000"], ["Fukuoka", "400000"], ["Saga", "410000"], ["Nagasaki", "420000"], ["Kumamoto", "430000"], ["Oita", "440000"], ["Miyazaki", "450000"], ["Kagoshima", "460100"], ["Naha", "471000"],
+];
 
 const tokyoPayload = [{
   publishingOffice: "気象庁",
@@ -38,13 +45,54 @@ test("只以明確 JP 國碼判定日本地點", () => {
   assert.equal(isJapanLocation({ group: "日本" }), false);
 });
 
-test("東京、大阪、福岡以行政區或座標唯一對應官方預報區", () => {
-  assert.deepEqual(resolveJmaForecastArea({ countryCode: "JP", admin1: "Tokyo" }), {
-    forecastAreaCode: "130000", areaCode: "130010", temperatureAreaCode: "44132", prefecture: "東京都",
+test("東京、大阪、福岡以精確城市或座標唯一對應官方預報區", () => {
+  assert.deepEqual(resolveJmaForecastArea({ countryCode: "JP", name: "Tokyo" }), {
+    forecastAreaCode: "130000", areaCode: "130010", temperatureAreaCode: "44132", prefecture: "東京",
   });
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "Osaka" }).forecastAreaCode, "270000");
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", latitude: 33.5904, longitude: 130.4017 }).forecastAreaCode, "400000");
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "東京大阪" }), null);
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", latitude: 0, longitude: 0 }), null);
+});
+
+test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區", () => {
+  assert.equal(prefecturalCapitals.length, 47);
+  for (const [city, forecastAreaCode] of prefecturalCapitals) {
+    assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: city })?.forecastAreaCode, forecastAreaCode, city);
+  }
+  assert.equal(Object.keys(JMA_OFFICE_FORECAST_AREAS).length, 58);
+  assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["130000"], ["130010", "130020", "130030", "130040"]);
+  assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["400000"], ["400010", "400020", "400030", "400040"]);
+  assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["474000"], ["474010", "474020"]);
+  assert.ok(JMA_FORECAST_AREAS.length >= 51);
+});
+
+test("儲存的官方區碼追溯 fixture 與分區表一致", async () => {
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/jma-official-area-source-2026-07-27.json", import.meta.url), "utf8"));
+  assert.equal(fixture.sourceUrl, "https://www.jma.go.jp/bosai/common/const/area.json");
+  assert.match(fixture.retrievedAt, /^2026-07-27T/);
+  for (const [officeCode, areaCodes] of Object.entries(fixture.officeSamples)) {
+    assert.deepEqual(JMA_OFFICE_FORECAST_AREAS[officeCode], areaCodes);
+  }
+});
+
+test("廣域行政區不能覆蓋函館、小笠原、北九州與舞鶴的精確座標", () => {
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Hokkaido", latitude: 41.7687, longitude: 140.7291 })?.areaCode, "017010");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Tokyo", latitude: 27.0944, longitude: 142.1917 })?.areaCode, "130040");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Fukuoka", latitude: 33.8834, longitude: 130.8752 })?.areaCode, "400020");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Kyoto", latitude: 35.4748, longitude: 135.3859 })?.areaCode, "260020");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", admin1: "Tokyo" }), null);
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", group: "北海道" }), null);
+});
+
+test("官方拆分區的座標範圍互不重疊，邊界外不猜測", () => {
+  for (let index = 0; index < JMA_FORECAST_AREAS.length; index += 1) {
+    for (let compareIndex = index + 1; compareIndex < JMA_FORECAST_AREAS.length; compareIndex += 1) {
+      const left = JMA_FORECAST_AREAS[index].bounds;
+      const right = JMA_FORECAST_AREAS[compareIndex].bounds;
+      assert.ok(left.maxLat < right.minLat || right.maxLat < left.minLat || left.maxLon < right.minLon || right.maxLon < left.minLon);
+    }
+  }
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", latitude: 0, longitude: 0 }), null);
 });
 
@@ -81,6 +129,7 @@ test("JMA 天氣文字按雷雨、雪、雨、霧、多雲、晴映射，未知�
 test("缺欄位、區碼不符、序列長度不一致與無目標日期均安全回傳 null", () => {
   assert.equal(parseJmaForecast({}, { forecastAreaCode: "130000", areaCode: "130010" }), null);
   assert.equal(parseJmaForecast(tokyoPayload, { forecastAreaCode: "130000", areaCode: "999999" }), null);
+  assert.equal(parseJmaForecast(tokyoPayload, { forecastAreaCode: "400000", areaCode: "130010", temperatureAreaCode: "44132" }), null);
   const badLengths = structuredClone(tokyoPayload);
   badLengths[0].timeSeries[1].areas[0].pops = ["40"];
   assert.equal(parseJmaForecast(badLengths, { forecastAreaCode: "130000", areaCode: "130010", temperatureAreaCode: "44132" }), null);

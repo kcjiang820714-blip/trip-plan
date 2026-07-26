@@ -4,7 +4,9 @@
 
 - 新增 `jma-weather.js` 純 ES module；不讀取 DOM、app state、trip，也不執行 `fetch`。
 - 提供 `isJapanLocation`、`resolveJmaForecastArea`、`buildJmaForecastUrl`、`parseJmaForecast`、`mapJmaWeatherToWmo`。
-- 已建立東京、京都、大阪、札幌、福岡的官方端點／預報區／溫度站對應；解析器將 JMA 的區域預報輸出為既有 `daily` 與空 `hourly.time` 結構。
+- 已由 JMA 官方 `area.json`（2026-07-27 取得）建立 58 個預報端點與所有 class10 預報拆分區的 `JMA_OFFICE_FORECAST_AREAS`；追溯 fixture 在 `tests/fixtures/jma-official-area-source-2026-07-27.json`。
+- `JMA_FORECAST_AREAS` 涵蓋 47 都道府縣代表城市，另含函館、小笠原、北九州、舞鶴、伊豆諸島、沖繩離島與奄美的獨立預報區／溫度站碼。
+- 解析只接受精確城市名稱、已保存的內部預報區碼或唯一座標範圍；廣域都道府縣文字（例如 `Tokyo`、`Hokkaido`）不再被當成城市答案。若無法唯一對應，安全回傳 `null` 交由後續 Open-Meteo 備援。
 - 解析以 `Intl.DateTimeFormat` 的 `Asia/Tokyo` 時區產生日字串；`--`、空字串、非數字與未知天氣都保留為 `null`，不補 0 或晴天。
 - 不完整 payload、區碼不符、序列長度不符與要求日期不存在都安全回傳 `null`，不拋出未處理例外。
 
@@ -22,10 +24,10 @@ node --test tests/jma-weather.test.mjs
 
 ```bash
 node --test tests/jma-weather.test.mjs
-# 7 passed, 0 failed
+# 11 passed, 0 failed
 
 node --test
-# 34 passed, 0 failed
+# 38 passed, 0 failed
 
 node --check jma-weather.js
 git diff --check
@@ -40,5 +42,5 @@ git diff --check
 
 ## 已知限制／後續風險
 
-- 目前對應表只含 Task 1 驗收所需的東京、京都、大阪、札幌、福岡。完整 47 都道府縣及北海道／離島的實際 JMA 分區，必須在擴表時逐筆補上官方端點、內部預報區、溫度站與不重疊座標範圍，並新增對應測試，不能以城市名稱模糊比對推測。
-- JMA 的溫度區域代碼與預報區代碼不同；新增地區時兩者都必須確認，否則解析器會安全回傳 `null` 並讓後續的 Open-Meteo 備援處理。
+- JMA 的預報邊界不是簡單矩形。這個純前端版本僅為已確認的城市／島嶼放入小型、不重疊的座標範圍；其他地點必須靠精確名稱或未來保存的 `jmaAreaCode` 才會走 JMA，否則安全 fallback。不得以都道府縣名稱或大範圍矩形猜測子區。
+- JMA 的溫度區域代碼與預報區代碼不同；新增城市時兩者都必須以該端點官方 JSON 確認，並新增對應測試。
