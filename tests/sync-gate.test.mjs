@@ -2,6 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createSyncCoordinator } from "../sync-gate.js";
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 test("同一使用者的同步會共用同一個 promise", async () => {
   let resolveWork;
   let calls = 0;
@@ -21,22 +31,50 @@ test("同一使用者的同步會共用同一個 promise", async () => {
   assert.equal(coordinator.snapshot().phase, "success");
 });
 
-test("重試後舊世代不再是目前同步", async () => {
-  let resolveFirst;
-  let firstIsCurrent;
+test("retry 先成功後，舊 success 不會覆寫 retry 世代的 snapshot", async () => {
+  const firstWork = deferred();
+  const retryWork = deferred();
   const coordinator = createSyncCoordinator();
-  const first = coordinator.request("user-a", ({ isCurrent }) => {
-    firstIsCurrent = isCurrent;
-    return new Promise((resolve) => { resolveFirst = resolve; });
+  const first = coordinator.request("user-a", () => firstWork.promise);
+  const retry = coordinator.request("user-a", () => retryWork.promise, { retry: true });
+
+  retryWork.resolve();
+  await retry;
+  assert.deepEqual(coordinator.snapshot(), {
+    phase: "success",
+    userId: "user-a",
+    attemptId: 2,
+    error: "",
   });
 
-  await Promise.resolve();
-  const retry = coordinator.request("user-a", () => Promise.resolve(), { retry: true });
+  firstWork.resolve();
+  await first;
+  assert.deepEqual(coordinator.snapshot(), {
+    phase: "success",
+    userId: "user-a",
+    attemptId: 2,
+    error: "",
+  });
+});
 
-  assert.equal(firstIsCurrent(), false);
-  resolveFirst();
-  await Promise.all([first, retry]);
-  assert.equal(coordinator.snapshot().phase, "success");
+test("retry 成功後，舊 reject 不會覆寫 retry 世代的 snapshot", async () => {
+  const firstWork = deferred();
+  const retryWork = deferred();
+  const coordinator = createSyncCoordinator();
+  const first = coordinator.request("user-a", () => firstWork.promise);
+  const retry = coordinator.request("user-a", () => retryWork.promise, { retry: true });
+
+  retryWork.resolve();
+  await retry;
+  firstWork.reject(new Error("舊同步失敗"));
+  await assert.rejects(first, /舊同步失敗/);
+
+  assert.deepEqual(coordinator.snapshot(), {
+    phase: "success",
+    userId: "user-a",
+    attemptId: 2,
+    error: "",
+  });
 });
 
 test("invalidate 後未完成同步不再是目前世代", async () => {
