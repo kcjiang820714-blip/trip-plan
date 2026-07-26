@@ -1,3 +1,7 @@
+export function createAttemptGuard({ userId, isCurrent, getCurrentUserId }) {
+  return () => Boolean(userId && isCurrent() && getCurrentUserId() === userId);
+}
+
 export function createSyncCoordinator({ onStateChange = () => {} } = {}) {
   let sequence = 0;
   let active = null;

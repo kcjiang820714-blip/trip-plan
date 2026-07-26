@@ -1,4 +1,4 @@
-import { createSyncCoordinator } from "./sync-gate.js?v=1";
+import { createAttemptGuard, createSyncCoordinator } from "./sync-gate.js?v=1";
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
 import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
 import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=3";
@@ -215,6 +215,7 @@ const homeView = document.querySelector("#homeView");
 const tripView = document.querySelector("#tripView");
 const appShell = document.querySelector("#appShell");
 const syncGate = document.querySelector("#syncGate");
+const syncGateCard = document.querySelector("#syncGateCard");
 const syncGateTitle = document.querySelector("#syncGateTitle");
 const syncGateMessage = document.querySelector("#syncGateMessage");
 const syncGateRetryButton = document.querySelector("#syncGateRetryButton");
@@ -458,6 +459,7 @@ function setSyncGate(gateState = { phase: "idle" }) {
     syncGateTitle.textContent = "正在與 Supabase 同步旅行資料…";
     syncGateMessage.textContent = "";
     syncGateRetryButton.hidden = true;
+    queueMicrotask(() => syncGateCard?.focus());
     return;
   }
 
@@ -1322,7 +1324,10 @@ async function initCloudSync() {
       const previousUserId = state.cloudUser?.id || null;
       const nextUser = session?.user || null;
       const nextUserId = nextUser?.id || null;
-      if (event === "SIGNED_OUT") syncCoordinator.invalidate();
+      if (event === "SIGNED_OUT") {
+        syncCoordinator.invalidate();
+        state.cloudSyncing = false;
+      }
       state.cloudUser = nextUser;
       renderCloudStatus();
       if (state.cloudUser && event === "SIGNED_IN" && nextUserId !== previousUserId) {
@@ -1356,11 +1361,11 @@ function requestInitialCloudSync(userId, options = {}) {
   );
 }
 
-function toCloudTripPayload(trip) {
+function toCloudTripPayload(trip, userId = state.cloudUser?.id) {
   const cloudTrip = stripAttachmentsForCloudTrip(trip);
 
   return {
-    owner_id: state.cloudUser.id,
+    owner_id: userId,
     title: trip.title || "未命名旅程",
     start_date: trip.startDate || null,
     end_date: trip.endDate || null,
@@ -1466,10 +1471,10 @@ function fromCloudTodo(row) {
   });
 }
 
-function toCloudExpensePayload(trip, expense) {
+function toCloudExpensePayload(trip, expense, userId = state.cloudUser?.id) {
   return {
     trip_id: trip.cloudId,
-    created_by: expense.createdBy || state.cloudUser.id,
+    created_by: expense.createdBy || userId,
     date: expense.date || null,
     name: expense.name || "",
     amount: Number(expense.amount) || 0,
@@ -1483,10 +1488,10 @@ function toCloudExpensePayload(trip, expense) {
   };
 }
 
-function toCloudTodoPayload(trip, todo) {
+function toCloudTodoPayload(trip, todo, userId = state.cloudUser?.id) {
   return {
     trip_id: trip.cloudId,
-    owner_id: todo.ownerId || state.cloudUser.id,
+    owner_id: todo.ownerId || userId,
     group_name: todo.group || "行前準備",
     text: todo.text || "",
     note: formatTodoCloudNote(todo),
@@ -1660,7 +1665,7 @@ async function loadCloudLibraryForAttempt({ userId, isCurrent }) {
       if (!canCommit()) return;
       restoreViewState(viewState);
     } else {
-      await saveCloudLibrary({ allowWhileSyncing: true, throwOnError: true });
+      await saveCloudLibraryForInitialAttempt({ userId, isCurrent });
       if (!canCommit()) return;
     }
 
@@ -1689,11 +1694,11 @@ function canSaveCloudTripShell(trip) {
   return !trip.role || trip.role === "owner";
 }
 
-function attachmentStoragePath(trip, ownerType, ownerId, attachment) {
+function attachmentStoragePath(trip, ownerType, ownerId, attachment, userId = state.cloudUser?.id) {
   const extension = storageFileExtension(attachment);
   const fileName = `${safeStorageSegment(attachment.id || createId(), "attachment")}-${storageBaseName(attachment)}.${extension}`;
   return [
-    safeStorageSegment(state.cloudUser.id, "user"),
+    safeStorageSegment(userId, "user"),
     safeStorageSegment(trip.id, "trip"),
     safeStorageSegment(ownerType, "owner"),
     safeStorageSegment(ownerId, "item"),
@@ -1701,51 +1706,63 @@ function attachmentStoragePath(trip, ownerType, ownerId, attachment) {
   ].join("/");
 }
 
-async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment) {
-  if (attachment.publicUrl || !attachment.dataUrl) return;
+async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment, { userId, canCommit = () => true } = {}) {
+  if (!canCommit()) return false;
+  if (attachment.publicUrl || !attachment.dataUrl) return true;
 
   const blob = dataUrlToBlob(attachment.dataUrl);
-  const storagePath = isSafeStoragePath(attachment.storagePath) ? attachment.storagePath : attachmentStoragePath(trip, ownerType, ownerId, attachment);
+  const storagePath = isSafeStoragePath(attachment.storagePath)
+    ? attachment.storagePath
+    : attachmentStoragePath(trip, ownerType, ownerId, attachment, userId);
   const { error } = await client.storage.from(SUPABASE_ATTACHMENT_BUCKET).upload(storagePath, blob, {
     cacheControl: "3600",
     contentType: attachment.type || blob.type || "application/octet-stream",
     upsert: true
   });
 
+  if (!canCommit()) return false;
   if (error) throw error;
 
   const { data } = client.storage.from(SUPABASE_ATTACHMENT_BUCKET).getPublicUrl(storagePath);
+  if (!canCommit()) return false;
   attachment.storagePath = storagePath;
+  if (!canCommit()) return false;
   attachment.publicUrl = data.publicUrl;
+  if (!canCommit()) return false;
   attachment.uploadedAt = new Date().toISOString();
+  if (!canCommit()) return false;
   attachment.dataUrl = "";
+  if (!canCommit()) return false;
+  return true;
 }
 
-async function uploadTripAttachments(client, trip) {
+async function uploadTripAttachments(client, trip, options) {
   for (const day of trip.days || []) {
     for (const item of day.items || []) {
       for (const attachment of item.attachments || []) {
-        await uploadAttachmentToCloud(client, trip, "item", item.id || "item", attachment);
+        if (!await uploadAttachmentToCloud(client, trip, "item", item.id || "item", attachment, options)) return false;
       }
     }
   }
 
   for (const booking of trip.bookings || []) {
     for (const attachment of booking.attachments || []) {
-      await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment);
+      if (!await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment, options)) return false;
     }
     for (const ticket of booking.personalTickets || []) {
       for (const attachment of ticket.attachments || []) {
-        await uploadAttachmentToCloud(client, trip, "personal-ticket", ticket.id || "ticket", attachment);
+        if (!await uploadAttachmentToCloud(client, trip, "personal-ticket", ticket.id || "ticket", attachment, options)) return false;
       }
     }
   }
 
   for (const todo of trip.todos || []) {
     for (const attachment of todo.attachments || []) {
-      await uploadAttachmentToCloud(client, trip, "todo", todo.id || "todo", attachment);
+      if (!await uploadAttachmentToCloud(client, trip, "todo", todo.id || "todo", attachment, options)) return false;
     }
   }
+
+  return true;
 }
 
 async function deleteAttachmentFromCloud(client, attachment) {
@@ -1855,6 +1872,63 @@ async function saveCloudLibrary({ allowWhileSyncing = false, throwOnError = fals
   if (failure && throwOnError) throw failure;
 }
 
+async function saveCloudLibraryForInitialAttempt({ userId, isCurrent }) {
+  const canCommit = createAttemptGuard({
+    userId,
+    isCurrent,
+    getCurrentUserId: () => state.cloudUser?.id || null,
+  });
+  if (!canCommit() || !state.cloudReady) return false;
+
+  try {
+    state.cloudSyncing = true;
+    renderCloudStatus();
+    const client = await getSupabaseClient();
+    if (!canCommit()) return false;
+
+    for (const trip of state.library.trips) {
+      if (!canCommit()) return false;
+      if (canSaveCloudTripShell(trip)) {
+        const attachmentsUploaded = await uploadTripAttachments(client, trip, { userId, canCommit });
+        if (!attachmentsUploaded || !canCommit()) return false;
+
+        const payload = toCloudTripPayload(trip, userId);
+        if (!canCommit()) return false;
+        const query = trip.cloudId
+          ? client.from("trips").update(payload).eq("id", trip.cloudId).select("id").single()
+          : client.from("trips").insert(payload).select("id").single();
+        const { data, error } = await query;
+        if (!canCommit()) return false;
+        if (error) throw error;
+        if (!trip.cloudId && data?.id) {
+          if (!canCommit()) return false;
+          trip.cloudId = data.id;
+          if (!canCommit()) return false;
+          trip.role = "owner";
+          if (!canCommit()) return false;
+        }
+      }
+
+      const collaborativeDataSaved = await saveCloudCollaborativeData(client, trip, { userId, canCommit });
+      if (!collaborativeDataSaved || !canCommit()) return false;
+    }
+
+    if (!canCommit()) return false;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+    if (!canCommit()) return false;
+    state.cloudError = "";
+    return true;
+  } catch (error) {
+    if (!canCommit()) return false;
+    state.cloudError = "雲端儲存失敗，請確認網路與 Supabase 設定。";
+    throw error;
+  } finally {
+    if (!canCommit()) return;
+    state.cloudSyncing = false;
+    renderCloudStatus();
+  }
+}
+
 async function upsertCloudRow(client, table, cloudId, payload) {
   const query = cloudId
     ? client.from(table).update(payload).eq("id", cloudId).select("id").single()
@@ -1901,29 +1975,43 @@ function saveTodoAndSync(trip, todo) {
   }
 }
 
-async function saveCloudCollaborativeData(client, trip) {
-  if (!trip.cloudId) return;
+async function saveCloudCollaborativeData(client, trip, { userId, canCommit = () => true } = {}) {
+  const targetUserId = userId || state.cloudUser?.id;
+  if (!canCommit()) return false;
+  if (!trip.cloudId) return true;
 
   try {
     for (const expense of trip.expenses || []) {
-      const cloudId = await upsertCloudRow(client, "trip_expenses", expense.cloudId, toCloudExpensePayload(trip, expense));
+      if (!canCommit()) return false;
+      const cloudId = await upsertCloudRow(client, "trip_expenses", expense.cloudId, toCloudExpensePayload(trip, expense, targetUserId));
+      if (!canCommit()) return false;
       if (cloudId) {
+        if (!canCommit()) return false;
         expense.cloudId = cloudId;
-        expense.createdBy = expense.createdBy || state.cloudUser.id;
+        if (!canCommit()) return false;
+        expense.createdBy = expense.createdBy || targetUserId;
+        if (!canCommit()) return false;
       }
     }
 
     for (const todo of trip.todos || []) {
-      const cloudId = await upsertCloudRow(client, "trip_todos", todo.cloudId, toCloudTodoPayload(trip, todo));
+      if (!canCommit()) return false;
+      const cloudId = await upsertCloudRow(client, "trip_todos", todo.cloudId, toCloudTodoPayload(trip, todo, targetUserId));
+      if (!canCommit()) return false;
       if (cloudId) {
+        if (!canCommit()) return false;
         todo.cloudId = cloudId;
-        todo.ownerId = todo.ownerId || state.cloudUser.id;
+        if (!canCommit()) return false;
+        todo.ownerId = todo.ownerId || targetUserId;
+        if (!canCommit()) return false;
       }
     }
   } catch (error) {
-    if (isMissingCloudTableError(error)) return;
+    if (isMissingCloudTableError(error)) return true;
     throw error;
   }
+
+  return true;
 }
 
 async function deleteCloudRow(table, cloudId) {
@@ -6590,6 +6678,7 @@ cloudSignOutButton.addEventListener("click", async () => {
   if (isReadonly) return;
 
   syncCoordinator.invalidate();
+  state.cloudSyncing = false;
   try {
     const client = await getSupabaseClient();
     await client.auth.signOut();

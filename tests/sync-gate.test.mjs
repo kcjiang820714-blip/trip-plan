@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createSyncCoordinator } from "../sync-gate.js";
+import * as syncGateModule from "../sync-gate.js";
+
+const { createSyncCoordinator } = syncGateModule;
 
 function deferred() {
   let resolve;
@@ -23,10 +25,46 @@ test("同步閘門提供必要 DOM、樣式與同步入口", async () => {
   assert.match(html, /id="syncGate"/);
   assert.match(html, /正在與 Supabase 同步旅行資料…/);
   assert.match(html, /id="syncGateRetryButton"/);
+  assert.match(html, /id="syncGateCard"[^>]*tabindex="-1"/);
   assert.match(styles, /\.sync-gate/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(app, /requestInitialCloudSync/);
   assert.match(app, /createSyncCoordinator/);
+  assert.match(app, /syncGateCard\?\.focus\(\)/);
+  assert.match(app, /saveCloudLibraryForInitialAttempt/);
+});
+
+test("空雲端首次上傳在切換使用者或登出後不會寫入舊世代", async () => {
+  assert.equal(typeof syncGateModule.createAttemptGuard, "function");
+
+  const coordinator = createSyncCoordinator();
+  const uploadA = deferred();
+  const uploadB = deferred();
+  let currentUserId = "user-a";
+  const committedUserIds = [];
+  const runEmptyCloudInitialUpload = (userId, upload) => coordinator.request(userId, async ({ isCurrent }) => {
+    const canCommit = syncGateModule.createAttemptGuard({
+      userId,
+      isCurrent,
+      getCurrentUserId: () => currentUserId,
+    });
+    await upload.promise;
+    if (!canCommit()) return;
+    committedUserIds.push(userId);
+  });
+
+  const first = runEmptyCloudInitialUpload("user-a", uploadA);
+  currentUserId = "user-b";
+  const second = runEmptyCloudInitialUpload("user-b", uploadB);
+  uploadA.resolve();
+  await first;
+  assert.deepEqual(committedUserIds, []);
+
+  coordinator.invalidate();
+  currentUserId = null;
+  uploadB.resolve();
+  await second;
+  assert.deepEqual(committedUserIds, []);
 });
 
 test("同一使用者的同步會共用同一個 promise", async () => {
