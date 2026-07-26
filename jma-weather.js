@@ -53,6 +53,10 @@ for (const [japaneseName, englishName, areaCode] of JMA_MUNICIPALITY_AREAS) {
 
 const JMA_FORECAST_BASE_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast";
 const WMO_SEVERITY = [95, 73, 63, 45, 3, 0];
+const PREFECTURES_BY_JIS_PREFIX = [
+  ["01", "北海道", "Hokkaido"], ["02", "青森", "Aomori"], ["03", "岩手", "Iwate"], ["04", "宮城", "Miyagi"], ["05", "秋田", "Akita"], ["06", "山形", "Yamagata"], ["07", "福島", "Fukushima"], ["08", "茨城", "Ibaraki"], ["09", "栃木", "Tochigi"], ["10", "群馬", "Gunma"], ["11", "埼玉", "Saitama"], ["12", "千葉", "Chiba"], ["13", "東京", "Tokyo"], ["14", "神奈川", "Kanagawa"], ["15", "新潟", "Niigata"], ["16", "富山", "Toyama"], ["17", "石川", "Ishikawa"], ["18", "福井", "Fukui"], ["19", "山梨", "Yamanashi"], ["20", "長野", "Nagano"], ["21", "岐阜", "Gifu"], ["22", "静岡", "Shizuoka"], ["23", "愛知", "Aichi"], ["24", "三重", "Mie"], ["25", "滋賀", "Shiga"], ["26", "京都", "Kyoto"], ["27", "大阪", "Osaka"], ["28", "兵庫", "Hyogo"], ["29", "奈良", "Nara"], ["30", "和歌山", "Wakayama"], ["31", "鳥取", "Tottori"], ["32", "島根", "Shimane"], ["33", "岡山", "Okayama"], ["34", "広島", "Hiroshima"], ["35", "山口", "Yamaguchi"], ["36", "徳島", "Tokushima"], ["37", "香川", "Kagawa"], ["38", "愛媛", "Ehime"], ["39", "高知", "Kochi"], ["40", "福岡", "Fukuoka"], ["41", "佐賀", "Saga"], ["42", "長崎", "Nagasaki"], ["43", "熊本", "Kumamoto"], ["44", "大分", "Oita"], ["45", "宮崎", "Miyazaki"], ["46", "鹿児島", "Kagoshima"], ["47", "沖縄", "Okinawa"],
+];
+const PREFECTURE_NAMES_BY_JIS_PREFIX = new Map(PREFECTURES_BY_JIS_PREFIX.map(([prefix, ...names]) => [prefix, new Set(names.map(normalizeText))]));
 
 export function isJapanLocation(location) {
   return String(location?.countryCode || location?.country_code || "").trim().toUpperCase() === "JP";
@@ -81,22 +85,43 @@ export function resolveJmaForecastArea(location) {
   }
 
   const candidates = new Set(normalizeLocationText(location?.name));
+  const coordinateArea = resolveCoordinateArea(location);
   const textualMatches = JMA_FORECAST_AREAS.filter((area) =>
     area.aliases.some((alias) => candidates.has(normalizeText(alias))),
   );
-  if (textualMatches.length === 1) return publicArea(textualMatches[0]);
+  if (textualMatches.length === 1) {
+    const textualArea = textualMatches[0];
+    // A short alias is not enough when the app also supplied administrative
+    // context. Verify that context and any known coordinate point agree first.
+    if (hasLocationContext && (!admin1MatchesArea(location?.admin1, textualArea) || (coordinateArea && coordinateArea.areaCode !== textualArea.areaCode))) return null;
+    return publicArea(textualArea);
+  }
   if (textualMatches.length > 1) return null;
 
   const municipalityCodes = new Set([...candidates].flatMap((candidate) => [...(MUNICIPALITY_AREA_CODES_BY_NAME.get(candidate) || [])]));
   if (municipalityCodes.size === 1) return publicArea(CLASS10_BY_CODE.get([...municipalityCodes][0]));
 
+  return coordinateArea ? publicArea(coordinateArea) : null;
+}
+
+function admin1MatchesArea(admin1, area) {
+  const admin1Name = normalizeAdmin1(admin1);
+  if (!admin1Name) return false;
+  return PREFECTURE_NAMES_BY_JIS_PREFIX.get(area.areaCode.slice(0, 2))?.has(admin1Name) || false;
+}
+
+function normalizeAdmin1(value) {
+  return normalizeText(value).replace(/\s+prefecture$/u, "").replace(/[都道府県]$/u, "");
+}
+
+function resolveCoordinateArea(location) {
   const latitude = Number(location?.latitude);
   const longitude = Number(location?.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   const coordinateMatches = JMA_FORECAST_AREAS.filter(({ bounds }) =>
     latitude >= bounds.minLat && latitude <= bounds.maxLat && longitude >= bounds.minLon && longitude <= bounds.maxLon,
   );
-  return coordinateMatches.length === 1 ? publicArea(coordinateMatches[0]) : null;
+  return coordinateMatches.length === 1 ? coordinateMatches[0] : null;
 }
 
 export function buildJmaForecastUrl(forecastAreaCode) {

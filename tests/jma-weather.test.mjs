@@ -108,6 +108,19 @@ test("市內分區與括號名不會被都道府縣短別名劫持", () => {
   for (const [name, areaCode] of cases) assert.equal(resolveJmaForecastArea({ countryCode: "JP", name, admin1: name.split(",")[1].trim(), country: "Japan" })?.areaCode, areaCode, name);
 });
 
+test("帶 app 上下文的短別名必須與都道府縣及可辨識座標相容", () => {
+  const rejected = [
+    { name: "Fukushima, Hokkaido, Japan", admin1: "Hokkaido", country: "Japan" },
+    { name: "Fukushima, Hokkaido, Japan", admin1: "Hokkaido", country: "Japan", latitude: 41.48, longitude: 140.25 },
+    { name: "Tokyo, Hokkaido, Japan", admin1: "Hokkaido", country: "Japan" },
+    { name: "Otsu, Ehime, Japan", admin1: "Ehime", country: "Japan" },
+    { name: "Fukushima, Fukushima, Japan", admin1: "Fukushima", country: "Japan", latitude: 35.6762, longitude: 139.6503 },
+  ];
+  for (const location of rejected) assert.equal(resolveJmaForecastArea({ countryCode: "JP", ...location }), null, location.name);
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "Fukushima, Fukushima, Japan", admin1: "Fukushima", country: "Japan" })?.areaCode, "070010");
+  assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "Fukushima, Fukushima Prefecture, Japan", admin1: "福島県", country: "Japan" })?.areaCode, "070010");
+});
+
 test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區", () => {
   assert.equal(prefecturalCapitals.length, 47);
   for (const [city, forecastAreaCode] of prefecturalCapitals) {

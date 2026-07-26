@@ -10,6 +10,7 @@
 - 新增 `jma-municipality-areas.js`：從同一份官方資料擷取 1,805 筆 class20 市町村名稱、英文名稱與 class10 代碼。新地點的名稱若唯一命中，就直接取得正確 JMA endpoint／class10，不需要事先保存 `jmaAreaCode`。
 - app 儲存的 `"Municipality, Prefecture, Japan"` 格式會先取第一段完整市町村名稱判定，再處理短別名；含 City／Town／Village 後綴的同名地點沒有唯一官方對應時安全回傳 `null`。
 - 完整市町村名稱與「去除 City／Town／Village 的短名稱」使用不同索引。含都道府縣／國家資訊的 app 地點會依序檢查所有完整前綴，因此市內分區、括號區域（例如 `Sasebo City (Uku Area), Nagasaki, Japan`）不會被 `Nagasaki` 等短別名誤配；單獨的 `Yamagata`、`Yokohama` 仍可使用已確認城市別名。
+- 帶 app 上下文的短城市別名必須與 `admin1` 都道府縣一致；若已知的小範圍座標也指向不同城市，安全回傳 `null`。這避免 `Fukushima, Hokkaido, Japan`、`Tokyo, Hokkaido, Japan`、`Otsu, Ehime, Japan` 等矛盾資料被錯配。支援英文 `Prefecture` 與日文 `都／道／府／県` 後綴。
 - 完整但精簡的官方 class10／class15／class20 階層（142／375／1,805）保存於 `tests/fixtures/jma-area-hierarchy-2026-07-27.json`，含來源 URL 與取得日。
 - `JMA_FORECAST_AREAS` 涵蓋 47 都道府縣代表城市，另含函館、小笠原、北九州、舞鶴、伊豆諸島、沖繩離島與奄美的獨立預報區／溫度站碼。
 - 解析只接受精確城市名稱、已保存的內部預報區碼或唯一座標範圍；廣域都道府縣文字（例如 `Tokyo`、`Hokkaido`）不再被當成城市答案。若無法唯一對應，安全回傳 `null` 交由後續 Open-Meteo 備援。
@@ -30,10 +31,10 @@ node --test tests/jma-weather.test.mjs
 
 ```bash
 node --test tests/jma-weather.test.mjs
-# 17 passed, 0 failed
+# 18 passed, 0 failed
 
 node --test
-# 44 passed, 0 failed
+# 45 passed, 0 failed
 
 node --check jma-weather.js
 git diff --check
