@@ -108,7 +108,7 @@ test("混合有效與無效日期時只篩選有效卡片並保留無效交通�
   ]);
 });
 
-test("Service Worker 預快取目前頁面載入的樣式、程式與日期頁籤模組", async () => {
+test("Service Worker 預快取目前頁面載入的樣式、程式、同步閘門與日期頁籤模組", async () => {
   const listeners = new Map();
   const precache = { name: "", assets: [] };
   const [indexHtml, appSource, serviceWorker] = await Promise.all([
@@ -146,11 +146,13 @@ test("Service Worker 預快取目前頁面載入的樣式、程式與日期頁�
 
   const styleUrl = indexHtml.match(/href="(\.\/styles\.css\?v=\d+)"/)?.[1];
   const appUrl = indexHtml.match(/src="(\.\/app\.js\?v=\d+)"/)?.[1];
+  const syncGateUrl = appSource.match(/from "(\.\/sync-gate\.js\?v=\d+)"/)?.[1];
   const dateTabsUrl = appSource.match(/from "(\.\/booking-date-tabs\.js\?v=\d+)"/)?.[1];
 
-  assert.match(precache.name, /^trip-notebook-v\d+$/);
+  assert.equal(precache.name, "trip-notebook-v155");
   assert.ok(precache.assets.includes(styleUrl));
   assert.ok(precache.assets.includes(appUrl));
+  assert.ok(precache.assets.includes(syncGateUrl));
   assert.ok(precache.assets.includes(dateTabsUrl));
 });
 
