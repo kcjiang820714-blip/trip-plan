@@ -21,7 +21,7 @@
 
 ## File Structure
 
-- Create: `booking-date-tabs.js` — 純日期篩選與選取規則，不讀取 DOM、不寫入資料。
+- Create: `booking-date-tabs.js` — 純日期篩選、選取規則與日期頁籤標記，不讀取 DOM、不寫入資料。
 - Create: `tests/booking-date-tabs.test.mjs` — 依分類、日期、住宿、交通、無日期與選取回退的回歸測試。
 - Modify: `app.js` — 新增 `activeBookingDate` 暫態畫面狀態、接入純函式、渲染日期小分頁與處理點擊。
 - Modify: `index.html` — 在預訂分類與主清單之間加入可存取的日期頁籤容器，更新資產版本。
@@ -104,6 +104,7 @@ git commit -m "test: define booking date tab rules"
 
 **Files:**
 
+- Modify: `booking-date-tabs.js`
 - Modify: `app.js:1,188,255-260,1163-1174,1193-1203,3287-3323,5385-5402,6891-6897`
 - Modify: `index.html:230-242`
 - Test: `tests/booking-date-tabs.test.mjs`
@@ -113,30 +114,40 @@ git commit -m "test: define booking date tab rules"
 - Consumes: Task 1 的四個純函式與既有 `getBookingGroup()`、`canViewBookingTicket()`。
 - Produces: `state.activeBookingDate`、`#bookingDateTabs` 的可操作日期按鈕、與日期一致的主卡片清單。
 
-- [ ] **Step 1: 先寫接線失敗測試**
+- [ ] **Step 1: 先寫日期頁籤標記的失敗測試**
 
-擴充 `tests/booking-date-tabs.test.mjs`，建立依分類篩好的兩組資料，要求「全部」資料可產生所有日期、個別分類只產生自己的日期，且 `splitBookingsByDate()` 的 `scheduled.length` 等於目前日期清單卡片數。新增程式接線前，測試中的匯入或行為應至少有一項 FAIL。
+擴充 `tests/booking-date-tabs.test.mjs`，要求尚不存在的 `renderBookingDateTabs()` 輸出可存取、可點選的日期按鈕：
+
+```js
+const markup = renderBookingDateTabs(["2026-07-01", "2026-07-02"], "2026-07-02");
+assert.match(markup, /data-booking-date="2026-07-01"/);
+assert.match(markup, />7\/2（週四）</);
+assert.match(markup, /data-booking-date="2026-07-02"[^>]*aria-pressed="true"/);
+```
+
+同時保留依分類篩好的兩組資料，要求「全部」資料可產生所有日期、個別分類只產生自己的日期，且 `splitBookingsByDate()` 的 `scheduled.length` 等於目前日期清單卡片數。
 
 - [ ] **Step 2: 執行測試，確認紅燈**
 
 Run: `node --test tests/booking-date-tabs.test.mjs`
 
-Expected: FAIL，直到 Task 1 的規則與本任務要用的整合行為完整接上。
+Expected: FAIL，因 `renderBookingDateTabs` 尚未輸出。
 
 - [ ] **Step 3: 在畫面加上狀態、容器與事件**
 
-1. 在 `app.js` 匯入 `booking-date-tabs.js?v=1` 的函式，並在 state 新增 `activeBookingDate: ""`。
-2. 在 view state 的 capture／restore 與 `showTrip()` 選項中攜帶 `activeBookingDate`，僅作本機工作階段畫面還原。
-3. 在 `index.html` 的 `bookingSubTabs` 下新增：
+1. 在 `booking-date-tabs.js` 新增 `renderBookingDateTabs(availableDates, activeDate)`：以 UTC 日期標籤輸出 `data-booking-date`、`aria-pressed` 和作用中 class 的按鈕字串；它只根據傳入資料產生標記，不能讀取 DOM 或 state。
+2. 在 `app.js` 匯入 `booking-date-tabs.js?v=1` 的所有規則與 renderer，並在 state 新增 `activeBookingDate: ""`。
+3. 在 view state 的 capture／restore 與 `showTrip()` 選項中攜帶 `activeBookingDate`，僅作本機工作階段畫面還原。
+4. 在 `index.html` 的 `bookingSubTabs` 下新增：
 
 ```html
 <nav class="booking-date-tabs" id="bookingDateTabs" aria-label="預訂日期" hidden></nav>
 ```
 
-4. 在 `renderBookings()` 先保留既有 `visibleBookings` 權限篩選，再套用既有 `activeBookingGroup`；以 `getAvailableBookingDates()` 取得日期，使用 `resolveActiveBookingDate()` 決定 state，最後以 `splitBookingsByDate()` 取得 `scheduled` 和 `undated`。
-5. 只用 `scheduled` 渲染主要日期清單；有 `undated` 時在其後加上標題「日期未定」的獨立卡片區塊；無任何預訂時保留既有空狀態。
-6. `bookingDateTabs` 只有 `availableDates.length > 0` 時顯示；每個按鈕使用 `data-booking-date`、`formatShortDate(date)`、`aria-pressed` 和作用中 class。
-7. 分類 click handler 先設 `state.activeBookingGroup`，再清空 `state.activeBookingDate` 後重繪，確保選取該分類最早日期；日期 click handler 只設日期後重繪並保存 view state。
+5. 在 `renderBookings()` 先保留既有 `visibleBookings` 權限篩選，再套用既有 `activeBookingGroup`；以 `getAvailableBookingDates()` 取得日期，使用 `resolveActiveBookingDate()` 決定 state，最後以 `splitBookingsByDate()` 取得 `scheduled` 和 `undated`。
+6. 只用 `scheduled` 渲染主要日期清單；有 `undated` 時在其後加上標題「日期未定」的獨立卡片區塊；無任何預訂時保留既有空狀態。
+7. `bookingDateTabs` 只有 `availableDates.length > 0` 時顯示，內容來自 `renderBookingDateTabs()`。
+8. 分類 click handler 先設 `state.activeBookingGroup`，再清空 `state.activeBookingDate` 後重繪，確保選取該分類最早日期；日期 click handler 只設日期後重繪並保存 view state。
 
 - [ ] **Step 4: 執行自動檢查**
 
