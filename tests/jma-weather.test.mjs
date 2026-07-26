@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   JMA_FORECAST_AREAS,
+  JMA_CLASS10_FORECAST_AREAS,
   JMA_OFFICE_FORECAST_AREAS,
   buildJmaForecastUrl,
   isJapanLocation,
@@ -60,17 +61,32 @@ test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區",
   for (const [city, forecastAreaCode] of prefecturalCapitals) {
     assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: city })?.forecastAreaCode, forecastAreaCode, city);
   }
-  assert.equal(Object.keys(JMA_OFFICE_FORECAST_AREAS).length, 58);
+  assert.equal(Object.keys(JMA_OFFICE_FORECAST_AREAS).length, 56);
   assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["130000"], ["130010", "130020", "130030", "130040"]);
   assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["400000"], ["400010", "400020", "400030", "400040"]);
   assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["474000"], ["474010", "474020"]);
   assert.ok(JMA_FORECAST_AREAS.length >= 51);
 });
 
+test("實際 forecast endpoint 將十勝與奄美併入可用 URL，且 142 個 class10 都可用保存區碼精確解析", () => {
+  assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["014100"], ["014010", "014020", "014030"]);
+  assert.deepEqual(JMA_OFFICE_FORECAST_AREAS["460100"], ["460010", "460020", "460030", "460040"]);
+  assert.equal(buildJmaForecastUrl("014030"), null);
+  assert.equal(buildJmaForecastUrl("460040"), null);
+  assert.equal(buildJmaForecastUrl("014100"), "https://www.jma.go.jp/bosai/forecast/data/forecast/014100.json");
+  assert.equal(buildJmaForecastUrl("460100"), "https://www.jma.go.jp/bosai/forecast/data/forecast/460100.json");
+  assert.equal(JMA_CLASS10_FORECAST_AREAS.length, 142);
+  for (const area of JMA_CLASS10_FORECAST_AREAS) {
+    assert.deepEqual(resolveJmaForecastArea({ countryCode: "JP", jmaAreaCode: area.areaCode }), area);
+    assert.ok(buildJmaForecastUrl(area.forecastAreaCode));
+  }
+});
+
 test("儲存的官方區碼追溯 fixture 與分區表一致", async () => {
   const fixture = JSON.parse(await readFile(new URL("./fixtures/jma-official-area-source-2026-07-27.json", import.meta.url), "utf8"));
   assert.equal(fixture.sourceUrl, "https://www.jma.go.jp/bosai/common/const/area.json");
   assert.match(fixture.retrievedAt, /^2026-07-27T/);
+  assert.equal(fixture.forecastEndpointCount, Object.keys(JMA_OFFICE_FORECAST_AREAS).length);
   for (const [officeCode, areaCodes] of Object.entries(fixture.officeSamples)) {
     assert.deepEqual(JMA_OFFICE_FORECAST_AREAS[officeCode], areaCodes);
   }
