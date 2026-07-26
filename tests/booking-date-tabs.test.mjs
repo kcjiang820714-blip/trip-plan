@@ -108,12 +108,14 @@ test("混合有效與無效日期時只篩選有效卡片並保留無效交通�
   ]);
 });
 
-test("Service Worker 預快取目前頁面載入的樣式、程式、同步閘門與日期頁籤模組", async () => {
+test("Service Worker 預快取目前頁面與 JMA 相依模組，且版本完全一致", async () => {
   const listeners = new Map();
   const precache = { name: "", assets: [] };
-  const [indexHtml, appSource, serviceWorker] = await Promise.all([
+  const [indexHtml, appSource, weatherProviderSource, jmaWeatherSource, serviceWorker] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../weather-provider.js", import.meta.url), "utf8"),
+    readFile(new URL("../jma-weather.js", import.meta.url), "utf8"),
     readFile(new URL("../sw.js", import.meta.url), "utf8"),
   ]);
   const context = {
@@ -148,12 +150,21 @@ test("Service Worker 預快取目前頁面載入的樣式、程式、同步閘�
   const appUrl = indexHtml.match(/src="(\.\/app\.js\?v=\d+)"/)?.[1];
   const syncGateUrl = appSource.match(/from "(\.\/sync-gate\.js\?v=\d+)"/)?.[1];
   const dateTabsUrl = appSource.match(/from "(\.\/booking-date-tabs\.js\?v=\d+)"/)?.[1];
+  const weatherProviderUrl = appSource.match(/from "(\.\/weather-provider\.js\?v=\d+)"/)?.[1];
+  const jmaWeatherUrl = weatherProviderSource.match(/from "(\.\/jma-weather\.js\?v=\d+)"/)?.[1];
+  const municipalityUrl = jmaWeatherSource.match(/from "(\.\/jma-municipality-areas\.js\?v=\d+)"/)?.[1];
+  const version = appUrl?.match(/\?v=(\d+)$/)?.[1];
 
-  assert.equal(precache.name, "trip-notebook-v155");
+  assert.equal(precache.name, `trip-notebook-v${version}`);
+  assert.match(indexHtml, new RegExp(`styles\\.css\\?v=${version}`));
+  assert.match(appSource, new RegExp(`register\\("\\./sw\\.js\\?v=${version}"\\)`));
   assert.ok(precache.assets.includes(styleUrl));
   assert.ok(precache.assets.includes(appUrl));
   assert.ok(precache.assets.includes(syncGateUrl));
   assert.ok(precache.assets.includes(dateTabsUrl));
+  assert.ok(precache.assets.includes(weatherProviderUrl));
+  assert.ok(precache.assets.includes(jmaWeatherUrl));
+  assert.ok(precache.assets.includes(municipalityUrl));
 });
 
 test("日期頁籤輸出可點選且標示目前選取日期", () => {

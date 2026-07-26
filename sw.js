@@ -1,13 +1,16 @@
-const CACHE_NAME = "trip-notebook-v155";
+const CACHE_NAME = "trip-notebook-v156";
 const APP_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=120",
-  "./app.js?v=130",
+  "./styles.css?v=156",
+  "./app.js?v=156",
   "./sync-gate.js?v=1",
   "./booking-date-tabs.js?v=3",
   "./todo-sync.js?v=123",
   "./ui-presentation.js?v=3",
+  "./weather-provider.js?v=156",
+  "./jma-weather.js?v=156",
+  "./jma-municipality-areas.js?v=156",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-192.png",

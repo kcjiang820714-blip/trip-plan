@@ -2,7 +2,7 @@ import { createAttemptGuard, createSyncCoordinator } from "./sync-gate.js?v=1";
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
 import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
 import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=3";
-import { fetchWeatherForecast } from "./weather-provider.js?v=1";
+import { fetchWeatherForecast } from "./weather-provider.js?v=156";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -7844,7 +7844,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=156").then((registration) => registration.update());
 }
 
 populateTimeOptions();
