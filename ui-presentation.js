@@ -7,6 +7,10 @@ export function getTodoProgress(todos = [], activeGroup = "") {
   return { total, done, pending: total - done, percent: total ? Math.round((done / total) * 100) : 0 };
 }
 
+export function renderTodoProgressRing(progress) {
+  return `<div class="todo-progress-ring" style="--todo-progress: ${progress.percent}" aria-label="已完成 ${progress.percent}%"><div class="todo-progress-ring-content"><strong>${progress.percent}%</strong><small>${progress.done} / ${progress.total}</small></div></div>`;
+}
+
 const bookingIcons = { 全部: "☰", 票券: "🎟️", 交通: "🚆", 住宿: "🛏️", 餐廳: "🍽️" };
 
 export function bookingGroupIcon(group) {

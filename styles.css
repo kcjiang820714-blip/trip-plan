@@ -9073,14 +9073,13 @@ select {
   background: #fffefa;
 }
 
-.todo-progress-ring > * {
+.todo-progress-ring-content {
   position: relative;
   z-index: 1;
-}
-
-.todo-progress-ring > span {
-  color: var(--ref-blue);
-  font-size: 2rem;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
 }
 
 .todo-list-section {

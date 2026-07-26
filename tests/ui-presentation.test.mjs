@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bookingGroupIcon, bookingTypeMeta, expenseCategoryMeta, getTodoProgress } from "../ui-presentation.js";
+import { bookingGroupIcon, bookingTypeMeta, expenseCategoryMeta, getTodoProgress, renderTodoProgressRing } from "../ui-presentation.js";
 
 const todos = [
   { group: "行前準備", done: true },
@@ -29,4 +29,11 @@ test("booking and expense category icons use the agreed visible mapping", () => 
   assert.equal(bookingTypeMeta("交通").icon, "🚆");
   assert.equal(expenseCategoryMeta("票券").icon, "🎟️");
   assert.equal(expenseCategoryMeta("餐飲").icon, "🍽️");
+});
+
+test("renderTodoProgressRing keeps percent and count in one centered content wrapper", () => {
+  const markup = renderTodoProgressRing({ total: 2, done: 1, pending: 1, percent: 50 });
+  assert.match(markup, /class="todo-progress-ring-content"/);
+  assert.match(markup, />50%<\/strong>/);
+  assert.match(markup, />1 \/ 2<\/small>/);
 });

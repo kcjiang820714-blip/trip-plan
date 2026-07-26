@@ -1,4 +1,5 @@
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
+import { bookingTypeMeta, expenseCategoryMeta, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=1";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -3240,13 +3241,7 @@ function renderTripSectionTabs() {
 function getBookingReferencePresentation(booking, currentDate) {
   const transport = booking?.transport || {};
   const isTransport = booking?.type === "交通";
-  const typeMeta = isTransport
-    ? { group: "交通", icon: "▰", tone: "blue" }
-    : booking?.type === "住宿"
-      ? { group: "住宿", icon: "▥", tone: "green" }
-      : booking?.type === "餐廳"
-        ? { group: "餐廳", icon: "♜", tone: "coral" }
-        : { group: "票券", icon: "▣", tone: "blue" };
+  const typeMeta = bookingTypeMeta(booking?.type);
   const date = isTransport ? transport.departureDate || booking?.date || "" : booking?.date || "";
   const time = isTransport ? transport.departureTime || booking?.time || "" : booking?.time || "";
   const route = isTransport
@@ -4127,19 +4122,6 @@ function shortText(value, maxLength) {
   return `${text.slice(0, maxLength - 1)}…`;
 }
 
-function getTodoProgress(todos = []) {
-  const total = todos.length;
-  const done = todos.filter((todo) => Boolean(todo.done)).length;
-  const pending = total - done;
-
-  return {
-    total,
-    done,
-    pending,
-    percent: total > 0 ? Math.round((done / total) * 100) : 0
-  };
-}
-
 function todoPrimaryDate(todo) {
   return todo?.date || todo?.dueDate || "";
 }
@@ -4176,7 +4158,7 @@ function findUpcomingTodos(todos = [], todayIso = "", limit = 3) {
 
 function renderTodos() {
   const trip = currentTrip();
-  const progress = getTodoProgress(trip.todos);
+  const progress = getTodoProgress(trip.todos, state.activeTodoGroup);
   const todayIso = new Date().toLocaleDateString("sv-SE");
   const sections = buildTodoSections(trip.todos, state.activeTodoGroup, todayIso);
   const upcomingTodos = findUpcomingTodos(trip.todos, todayIso, 3);
@@ -4196,18 +4178,13 @@ function renderTodos() {
       <span>完成進度</span>
       <strong>${progress.done}<small>/ ${progress.total}</small></strong>
     </div>
-    <div class="todo-progress-ring" style="--todo-progress: ${progress.percent}" aria-label="已完成 ${progress.percent}%">
-      <span aria-hidden="true">▣</span>
-    </div>
+    ${renderTodoProgressRing(progress)}
   `;
 
   todoProgressSide.innerHTML = `
     <h3>完成進度</h3>
     <div class="todo-side-progress">
-      <div class="todo-progress-ring" style="--todo-progress: ${progress.percent}">
-        <strong>${progress.percent}%</strong>
-        <small>${progress.done} / ${progress.total}</small>
-      </div>
+      ${renderTodoProgressRing(progress)}
     </div>
     <div class="todo-progress-legend">
       <span><i class="is-done"></i>已完成 ${progress.done}</span>
@@ -4357,16 +4334,6 @@ function buildExpenseCategoryBreakdown(expenses = []) {
       ...item,
       percent: totalTwd > 0 ? Number(((item.totalTwd / totalTwd) * 100).toFixed(1)) : 0
     }));
-}
-
-function expenseCategoryMeta(category) {
-  const normalized = String(category || "其他");
-  if (normalized.includes("餐") || normalized.includes("食")) return { icon: "🍴", tone: "food" };
-  if (normalized.includes("交通") || normalized.includes("車")) return { icon: "▣", tone: "transport" };
-  if (normalized.includes("景點") || normalized.includes("門票")) return { icon: "⌂", tone: "sight" };
-  if (normalized.includes("購物")) return { icon: "⌑", tone: "shopping" };
-  if (normalized.includes("住宿")) return { icon: "▰", tone: "stay" };
-  return { icon: "•••", tone: "other" };
 }
 
 function expenseMemberInitial(member) {
