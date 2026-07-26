@@ -58,6 +58,12 @@ export function resolveJmaForecastArea(location) {
     if (saved.length === 1) return publicArea(saved[0]);
   }
 
+  const fullName = normalizeText(location?.name);
+  const fullMunicipalityCodes = MUNICIPALITY_AREA_CODES_BY_NAME.get(fullName) || new Set();
+  if (hasMunicipalitySuffix(location?.name)) {
+    return fullMunicipalityCodes.size === 1 ? publicArea(CLASS10_BY_CODE.get([...fullMunicipalityCodes][0])) : null;
+  }
+
   const candidates = new Set(normalizeLocationText(location?.name));
   const textualMatches = JMA_FORECAST_AREAS.filter((area) =>
     area.aliases.some((alias) => candidates.has(normalizeText(alias))),
@@ -166,6 +172,10 @@ function stripMunicipalitySuffix(value) {
   return String(value || "")
     .replace(/\s+(City|Town|Village)$/iu, "")
     .replace(/[市町村]$/u, "");
+}
+
+function hasMunicipalitySuffix(value) {
+  return /\s+(City|Town|Village)$/iu.test(String(value || "")) || /[市町村]$/u.test(String(value || ""));
 }
 
 function findSeries(timeSeries, areaCode, field) {

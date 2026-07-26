@@ -65,6 +65,17 @@ test("官方市町村資料讓新地點不帶 jmaAreaCode 仍能唯一對應 cla
   assert.equal(resolveJmaForecastArea({ countryCode: "JP", name: "不存在的城市", latitude: 35.0, longitude: 135.0 }), null);
 });
 
+test("完整市町村名稱優先於短別名，且 1805 筆官方名稱不會解析到錯誤 class10", () => {
+  const cases = [["Fukushima Town", "017010"], ["Fukushima City", "070010"], ["Asahikawa City", "012010"], ["Niseko Town", "016030"], ["Amami City", "460040"], ["Yonaguni Town", "474020"], ["Naha City", "471010"], ["Yakushima Town", "460030"]];
+  for (const [name, areaCode] of cases) assert.equal(resolveJmaForecastArea({ countryCode: "JP", name })?.areaCode, areaCode, name);
+  for (const [japaneseName, englishName, areaCode] of JMA_MUNICIPALITY_AREAS) {
+    for (const name of [japaneseName, englishName]) {
+      const resolved = resolveJmaForecastArea({ countryCode: "JP", name });
+      assert.ok(!resolved || resolved.areaCode === areaCode, `${name}: ${resolved?.areaCode}`);
+    }
+  }
+});
+
 test("完整官方端點表涵蓋 47 都道府縣及所有 JMA 預報拆分區", () => {
   assert.equal(prefecturalCapitals.length, 47);
   for (const [city, forecastAreaCode] of prefecturalCapitals) {
