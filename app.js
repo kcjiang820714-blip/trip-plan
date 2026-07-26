@@ -4326,36 +4326,29 @@ function expenseViewerName(trip) {
   return members.includes("我") ? "我" : members[0] || "我";
 }
 
-function expenseMemberAvatarClass(member) {
-  const avatarClassByMember = {
-    晨: "expense-avatar-1",
-    智: "expense-avatar-2",
-    娘: "expense-avatar-3"
-  };
-  const name = String(member || "");
-  if (Object.hasOwn(avatarClassByMember, name)) return avatarClassByMember[name];
-  const nameCodePointSum = Array.from(name).reduce((sum, character) => sum + character.codePointAt(0), 0);
-  return `expense-avatar-${(nameCodePointSum % 5) + 1}`;
+function expenseMemberAvatarClass(trip, member) {
+  const memberIndex = expenseMemberNames(trip).indexOf(member);
+  return `expense-avatar-${((memberIndex >= 0 ? memberIndex : 0) % 5) + 1}`;
 }
 
 function renderExpenseMemberNavigation(trip) {
   const members = expenseMemberNames(trip);
   const viewer = expenseViewerName(trip);
-  const avatar = (member, index, extraClass = "") => `
-    <span class="expense-avatar ${expenseMemberAvatarClass(member)} ${extraClass}" title="${escapeHtml(member)}" aria-label="${escapeHtml(member)}">
+  const avatar = (member, extraClass = "") => `
+    <span class="expense-avatar ${expenseMemberAvatarClass(trip, member)} ${extraClass}" title="${escapeHtml(member)}" aria-label="${escapeHtml(member)}">
       ${escapeHtml(expenseMemberInitial(member))}
     </span>
   `;
 
   expenseMemberAvatars.innerHTML = `
-    ${members.slice(0, 3).map((member, index) => avatar(member, index)).join("")}
+    ${members.slice(0, 3).map((member) => avatar(member)).join("")}
     ${members.length > 3 ? `<span class="expense-avatar expense-avatar-more">+${members.length - 3}</span>` : ""}
   `;
   expenseMemberSwitcher.innerHTML = members
     .map(
-      (member, index) => `
+      (member) => `
         <span class="expense-member-option ${member === viewer ? "is-current" : ""}">
-          ${avatar(member, index, "expense-avatar-small")}
+          ${avatar(member, "expense-avatar-small")}
           ${escapeHtml(member === viewer ? "你" : member)}
         </span>
       `
@@ -4471,9 +4464,9 @@ function renderExpenseSettlementCard(trip, settlements) {
                 <div class="expense-settlement-copy">
                   <strong>${escapeHtml(from)} 應支付給 <em>${escapeHtml(to)}</em></strong>
                   <span>
-                    <i class="expense-avatar expense-avatar-small ${expenseMemberAvatarClass(settlement.from)}">${escapeHtml(expenseMemberInitial(settlement.from))}</i>
+                    <i class="expense-avatar expense-avatar-small ${expenseMemberAvatarClass(trip, settlement.from)}">${escapeHtml(expenseMemberInitial(settlement.from))}</i>
                     ${escapeHtml(settlement.from)} <b>⟶</b>
-                    <i class="expense-avatar expense-avatar-small ${expenseMemberAvatarClass(settlement.to)}">${escapeHtml(expenseMemberInitial(settlement.to))}</i>
+                    <i class="expense-avatar expense-avatar-small ${expenseMemberAvatarClass(trip, settlement.to)}">${escapeHtml(expenseMemberInitial(settlement.to))}</i>
                     ${escapeHtml(settlement.to)}
                   </span>
                 </div>
@@ -4578,7 +4571,7 @@ function renderExpenseDayCard(date, expenses, trip) {
         ${expenses
           .map((expense, index) => {
             const visual = expenseCategoryMeta(expense.category);
-            const payerAvatarClass = expenseMemberAvatarClass(expense.payer);
+            const payerAvatarClass = expenseMemberAvatarClass(trip, expense.payer);
             return `
               <article class="expense-entry">
                 <span class="expense-entry-date">${index === 0 ? escapeHtml(dateLabel) : ""}</span>
