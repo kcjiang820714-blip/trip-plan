@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bookingGroupIcon, bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getTodoProgress, renderTodoProgressRing } from "../ui-presentation.js";
+import { bookingGroupIcon, bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "../ui-presentation.js";
 
 const todos = [
   { group: "行前準備", done: true },
@@ -31,6 +31,15 @@ test("todo list and progress share the same all and named group filter", () => {
   assert.equal(getTodoProgress(todos, "全部").total, allTodos.length);
   assert.equal(getTodoProgress(todos, "").total, emptyGroupTodos.length);
   assert.equal(getTodoProgress(todos, "行李打包").total, packingTodos.length);
+});
+
+test("new todos use a real group when opened from the all view", () => {
+  assert.equal(getDefaultTodoGroup("全部"), "行前準備");
+  assert.equal(getDefaultTodoGroup(""), "行前準備");
+  assert.equal(getDefaultTodoGroup("行前準備"), "行前準備");
+  assert.equal(getDefaultTodoGroup("行李打包"), "行李打包");
+  assert.equal(getDefaultTodoGroup("購物清單"), "購物清單");
+  assert.equal(getDefaultTodoGroup("旅途中提醒"), "旅途中提醒");
 });
 
 test("booking and expense category icons use the agreed visible mapping", () => {

@@ -1,7 +1,12 @@
 const allGroups = new Set(["", "全部"]);
+const todoGroups = new Set(["行前準備", "行李打包", "購物清單", "旅途中提醒"]);
 
 export function filterTodosByGroup(todos = [], activeGroup = "") {
   return allGroups.has(activeGroup) ? todos : todos.filter((todo) => todo.group === activeGroup);
+}
+
+export function getDefaultTodoGroup(activeGroup = "") {
+  return todoGroups.has(activeGroup) ? activeGroup : "行前準備";
 }
 
 export function getTodoProgress(todos = [], activeGroup = "") {

@@ -1,5 +1,5 @@
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
-import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=2";
+import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -5052,7 +5052,7 @@ function openTodoDialog(todoId = null) {
   state.editingTodoId = todo?.id || null;
   todoDialogTitle.textContent = todo ? "編輯待辦" : "新增待辦";
   deleteTodoButton.hidden = !todo;
-  todoGroupInput.value = todo?.group || state.activeTodoGroup;
+  todoGroupInput.value = todo ? todo.group : getDefaultTodoGroup(state.activeTodoGroup);
   todoTextInput.value = todo?.text || "";
   todoScheduleInput.value = todo ? todoSchedule(todo, todayString()) : "optional";
   todoDueDateInput.value = todo?.dueDate || "";
