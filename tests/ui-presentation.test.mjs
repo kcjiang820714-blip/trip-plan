@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bookingGroupIcon, bookingTypeMeta, expenseCategoryMeta, getTodoProgress, renderTodoProgressRing } from "../ui-presentation.js";
+import { bookingGroupIcon, bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getTodoProgress, renderTodoProgressRing } from "../ui-presentation.js";
 
 const todos = [
   { group: "行前準備", done: true },
@@ -20,13 +20,32 @@ test("getTodoProgress counts all todos only for all or empty groups", () => {
   assert.deepEqual(getTodoProgress(todos, ""), { total: 4, done: 2, pending: 2, percent: 50 });
 });
 
+test("todo list and progress share the same all and named group filter", () => {
+  const allTodos = filterTodosByGroup(todos, "全部");
+  const emptyGroupTodos = filterTodosByGroup(todos, "");
+  const packingTodos = filterTodosByGroup(todos, "行李打包");
+
+  assert.deepEqual(allTodos, todos);
+  assert.deepEqual(emptyGroupTodos, todos);
+  assert.deepEqual(packingTodos, todos.slice(2));
+  assert.equal(getTodoProgress(todos, "全部").total, allTodos.length);
+  assert.equal(getTodoProgress(todos, "").total, emptyGroupTodos.length);
+  assert.equal(getTodoProgress(todos, "行李打包").total, packingTodos.length);
+});
+
 test("booking and expense category icons use the agreed visible mapping", () => {
   assert.equal(bookingGroupIcon("全部"), "☰");
   assert.equal(bookingGroupIcon("票券"), "🎟️");
   assert.equal(bookingGroupIcon("交通"), "🚆");
   assert.equal(bookingGroupIcon("住宿"), "🛏️");
   assert.equal(bookingGroupIcon("餐廳"), "🍽️");
-  assert.equal(bookingTypeMeta("交通").icon, "🚆");
+  assert.deepEqual(bookingTypeMeta("機票"), { group: "票券", icon: "🎟️", tone: "blue" });
+  assert.deepEqual(bookingTypeMeta("交通"), { group: "交通", icon: "🚆", tone: "blue" });
+  assert.deepEqual(bookingTypeMeta("景點票券"), { group: "票券", icon: "🎟️", tone: "blue" });
+  assert.deepEqual(bookingTypeMeta("餐廳"), { group: "餐廳", icon: "🍽️", tone: "coral" });
+  assert.deepEqual(bookingTypeMeta("住宿"), { group: "住宿", icon: "🛏️", tone: "green" });
+  assert.deepEqual(bookingTypeMeta("活動"), { group: "票券", icon: "🎟️", tone: "blue" });
+  assert.deepEqual(bookingTypeMeta("其他"), { group: "其他", icon: "⋯", tone: "other" });
   assert.equal(expenseCategoryMeta("票券").icon, "🎟️");
   assert.equal(expenseCategoryMeta("餐飲").icon, "🍽️");
 });

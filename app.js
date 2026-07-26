@@ -1,5 +1,5 @@
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
-import { bookingTypeMeta, expenseCategoryMeta, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=1";
+import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=2";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -4134,7 +4134,7 @@ function todoSchedule(todo, todayIso = "") {
 }
 
 function buildTodoSections(todos = [], activeGroup = "", todayIso = "") {
-  const visibleTodos = todos.filter((todo) => !activeGroup || todo.group === activeGroup);
+  const visibleTodos = filterTodosByGroup(todos, activeGroup);
 
   return {
     departure: visibleTodos.filter((todo) => todoSchedule(todo, todayIso) === "departure"),

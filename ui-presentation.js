@@ -1,7 +1,11 @@
 const allGroups = new Set(["", "全部"]);
 
+export function filterTodosByGroup(todos = [], activeGroup = "") {
+  return allGroups.has(activeGroup) ? todos : todos.filter((todo) => todo.group === activeGroup);
+}
+
 export function getTodoProgress(todos = [], activeGroup = "") {
-  const visibleTodos = allGroups.has(activeGroup) ? todos : todos.filter((todo) => todo.group === activeGroup);
+  const visibleTodos = filterTodosByGroup(todos, activeGroup);
   const total = visibleTodos.length;
   const done = visibleTodos.filter((todo) => Boolean(todo.done)).length;
   return { total, done, pending: total - done, percent: total ? Math.round((done / total) * 100) : 0 };
@@ -12,13 +16,16 @@ export function renderTodoProgressRing(progress) {
 }
 
 const bookingIcons = { 全部: "☰", 票券: "🎟️", 交通: "🚆", 住宿: "🛏️", 餐廳: "🍽️" };
+const ticketBookingTypes = new Set(["票券", "機票", "景點票券", "活動"]);
 
 export function bookingGroupIcon(group) {
   return bookingIcons[group] || "⋯";
 }
 
 export function bookingTypeMeta(type) {
-  const group = bookingIcons[type] ? type : "票券";
+  const normalized = String(type || "其他").trim() || "其他";
+  const group = ticketBookingTypes.has(normalized) ? "票券" : normalized;
+  if (!bookingIcons[group]) return { group, icon: "⋯", tone: "other" };
   const tone = group === "住宿" ? "green" : group === "餐廳" ? "coral" : "blue";
   return { group, icon: bookingGroupIcon(group), tone };
 }
