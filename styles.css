@@ -7821,7 +7821,6 @@ select {
     display: none;
   }
 
-  #itineraryPanel .weather-panel,
   #itineraryPanel .quick-ticket-panel,
   #itineraryPanel .itinerary-timeline-heading {
     display: none;

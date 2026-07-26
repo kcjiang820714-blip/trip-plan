@@ -2,6 +2,7 @@ import { createAttemptGuard, createSyncCoordinator } from "./sync-gate.js?v=1";
 import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
 import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
 import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=3";
+import { fetchWeatherForecast } from "./weather-provider.js?v=1";
 
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
@@ -2756,7 +2757,7 @@ function renderWeatherPanel(statusText = "") {
           <p class="eyebrow">今日天氣</p>
           <h3>${hasLocations ? `${locations.length} 個天氣地點` : "尚未設定天氣地點"}</h3>
         </div>
-        ${hasLocations ? `<span>${escapeHtml(weatherSourceSummary(locations))}</span>` : ""}
+        ${hasLocations ? `<span>${escapeHtml(weatherSourceSummary(trip, locations))}</span>` : ""}
       </header>
       <div class="weather-controls">
         <button class="secondary-action" type="button" data-refresh-weather ${hasLocations ? "" : "disabled"}>更新天氣</button>
@@ -2869,7 +2870,7 @@ function weatherLocationTitle(location) {
 function weatherEmptyMessage(location = null, cachedForecast = null) {
   if (!location) return "請先到「編輯旅程」設定這一天要看的天氣城市。";
   if (cachedForecast) return "目前沒有這一天的預報資料。多數天氣模型只提供短期預報，請出發前或旅途中再更新。";
-  return `按「更新天氣」抓取 ${weatherSourceName(location)} 預報。`;
+  return `按「更新天氣」取得${weatherExpectedSourceName(location)}預報。`;
 }
 
 function renderWeatherIcon(code) {
@@ -2924,8 +2925,15 @@ function weatherSourceName(location) {
   return location?.model === "meteoswiss_icon_ch2" ? "Open-Meteo MeteoSwiss" : "Open-Meteo";
 }
 
-function weatherSourceSummary(locations) {
-  return locations.some((location) => location.model === "meteoswiss_icon_ch2") ? "含 MeteoSwiss" : "Open-Meteo";
+function weatherExpectedSourceName(location) {
+  return String(location?.countryCode || "").trim().toUpperCase() === "JP"
+    ? "日本氣象廳（失敗時改用 Open-Meteo）"
+    : weatherSourceName(location);
+}
+
+function weatherSourceSummary(trip, locations) {
+  const sources = [...new Set(locations.map((location) => trip?.weatherForecasts?.[location.id]?.source || weatherExpectedSourceName(location)))];
+  return sources.length === 1 ? sources[0] : `混合來源：${sources.join("、")}`;
 }
 
 function createWeatherLocationId(location) {
@@ -3094,7 +3102,7 @@ function weatherUpdatedLabel(forecast) {
   if (!forecast?.fetchedAt) return "尚未更新";
   const updated = new Date(forecast.fetchedAt);
   if (Number.isNaN(updated.getTime())) return "已使用上次成功抓取的資料";
-  return `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · Source: ${forecast.source || "Open-Meteo MeteoSwiss"}`;
+  return `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · 資料來源：${forecast.source || "Open-Meteo"}`;
 }
 
 function compactWeatherUpdatedLabel(forecast) {
@@ -3145,27 +3153,14 @@ async function fetchWeatherForActiveDay() {
 }
 
 async function fetchWeatherForLocation(trip, location) {
-  const params = new URLSearchParams({
-    latitude: String(location.latitude),
-    longitude: String(location.longitude),
-    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
-    hourly: "weather_code,temperature_2m,precipitation_probability,wind_speed_10m",
-    timezone: "auto",
-    forecast_days: "7",
-    wind_speed_unit: "kmh"
-  });
-
-  if (location.model) params.set("models", location.model);
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
+  const forecast = await fetchWeatherForecast(location);
   trip.weatherForecasts = normalizeWeatherForecasts({
     ...(trip.weatherForecasts || {}),
     [location.id]: {
-        fetchedAt: new Date().toISOString(),
-        source: weatherSourceName(location),
-        daily: data.daily || {},
-        hourly: data.hourly || {}
+      fetchedAt: new Date().toISOString(),
+      source: forecast.source,
+      daily: forecast.daily || {},
+      hourly: forecast.hourly || {}
       }
     });
 }
