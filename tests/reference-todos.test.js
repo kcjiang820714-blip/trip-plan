@@ -52,6 +52,7 @@ return getTodoProgress;`,
 test("待辦依目前分類分成出發前、本日與可選，並維持原順序", () => {
   const buildTodoSections = new Function(
     `${functionSource("todoPrimaryDate")}
+${functionSource("todoSchedule")}
 ${functionSource("buildTodoSections")}
 return buildTodoSections;`,
   )();
@@ -69,6 +70,17 @@ return buildTodoSections;`,
   assert.deepEqual(sections.today.map((todo) => todo.id), ["today-reminder", "today-prep"]);
   assert.deepEqual(sections.optional.map((todo) => todo.id), ["optional"]);
   assert.deepEqual(todos, snapshot);
+});
+
+test("新增待辦可選擇出發前、本日或可選，並將選擇保存到待辦資料", () => {
+  assert.match(html, /<select id="todoScheduleInput"[^>]*>/);
+  assert.match(html, /<option value="departure">出發前<\/option>/);
+  assert.match(html, /<option value="today">本日<\/option>/);
+  assert.match(html, /<option value="optional"(?: selected)?>可選<\/option>/);
+
+  const todoSubmit = app.match(/todoForm\.addEventListener\("submit", async \(event\) => \{[\s\S]*?\n\}\);/)?.[0] ?? "";
+  assert.match(todoSubmit, /schedule:\s*todoScheduleInput\.value/);
+  assert.match(functionSource("normalizeTodo"), /schedule:/);
 });
 
 test("即將到期只取未完成且有日期的待辦，依日期排序並限制筆數", () => {
@@ -122,6 +134,14 @@ test("待辦渲染保留分類、勾選與編輯權限入口，並產生三個�
   assert.match(renderTodos, /data-toggle-todo=/);
   assert.match(renderTodos, /canEditTodo\(todo,\s*trip\)/);
   assert.match(renderTodos, /data-edit-todo=/);
+});
+
+test("手機待辦會顯示已選出發前與本日的項目，不以日期欄位決定可見性", () => {
+  const renderTodos = functionSource("renderTodos");
+
+  assert.match(renderTodos, /const mobileScheduledTodos = \[\.\.\.sections\.departure, \.\.\.sections\.today\];/);
+  assert.match(renderTodos, /title: "出發前與本日", todos: mobileScheduledTodos/);
+  assert.doesNotMatch(renderTodos, /mobileScheduledTodos = trip\.todos\.filter\(/);
 });
 
 test("手機購物待辦以不可換行金額單位呈現，長品名保留截斷空間", () => {

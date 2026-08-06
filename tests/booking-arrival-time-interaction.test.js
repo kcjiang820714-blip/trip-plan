@@ -118,3 +118,13 @@ test("PWA 預快取必須使用網頁目前載入的 app 與樣式版本", () =>
     "啟用新版快取時只能刪除本 App 的舊快取，不能刪同網域其他快取"
   );
 });
+
+test("新版樣式會同時更新 CSS query 與 service worker 快取世代", () => {
+  const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
+  const cacheVersion = serviceWorkerSource.match(/const CACHE_NAME = "trip-notebook-v(\d+)"/)?.[1];
+
+  assert.ok(styleVersion && cacheVersion, "應能讀取樣式與快取版本號");
+  assert.ok(Number(styleVersion) > 115, "新版 CSS 必須使用比 v115 更高的 query 版本");
+  assert.ok(Number(cacheVersion) > 142, "新版 CSS 必須建立比 v142 更新的 service worker 快取");
+  assert.match(serviceWorkerSource, new RegExp(`"\\.\\/styles\\.css\\?v=${styleVersion}"`), "網頁與預快取必須指向同一個新版 CSS");
+});
