@@ -49,66 +49,6 @@ select {
   padding: max(18px, env(safe-area-inset-top)) 16px max(30px, env(safe-area-inset-bottom));
 }
 
-.sync-gate {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(255, 253, 248, 0.96);
-}
-
-.sync-gate-card {
-  display: grid;
-  justify-items: center;
-  gap: 14px;
-  width: min(100%, 360px);
-  padding: 28px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  text-align: center;
-}
-
-.sync-gate-card p {
-  margin: 0;
-}
-
-.sync-gate-card #syncGateTitle {
-  color: var(--ink);
-  font-weight: 850;
-}
-
-.sync-gate-card #syncGateMessage {
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.sync-gate-spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid rgba(15, 107, 95, 0.18);
-  border-top-color: var(--brand);
-  border-radius: 50%;
-  animation: sync-gate-spin 0.8s linear infinite;
-}
-
-.sync-gate.is-error .sync-gate-spinner {
-  display: none;
-}
-
-@keyframes sync-gate-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sync-gate-spinner {
-    animation: none;
-  }
-}
-
 .landing-view {
   display: grid;
   gap: 14px;
@@ -7821,6 +7761,7 @@ select {
     display: none;
   }
 
+  #itineraryPanel .weather-panel,
   #itineraryPanel .quick-ticket-panel,
   #itineraryPanel .itinerary-timeline-heading {
     display: none;
@@ -9132,13 +9073,14 @@ select {
   background: #fffefa;
 }
 
-.todo-progress-ring-content {
+.todo-progress-ring > * {
   position: relative;
   z-index: 1;
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  text-align: center;
+}
+
+.todo-progress-ring > span {
+  color: var(--ref-blue);
+  font-size: 2rem;
 }
 
 .todo-list-section {
@@ -9432,7 +9374,7 @@ select {
   .todo-category-tabs {
     grid-column: 1;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     margin: 0;
     overflow: hidden;
@@ -9871,70 +9813,6 @@ select {
   box-shadow: 0 8px 18px rgba(243, 101, 75, 0.2);
 }
 
-.booking-date-tabs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 18px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  padding: 3px 0;
-  scrollbar-width: none;
-  white-space: nowrap;
-}
-
-.booking-date-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.booking-date-tab {
-  flex: 0 0 auto;
-  min-height: 36px;
-  border: 1px solid rgba(85, 127, 152, 0.32);
-  border-radius: 999px;
-  background: rgba(255, 254, 250, 0.74);
-  color: var(--ref-blue);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 820;
-  letter-spacing: 0.02em;
-  padding: 7px 13px;
-  white-space: nowrap;
-}
-
-.booking-date-tab:hover {
-  border-color: var(--ref-blue);
-  background: var(--ref-blue-soft);
-}
-
-.booking-date-tab:focus-visible {
-  outline: 3px solid rgba(85, 127, 152, 0.35);
-  outline-offset: 2px;
-}
-
-.booking-date-tab.is-active {
-  border-color: var(--ref-blue);
-  background: var(--ref-blue);
-  color: #fff;
-  box-shadow: 0 6px 14px rgba(85, 127, 152, 0.22);
-}
-
-.booking-undated-section {
-  display: grid;
-  gap: 14px;
-  margin-top: 6px;
-  border-top: 1px dashed var(--ref-line);
-  padding-top: 22px;
-}
-
-.booking-undated-section h3 {
-  margin: 0;
-  color: var(--ref-muted);
-  font-size: 0.84rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-}
-
 .booking-focus-card {
   position: relative;
   display: grid;
@@ -10292,12 +10170,6 @@ select {
     scroll-padding-inline: 16px;
   }
 
-  #bookingsPanel .booking-date-tabs {
-    margin: 0 -16px 10px;
-    padding: 3px 16px 7px;
-    scroll-padding-inline: 16px;
-  }
-
   .booking-workspace {
     order: 1;
   }
@@ -10413,10 +10285,6 @@ select {
   #bookingsPanel .sub-tabs {
     margin-bottom: 22px;
     overflow: visible;
-  }
-
-  #bookingsPanel .booking-date-tabs {
-    margin: -10px 0 26px;
   }
 
   #bookingsPanel .sub-tab {

@@ -1,9 +1,3 @@
-import { createAttemptGuard, createSyncCoordinator } from "./sync-gate.js?v=1";
-import { mergeUnpublishedPrivateTodos, upsertTodoImmediately } from "./todo-sync.js?v=123";
-import { bookingTypeMeta, expenseCategoryMeta, filterTodosByGroup, getDefaultTodoGroup, getTodoProgress, renderTodoProgressRing } from "./ui-presentation.js?v=3";
-import { getAvailableBookingDates, renderBookingDateTabs, resolveActiveBookingDate, splitBookingsByDate } from "./booking-date-tabs.js?v=3";
-import { fetchWeatherForecast } from "./weather-provider.js?v=157";
-
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const VIEW_STATE_KEY = "trip-notebook-view-state-v1";
@@ -189,7 +183,6 @@ const state = {
   activeExpenseMember: null,
   activeTripSection: "itinerary",
   activeBookingGroup: "全部",
-  activeBookingDate: "",
   activeTodoGroup: "行前準備",
   editingItemIndex: null,
   editingTripId: null,
@@ -214,12 +207,6 @@ state.activeTripId = state.library.trips[0]?.id || null;
 const landingView = document.querySelector("#landingView");
 const homeView = document.querySelector("#homeView");
 const tripView = document.querySelector("#tripView");
-const appShell = document.querySelector("#appShell");
-const syncGate = document.querySelector("#syncGate");
-const syncGateCard = document.querySelector("#syncGateCard");
-const syncGateTitle = document.querySelector("#syncGateTitle");
-const syncGateMessage = document.querySelector("#syncGateMessage");
-const syncGateRetryButton = document.querySelector("#syncGateRetryButton");
 const tripList = document.querySelector("#tripList");
 const cloudAuthForm = document.querySelector("#cloudAuthForm");
 const cloudEmailInput = document.querySelector("#cloudEmailInput");
@@ -263,7 +250,6 @@ const quickTicketPanel = document.querySelector("#quickTicketPanel");
 const itineraryWeatherSummary = document.querySelector("#itineraryWeatherSummary");
 const itineraryStatsSummary = document.querySelector("#itineraryStatsSummary");
 const bookingSubTabs = document.querySelector("#bookingSubTabs");
-const bookingDateTabs = document.querySelector("#bookingDateTabs");
 const bookingSectionTitle = document.querySelector("#bookingSectionTitle");
 const bookingNextUpcoming = document.querySelector("#bookingNextUpcoming");
 const bookingList = document.querySelector("#bookingList");
@@ -441,38 +427,8 @@ const closeAttachmentViewerButton = document.querySelector("#closeAttachmentView
 let activeAttachmentUrl = null;
 let supabaseClient = null;
 let cloudSaveTimer = null;
-const pendingTodoSyncIds = new Set();
 let exchangeRateUpdatePromise = null;
 const exchangeRateUpdateStatuses = new Map();
-
-function setSyncGate(gateState = { phase: "idle" }) {
-  if (isReadonly || !syncGate || !appShell) return;
-
-  const isLoading = gateState.phase === "loading";
-  const isError = gateState.phase === "error";
-  const isVisible = isLoading || isError;
-  syncGate.hidden = !isVisible;
-  syncGate.classList.toggle("is-error", isError);
-  appShell.inert = isVisible;
-  appShell.toggleAttribute("aria-hidden", isVisible);
-
-  if (isLoading) {
-    syncGateTitle.textContent = "正在與 Supabase 同步旅行資料…";
-    syncGateMessage.textContent = "";
-    syncGateRetryButton.hidden = true;
-    queueMicrotask(() => syncGateCard?.focus());
-    return;
-  }
-
-  if (isError) {
-    syncGateTitle.textContent = "無法完成 Supabase 同步";
-    syncGateMessage.textContent = "請確認網路連線與 Supabase 設定後，再重新同步。";
-    syncGateRetryButton.hidden = false;
-    queueMicrotask(() => syncGateRetryButton.focus());
-  }
-}
-
-const syncCoordinator = createSyncCoordinator({ onStateChange: setSyncGate });
 
 function loadLibrary() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -847,11 +803,6 @@ function normalizeTodo(todo) {
   };
 }
 
-function resolveTodoVisibility(existingTodo) {
-  if (!existingTodo) return "private";
-  return existingTodo.visibility || "private";
-}
-
 function parseTodoDetails(note) {
   if (!note || typeof note !== "string") return { note: "" };
 
@@ -1195,9 +1146,9 @@ function createId() {
   return `trip-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function saveLibrary({ scheduleCloud = true } = {}) {
+function saveLibrary() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
-  if (scheduleCloud) scheduleCloudSave();
+  scheduleCloudSave();
 }
 
 function captureViewState() {
@@ -1209,7 +1160,6 @@ function captureViewState() {
     activeDayIndex: state.activeDayIndex,
     activeTripSection: state.activeTripSection,
     activeBookingGroup: state.activeBookingGroup,
-    activeBookingDate: state.activeBookingDate,
     activeTodoGroup: state.activeTodoGroup,
     activeExpenseDate: state.activeExpenseDate
   };
@@ -1239,7 +1189,6 @@ function restoreViewState(viewState) {
       dayIndex: Math.min(viewState.activeDayIndex, trip.days.length - 1),
       section: viewState.activeTripSection,
       bookingGroup: viewState.activeBookingGroup,
-      activeBookingDate: viewState.activeBookingDate,
       todoGroup: viewState.activeTodoGroup,
       expenseDate: viewState.activeExpenseDate
     });
@@ -1312,7 +1261,6 @@ function renderCloudStatus() {
 async function initCloudSync() {
   if (isReadonly) return;
 
-  setSyncGate({ phase: "loading" });
   try {
     renderCloudStatus();
     const client = await getSupabaseClient();
@@ -1325,48 +1273,25 @@ async function initCloudSync() {
       const previousUserId = state.cloudUser?.id || null;
       const nextUser = session?.user || null;
       const nextUserId = nextUser?.id || null;
-      if (event === "SIGNED_OUT") {
-        syncCoordinator.invalidate();
-        state.cloudSyncing = false;
-      }
       state.cloudUser = nextUser;
       renderCloudStatus();
-      if (state.cloudUser && event === "SIGNED_IN" && nextUserId !== previousUserId) {
-        requestInitialCloudSync(nextUserId).catch(() => {});
-      }
+      if (state.cloudUser && event === "SIGNED_IN" && nextUserId !== previousUserId) loadCloudLibrary();
     });
 
     renderCloudStatus();
-    if (state.cloudUser) {
-      await requestInitialCloudSync(state.cloudUser.id);
-    } else {
-      setSyncGate({ phase: "idle" });
-    }
+    if (state.cloudUser) await loadCloudLibrary();
   } catch (error) {
-    state.cloudError = "雲端功能暫時無法載入，請確認網路與 Supabase 設定。";
+    state.cloudReady = false;
+    state.cloudError = `雲端功能暫時無法載入：${error.message}`;
     renderCloudStatus();
-    setSyncGate({ phase: "error" });
   }
 }
 
-function requestInitialCloudSync(userId, options = {}) {
-  if (!userId || isReadonly) {
-    setSyncGate({ phase: "idle" });
-    return Promise.resolve();
-  }
-
-  return syncCoordinator.request(
-    userId,
-    ({ isCurrent }) => loadCloudLibraryForAttempt({ userId, isCurrent }),
-    options,
-  );
-}
-
-function toCloudTripPayload(trip, userId = state.cloudUser?.id) {
+function toCloudTripPayload(trip) {
   const cloudTrip = stripAttachmentsForCloudTrip(trip);
 
   return {
-    owner_id: userId,
+    owner_id: state.cloudUser.id,
     title: trip.title || "未命名旅程",
     start_date: trip.startDate || null,
     end_date: trip.endDate || null,
@@ -1472,10 +1397,10 @@ function fromCloudTodo(row) {
   });
 }
 
-function toCloudExpensePayload(trip, expense, userId = state.cloudUser?.id) {
+function toCloudExpensePayload(trip, expense) {
   return {
     trip_id: trip.cloudId,
-    created_by: expense.createdBy || userId,
+    created_by: expense.createdBy || state.cloudUser.id,
     date: expense.date || null,
     name: expense.name || "",
     amount: Number(expense.amount) || 0,
@@ -1489,10 +1414,10 @@ function toCloudExpensePayload(trip, expense, userId = state.cloudUser?.id) {
   };
 }
 
-function toCloudTodoPayload(trip, todo, userId = state.cloudUser?.id) {
+function toCloudTodoPayload(trip, todo) {
   return {
     trip_id: trip.cloudId,
-    owner_id: todo.ownerId || userId,
+    owner_id: todo.ownerId || state.cloudUser.id,
     group_name: todo.group || "行前準備",
     text: todo.text || "",
     note: formatTodoCloudNote(todo),
@@ -1613,71 +1538,43 @@ async function updateTripMemberDisplayNameById(memberId, displayName) {
   return fromCloudTripMember(Array.isArray(data) ? data[0] : data);
 }
 
-async function loadCloudLibraryForAttempt({ userId, isCurrent }) {
-  const canCommit = () => isCurrent() && state.cloudUser?.id === userId;
-  if (!canCommit()) return;
+async function loadCloudLibrary() {
+  if (!state.cloudUser) return;
 
   try {
     const viewState = captureViewState();
     state.cloudSyncing = true;
     renderCloudStatus();
     const client = await getSupabaseClient();
-    if (!canCommit()) return;
     const { data, error } = await client
       .from("trips")
       .select("id,owner_id,title,start_date,end_date,data,updated_at")
       .order("updated_at", { ascending: false });
-    if (!canCommit()) return;
     if (error) throw error;
 
     if (Array.isArray(data) && data.length > 0) {
-      const localTripsBeforeCloudOverwrite = state.library.trips;
-      const cloudLibrary = { trips: data.map(fromCloudTrip) };
-      await loadCloudCollaborativeData(client, cloudLibrary.trips);
-      if (!canCommit()) return;
-      const pendingTodoIdsBeforeCloudOverwrite = new Set(pendingTodoSyncIds);
-      const mergedTrips = mergeUnpublishedPrivateTodos(
-        localTripsBeforeCloudOverwrite,
-        cloudLibrary.trips,
-        userId,
-        pendingTodoIdsBeforeCloudOverwrite
-      );
-      if (!canCommit()) return;
-      state.library = { trips: mergedTrips };
-      if (!canCommit()) return;
-      pendingTodoIdsBeforeCloudOverwrite.forEach((todoId) => pendingTodoSyncIds.delete(todoId));
+      state.library = { trips: data.map(fromCloudTrip) };
+      await loadCloudCollaborativeData(client, state.library.trips);
       const activeTrip = state.library.trips.find((trip) => trip.id === viewState.activeTripId);
-      if (!canCommit()) return;
       state.activeTripId = activeTrip?.id || state.library.trips[0]?.id || null;
-      if (!canCommit()) return;
       state.activeDayIndex = activeTrip ? Math.min(viewState.activeDayIndex, activeTrip.days.length - 1) : 0;
-      if (!canCommit()) return;
       state.activeTripSection = viewState.activeTripSection;
-      if (!canCommit()) return;
       state.activeBookingGroup = viewState.activeBookingGroup || state.activeBookingGroup;
-      if (!canCommit()) return;
       state.activeTodoGroup = viewState.activeTodoGroup || state.activeTodoGroup;
-      if (!canCommit()) return;
       state.activeExpenseDate = viewState.activeExpenseDate || state.activeExpenseDate;
-      if (!canCommit()) return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
-      if (!canCommit()) return;
       render();
-      if (!canCommit()) return;
       restoreViewState(viewState);
     } else {
-      await saveCloudLibraryForInitialAttempt({ userId, isCurrent });
-      if (!canCommit()) return;
+      state.cloudSyncing = false;
+      await saveCloudLibrary();
+      state.cloudSyncing = true;
     }
 
-    if (!canCommit()) return;
     state.cloudError = "";
   } catch (error) {
-    if (!canCommit()) return;
-    state.cloudError = "雲端讀取失敗，請確認網路與 Supabase 設定。";
-    throw error;
+    state.cloudError = `雲端讀取失敗：${error.message}`;
   } finally {
-    if (!canCommit()) return;
     state.cloudSyncing = false;
     renderCloudStatus();
   }
@@ -1695,11 +1592,11 @@ function canSaveCloudTripShell(trip) {
   return !trip.role || trip.role === "owner";
 }
 
-function attachmentStoragePath(trip, ownerType, ownerId, attachment, userId = state.cloudUser?.id) {
+function attachmentStoragePath(trip, ownerType, ownerId, attachment) {
   const extension = storageFileExtension(attachment);
   const fileName = `${safeStorageSegment(attachment.id || createId(), "attachment")}-${storageBaseName(attachment)}.${extension}`;
   return [
-    safeStorageSegment(userId, "user"),
+    safeStorageSegment(state.cloudUser.id, "user"),
     safeStorageSegment(trip.id, "trip"),
     safeStorageSegment(ownerType, "owner"),
     safeStorageSegment(ownerId, "item"),
@@ -1707,63 +1604,51 @@ function attachmentStoragePath(trip, ownerType, ownerId, attachment, userId = st
   ].join("/");
 }
 
-async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment, { userId, canCommit = () => true } = {}) {
-  if (!canCommit()) return false;
-  if (attachment.publicUrl || !attachment.dataUrl) return true;
+async function uploadAttachmentToCloud(client, trip, ownerType, ownerId, attachment) {
+  if (attachment.publicUrl || !attachment.dataUrl) return;
 
   const blob = dataUrlToBlob(attachment.dataUrl);
-  const storagePath = isSafeStoragePath(attachment.storagePath)
-    ? attachment.storagePath
-    : attachmentStoragePath(trip, ownerType, ownerId, attachment, userId);
+  const storagePath = isSafeStoragePath(attachment.storagePath) ? attachment.storagePath : attachmentStoragePath(trip, ownerType, ownerId, attachment);
   const { error } = await client.storage.from(SUPABASE_ATTACHMENT_BUCKET).upload(storagePath, blob, {
     cacheControl: "3600",
     contentType: attachment.type || blob.type || "application/octet-stream",
     upsert: true
   });
 
-  if (!canCommit()) return false;
   if (error) throw error;
 
   const { data } = client.storage.from(SUPABASE_ATTACHMENT_BUCKET).getPublicUrl(storagePath);
-  if (!canCommit()) return false;
   attachment.storagePath = storagePath;
-  if (!canCommit()) return false;
   attachment.publicUrl = data.publicUrl;
-  if (!canCommit()) return false;
   attachment.uploadedAt = new Date().toISOString();
-  if (!canCommit()) return false;
   attachment.dataUrl = "";
-  if (!canCommit()) return false;
-  return true;
 }
 
-async function uploadTripAttachments(client, trip, options) {
+async function uploadTripAttachments(client, trip) {
   for (const day of trip.days || []) {
     for (const item of day.items || []) {
       for (const attachment of item.attachments || []) {
-        if (!await uploadAttachmentToCloud(client, trip, "item", item.id || "item", attachment, options)) return false;
+        await uploadAttachmentToCloud(client, trip, "item", item.id || "item", attachment);
       }
     }
   }
 
   for (const booking of trip.bookings || []) {
     for (const attachment of booking.attachments || []) {
-      if (!await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment, options)) return false;
+      await uploadAttachmentToCloud(client, trip, "booking", booking.id || "booking", attachment);
     }
     for (const ticket of booking.personalTickets || []) {
       for (const attachment of ticket.attachments || []) {
-        if (!await uploadAttachmentToCloud(client, trip, "personal-ticket", ticket.id || "ticket", attachment, options)) return false;
+        await uploadAttachmentToCloud(client, trip, "personal-ticket", ticket.id || "ticket", attachment);
       }
     }
   }
 
   for (const todo of trip.todos || []) {
     for (const attachment of todo.attachments || []) {
-      if (!await uploadAttachmentToCloud(client, trip, "todo", todo.id || "todo", attachment, options)) return false;
+      await uploadAttachmentToCloud(client, trip, "todo", todo.id || "todo", attachment);
     }
   }
-
-  return true;
 }
 
 async function deleteAttachmentFromCloud(client, attachment) {
@@ -1831,10 +1716,9 @@ function formatAttachmentUploadError(error) {
   return formatCloudSaveError(error).replace("雲端儲存失敗：", "附件上傳失敗：");
 }
 
-async function saveCloudLibrary({ allowWhileSyncing = false, throwOnError = false } = {}) {
-  if (!state.cloudUser || !state.cloudReady || (state.cloudSyncing && !allowWhileSyncing)) return;
+async function saveCloudLibrary() {
+  if (!state.cloudUser || !state.cloudReady || state.cloudSyncing) return;
 
-  let failure = null;
   try {
     state.cloudSyncing = true;
     renderCloudStatus();
@@ -1861,70 +1745,8 @@ async function saveCloudLibrary({ allowWhileSyncing = false, throwOnError = fals
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
     state.cloudError = "";
   } catch (error) {
-    failure = error;
-    state.cloudError = throwOnError
-      ? "雲端儲存失敗，請確認網路與 Supabase 設定。"
-      : formatCloudSaveError(error);
+    state.cloudError = formatCloudSaveError(error);
   } finally {
-    state.cloudSyncing = false;
-    renderCloudStatus();
-  }
-
-  if (failure && throwOnError) throw failure;
-}
-
-async function saveCloudLibraryForInitialAttempt({ userId, isCurrent }) {
-  const canCommit = createAttemptGuard({
-    userId,
-    isCurrent,
-    getCurrentUserId: () => state.cloudUser?.id || null,
-  });
-  if (!canCommit() || !state.cloudReady) return false;
-
-  try {
-    state.cloudSyncing = true;
-    renderCloudStatus();
-    const client = await getSupabaseClient();
-    if (!canCommit()) return false;
-
-    for (const trip of state.library.trips) {
-      if (!canCommit()) return false;
-      if (canSaveCloudTripShell(trip)) {
-        const attachmentsUploaded = await uploadTripAttachments(client, trip, { userId, canCommit });
-        if (!attachmentsUploaded || !canCommit()) return false;
-
-        const payload = toCloudTripPayload(trip, userId);
-        if (!canCommit()) return false;
-        const query = trip.cloudId
-          ? client.from("trips").update(payload).eq("id", trip.cloudId).select("id").single()
-          : client.from("trips").insert(payload).select("id").single();
-        const { data, error } = await query;
-        if (!canCommit()) return false;
-        if (error) throw error;
-        if (!trip.cloudId && data?.id) {
-          if (!canCommit()) return false;
-          trip.cloudId = data.id;
-          if (!canCommit()) return false;
-          trip.role = "owner";
-          if (!canCommit()) return false;
-        }
-      }
-
-      const collaborativeDataSaved = await saveCloudCollaborativeData(client, trip, { userId, canCommit });
-      if (!collaborativeDataSaved || !canCommit()) return false;
-    }
-
-    if (!canCommit()) return false;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
-    if (!canCommit()) return false;
-    state.cloudError = "";
-    return true;
-  } catch (error) {
-    if (!canCommit()) return false;
-    state.cloudError = "雲端儲存失敗，請確認網路與 Supabase 設定。";
-    throw error;
-  } finally {
-    if (!canCommit()) return;
     state.cloudSyncing = false;
     renderCloudStatus();
   }
@@ -1939,80 +1761,29 @@ async function upsertCloudRow(client, table, cloudId, payload) {
   return data?.id || cloudId || null;
 }
 
-function canImmediatelySyncTodo(trip) {
-  return Boolean(state.cloudUser && state.cloudReady && trip?.cloudId);
-}
-
-async function saveCloudTodo(trip, todo) {
-  if (!canImmediatelySyncTodo(trip)) return null;
-
-  try {
-    const client = await getSupabaseClient();
-    const cloudId = await upsertTodoImmediately({
-      client,
-      trip,
-      todo,
-      currentUserId: state.cloudUser.id,
-      toPayload: toCloudTodoPayload,
-      upsertCloudRow
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
-    state.cloudError = "";
-    return cloudId;
-  } catch (error) {
-    if (!isMissingCloudTableError(error)) state.cloudError = formatCloudSaveError(error);
-    scheduleCloudSave();
-    renderCloudStatus();
-    return null;
-  }
-}
-
-function saveTodoAndSync(trip, todo) {
-  const shouldSyncImmediately = canImmediatelySyncTodo(trip);
-  saveLibrary({ scheduleCloud: !shouldSyncImmediately });
-  if (shouldSyncImmediately) {
-    pendingTodoSyncIds.add(todo.id);
-    void saveCloudTodo(trip, todo);
-  }
-}
-
-async function saveCloudCollaborativeData(client, trip, { userId, canCommit = () => true } = {}) {
-  const targetUserId = userId || state.cloudUser?.id;
-  if (!canCommit()) return false;
-  if (!trip.cloudId) return true;
+async function saveCloudCollaborativeData(client, trip) {
+  if (!trip.cloudId) return;
 
   try {
     for (const expense of trip.expenses || []) {
-      if (!canCommit()) return false;
-      const cloudId = await upsertCloudRow(client, "trip_expenses", expense.cloudId, toCloudExpensePayload(trip, expense, targetUserId));
-      if (!canCommit()) return false;
+      const cloudId = await upsertCloudRow(client, "trip_expenses", expense.cloudId, toCloudExpensePayload(trip, expense));
       if (cloudId) {
-        if (!canCommit()) return false;
         expense.cloudId = cloudId;
-        if (!canCommit()) return false;
-        expense.createdBy = expense.createdBy || targetUserId;
-        if (!canCommit()) return false;
+        expense.createdBy = expense.createdBy || state.cloudUser.id;
       }
     }
 
     for (const todo of trip.todos || []) {
-      if (!canCommit()) return false;
-      const cloudId = await upsertCloudRow(client, "trip_todos", todo.cloudId, toCloudTodoPayload(trip, todo, targetUserId));
-      if (!canCommit()) return false;
+      const cloudId = await upsertCloudRow(client, "trip_todos", todo.cloudId, toCloudTodoPayload(trip, todo));
       if (cloudId) {
-        if (!canCommit()) return false;
         todo.cloudId = cloudId;
-        if (!canCommit()) return false;
-        todo.ownerId = todo.ownerId || targetUserId;
-        if (!canCommit()) return false;
+        todo.ownerId = todo.ownerId || state.cloudUser.id;
       }
     }
   } catch (error) {
-    if (isMissingCloudTableError(error)) return true;
+    if (isMissingCloudTableError(error)) return;
     throw error;
   }
-
-  return true;
 }
 
 async function deleteCloudRow(table, cloudId) {
@@ -2757,7 +2528,7 @@ function renderWeatherPanel(statusText = "") {
           <p class="eyebrow">今日天氣</p>
           <h3>${hasLocations ? `${locations.length} 個天氣地點` : "尚未設定天氣地點"}</h3>
         </div>
-        ${hasLocations ? `<span>${escapeHtml(weatherSourceSummary(trip, locations))}</span>` : ""}
+        ${hasLocations ? `<span>${escapeHtml(weatherSourceSummary(locations))}</span>` : ""}
       </header>
       <div class="weather-controls">
         <button class="secondary-action" type="button" data-refresh-weather ${hasLocations ? "" : "disabled"}>更新天氣</button>
@@ -2806,7 +2577,7 @@ function renderWeatherLocationForecast(trip, dayDate, location, statusText = "")
               </div>
               ${renderWeatherPeriods(periods)}
               <p class="weather-advice">${escapeHtml(weatherAdvice(location, forecast))}</p>
-              <small>${renderWeatherUpdatedLabel(cachedForecast)}</small>
+              <small>${escapeHtml(weatherUpdatedLabel(cachedForecast))}</small>
             `
             : `<p class="weather-empty">${escapeHtml(weatherDisplayText(statusText || weatherEmptyMessage(location, cachedForecast)))}</p>`
         }
@@ -2870,7 +2641,7 @@ function weatherLocationTitle(location) {
 function weatherEmptyMessage(location = null, cachedForecast = null) {
   if (!location) return "請先到「編輯旅程」設定這一天要看的天氣城市。";
   if (cachedForecast) return "目前沒有這一天的預報資料。多數天氣模型只提供短期預報，請出發前或旅途中再更新。";
-  return `按「更新天氣」取得${weatherExpectedSourceName(location)}預報。`;
+  return `按「更新天氣」抓取 ${weatherSourceName(location)} 預報。`;
 }
 
 function renderWeatherIcon(code) {
@@ -2925,15 +2696,8 @@ function weatherSourceName(location) {
   return location?.model === "meteoswiss_icon_ch2" ? "Open-Meteo MeteoSwiss" : "Open-Meteo";
 }
 
-function weatherExpectedSourceName(location) {
-  return String(location?.countryCode || "").trim().toUpperCase() === "JP"
-    ? "日本氣象廳（失敗時改用 Open-Meteo）"
-    : weatherSourceName(location);
-}
-
-function weatherSourceSummary(trip, locations) {
-  const sources = [...new Set(locations.map((location) => trip?.weatherForecasts?.[location.id]?.source || weatherExpectedSourceName(location)))];
-  return sources.length === 1 ? sources[0] : `混合來源：${sources.join("、")}`;
+function weatherSourceSummary(locations) {
+  return locations.some((location) => location.model === "meteoswiss_icon_ch2") ? "含 MeteoSwiss" : "Open-Meteo";
 }
 
 function createWeatherLocationId(location) {
@@ -3098,16 +2862,11 @@ function formatWeatherNumber(value, unit) {
   return value === null ? "--" : `${Math.round(value)}${unit}`;
 }
 
-function renderWeatherUpdatedLabel(forecast) {
-  if (!forecast?.fetchedAt) return escapeHtml("尚未更新");
+function weatherUpdatedLabel(forecast) {
+  if (!forecast?.fetchedAt) return "尚未更新";
   const updated = new Date(forecast.fetchedAt);
-  if (Number.isNaN(updated.getTime())) return escapeHtml("已使用上次成功抓取的資料");
-  const updatedLabel = `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
-  const source = forecast.source || "Open-Meteo";
-  if (source === "日本氣象廳") {
-    return `${escapeHtml(updatedLabel)} · 資料來源：<a href="https://www.jma.go.jp/bosai/forecast/" target="_blank" rel="noopener noreferrer">日本氣象廳（本 App 已加工）</a>`;
-  }
-  return `${escapeHtml(updatedLabel)} · 資料來源：${escapeHtml(source || "Open-Meteo")}`;
+  if (Number.isNaN(updated.getTime())) return "已使用上次成功抓取的資料";
+  return `上次更新：${updated.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · Source: ${forecast.source || "Open-Meteo MeteoSwiss"}`;
 }
 
 function compactWeatherUpdatedLabel(forecast) {
@@ -3158,14 +2917,27 @@ async function fetchWeatherForActiveDay() {
 }
 
 async function fetchWeatherForLocation(trip, location) {
-  const forecast = await fetchWeatherForecast(location);
+  const params = new URLSearchParams({
+    latitude: String(location.latitude),
+    longitude: String(location.longitude),
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
+    hourly: "weather_code,temperature_2m,precipitation_probability,wind_speed_10m",
+    timezone: "auto",
+    forecast_days: "7",
+    wind_speed_unit: "kmh"
+  });
+
+  if (location.model) params.set("models", location.model);
+  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
   trip.weatherForecasts = normalizeWeatherForecasts({
     ...(trip.weatherForecasts || {}),
     [location.id]: {
-      fetchedAt: new Date().toISOString(),
-      source: forecast.source,
-      daily: forecast.daily || {},
-      hourly: forecast.hourly || {}
+        fetchedAt: new Date().toISOString(),
+        source: weatherSourceName(location),
+        daily: data.daily || {},
+        hourly: data.hourly || {}
       }
     });
 }
@@ -3414,7 +3186,13 @@ function renderTripSectionTabs() {
 function getBookingReferencePresentation(booking, currentDate) {
   const transport = booking?.transport || {};
   const isTransport = booking?.type === "交通";
-  const typeMeta = bookingTypeMeta(booking?.type);
+  const typeMeta = isTransport
+    ? { group: "交通", icon: "▰", tone: "blue" }
+    : booking?.type === "住宿"
+      ? { group: "住宿", icon: "▥", tone: "green" }
+      : booking?.type === "餐廳"
+        ? { group: "餐廳", icon: "♜", tone: "coral" }
+        : { group: "票券", icon: "▣", tone: "blue" };
   const date = isTransport ? transport.departureDate || booking?.date || "" : booking?.date || "";
   const time = isTransport ? transport.departureTime || booking?.time || "" : booking?.time || "";
   const route = isTransport
@@ -3463,18 +3241,11 @@ function renderBookings() {
   const bookings = state.activeBookingGroup === "全部"
     ? visibleBookings
     : visibleBookings.filter((booking) => getBookingGroup(booking) === state.activeBookingGroup);
-  const availableDates = getAvailableBookingDates(bookings);
-  state.activeBookingDate = resolveActiveBookingDate(availableDates, state.activeBookingDate);
-  const { scheduled, undated } = splitBookingsByDate(bookings, state.activeBookingDate);
   const nextUpcomingBooking = findNextUpcomingBooking(visibleBookings, todayString(), getCurrentTimeValue());
   bookingSectionTitle.textContent = state.activeBookingGroup;
   bookingSubTabs.querySelectorAll("[data-booking-group]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.bookingGroup === state.activeBookingGroup);
   });
-  bookingDateTabs.hidden = availableDates.length === 0;
-  bookingDateTabs.innerHTML = availableDates.length > 0
-    ? renderBookingDateTabs(availableDates, state.activeBookingDate)
-    : "";
   bookingNextUpcoming.hidden = !nextUpcomingBooking;
   bookingNextUpcoming.innerHTML = nextUpcomingBooking
     ? renderUpcomingBookingFocus(nextUpcomingBooking, trip)
@@ -3488,7 +3259,7 @@ function renderBookings() {
     return;
   }
 
-  const renderBookingCards = (items) => items
+  bookingList.innerHTML = bookings
     .slice()
     .sort((left, right) => {
       const leftSchedule = `${getBookingScheduleDate(left) || "9999-12-31"} ${getBookingScheduleTime(left) || "23:59"}`;
@@ -3497,13 +3268,6 @@ function renderBookings() {
     })
     .map((booking) => renderBookingListCard(booking, trip))
     .join("");
-
-  bookingList.innerHTML = `${renderBookingCards(scheduled)}${undated.length > 0 ? `
-    <section class="booking-undated-section" aria-labelledby="bookingUndatedTitle">
-      <h3 id="bookingUndatedTitle">日期未定</h3>
-      ${renderBookingCards(undated)}
-    </section>
-  ` : ""}`;
 }
 
 function getBookingFocusDetails(booking) {
@@ -4309,6 +4073,19 @@ function shortText(value, maxLength) {
   return `${text.slice(0, maxLength - 1)}…`;
 }
 
+function getTodoProgress(todos = []) {
+  const total = todos.length;
+  const done = todos.filter((todo) => Boolean(todo.done)).length;
+  const pending = total - done;
+
+  return {
+    total,
+    done,
+    pending,
+    percent: total > 0 ? Math.round((done / total) * 100) : 0
+  };
+}
+
 function todoPrimaryDate(todo) {
   return todo?.date || todo?.dueDate || "";
 }
@@ -4321,7 +4098,7 @@ function todoSchedule(todo, todayIso = "") {
 }
 
 function buildTodoSections(todos = [], activeGroup = "", todayIso = "") {
-  const visibleTodos = filterTodosByGroup(todos, activeGroup);
+  const visibleTodos = todos.filter((todo) => !activeGroup || todo.group === activeGroup);
 
   return {
     departure: visibleTodos.filter((todo) => todoSchedule(todo, todayIso) === "departure"),
@@ -4345,7 +4122,7 @@ function findUpcomingTodos(todos = [], todayIso = "", limit = 3) {
 
 function renderTodos() {
   const trip = currentTrip();
-  const progress = getTodoProgress(trip.todos, state.activeTodoGroup);
+  const progress = getTodoProgress(trip.todos);
   const todayIso = new Date().toLocaleDateString("sv-SE");
   const sections = buildTodoSections(trip.todos, state.activeTodoGroup, todayIso);
   const upcomingTodos = findUpcomingTodos(trip.todos, todayIso, 3);
@@ -4365,13 +4142,18 @@ function renderTodos() {
       <span>完成進度</span>
       <strong>${progress.done}<small>/ ${progress.total}</small></strong>
     </div>
-    ${renderTodoProgressRing(progress)}
+    <div class="todo-progress-ring" style="--todo-progress: ${progress.percent}" aria-label="已完成 ${progress.percent}%">
+      <span aria-hidden="true">▣</span>
+    </div>
   `;
 
   todoProgressSide.innerHTML = `
     <h3>完成進度</h3>
     <div class="todo-side-progress">
-      ${renderTodoProgressRing(progress)}
+      <div class="todo-progress-ring" style="--todo-progress: ${progress.percent}">
+        <strong>${progress.percent}%</strong>
+        <small>${progress.done} / ${progress.total}</small>
+      </div>
     </div>
     <div class="todo-progress-legend">
       <span><i class="is-done"></i>已完成 ${progress.done}</span>
@@ -4428,12 +4210,12 @@ function renderTodos() {
 
   const desktopSectionDefinitions = [
     { className: "todo-section-departure", icon: "▣", title: "出發前", todos: sections.departure },
-    { className: "todo-section-today", icon: "☀", title: "旅行中", todos: sections.today },
+    { className: "todo-section-today", icon: "☀", title: "本日", todos: sections.today },
     { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
   ];
   const mobileScheduledTodos = [...sections.departure, ...sections.today];
   const mobileSectionDefinitions = [
-    { className: "todo-section-today", icon: "☀", title: "出發前與旅行中", todos: mobileScheduledTodos },
+    { className: "todo-section-today", icon: "☀", title: "出發前與本日", todos: mobileScheduledTodos },
     { className: "todo-section-optional", icon: "♧", title: "可選", todos: sections.optional }
   ];
   const sectionDefinitions = window.matchMedia("(max-width: 679px)").matches
@@ -4523,6 +4305,16 @@ function buildExpenseCategoryBreakdown(expenses = []) {
     }));
 }
 
+function expenseCategoryMeta(category) {
+  const normalized = String(category || "其他");
+  if (normalized.includes("餐") || normalized.includes("食")) return { icon: "🍴", tone: "food" };
+  if (normalized.includes("交通") || normalized.includes("車")) return { icon: "▣", tone: "transport" };
+  if (normalized.includes("景點") || normalized.includes("門票")) return { icon: "⌂", tone: "sight" };
+  if (normalized.includes("購物")) return { icon: "⌑", tone: "shopping" };
+  if (normalized.includes("住宿")) return { icon: "▰", tone: "stay" };
+  return { icon: "•••", tone: "other" };
+}
+
 function expenseMemberInitial(member) {
   return Array.from(String(member || "旅")).slice(-1)[0] || "旅";
 }
@@ -4535,28 +4327,28 @@ function expenseViewerName(trip) {
 }
 
 function expenseMemberAvatarClass(trip, member) {
-  const memberIndex = expenseMemberNames(trip).indexOf(member);
-  return `expense-avatar-${((memberIndex >= 0 ? memberIndex : 0) % 5) + 1}`;
+  const index = expenseMemberNames(trip).indexOf(member);
+  return `expense-avatar-${(index >= 0 ? index : 0) % 5 + 1}`;
 }
 
 function renderExpenseMemberNavigation(trip) {
   const members = expenseMemberNames(trip);
   const viewer = expenseViewerName(trip);
-  const avatar = (member, extraClass = "") => `
+  const avatar = (member, index, extraClass = "") => `
     <span class="expense-avatar ${expenseMemberAvatarClass(trip, member)} ${extraClass}" title="${escapeHtml(member)}" aria-label="${escapeHtml(member)}">
       ${escapeHtml(expenseMemberInitial(member))}
     </span>
   `;
 
   expenseMemberAvatars.innerHTML = `
-    ${members.slice(0, 3).map((member) => avatar(member)).join("")}
+    ${members.slice(0, 3).map((member, index) => avatar(member, index)).join("")}
     ${members.length > 3 ? `<span class="expense-avatar expense-avatar-more">+${members.length - 3}</span>` : ""}
   `;
   expenseMemberSwitcher.innerHTML = members
     .map(
-      (member) => `
+      (member, index) => `
         <span class="expense-member-option ${member === viewer ? "is-current" : ""}">
-          ${avatar(member, "expense-avatar-small")}
+          ${avatar(member, index, "expense-avatar-small")}
           ${escapeHtml(member === viewer ? "你" : member)}
         </span>
       `
@@ -4672,9 +4464,9 @@ function renderExpenseSettlementCard(trip, settlements) {
                 <div class="expense-settlement-copy">
                   <strong>${escapeHtml(from)} 應支付給 <em>${escapeHtml(to)}</em></strong>
                   <span>
-                    <i class="expense-avatar expense-avatar-small ${expenseMemberAvatarClass(trip, settlement.from)}">${escapeHtml(expenseMemberInitial(settlement.from))}</i>
+                    <i class="expense-avatar expense-avatar-small expense-avatar-${(index % 5) + 1}">${escapeHtml(expenseMemberInitial(settlement.from))}</i>
                     ${escapeHtml(settlement.from)} <b>⟶</b>
-                    <i class="expense-avatar expense-avatar-small ${expenseMemberAvatarClass(trip, settlement.to)}">${escapeHtml(expenseMemberInitial(settlement.to))}</i>
+                    <i class="expense-avatar expense-avatar-small expense-avatar-${((index + 1) % 5) + 1}">${escapeHtml(expenseMemberInitial(settlement.to))}</i>
                     ${escapeHtml(settlement.to)}
                   </span>
                 </div>
@@ -5239,7 +5031,7 @@ function openTodoDialog(todoId = null) {
   state.editingTodoId = todo?.id || null;
   todoDialogTitle.textContent = todo ? "編輯待辦" : "新增待辦";
   deleteTodoButton.hidden = !todo;
-  todoGroupInput.value = todo ? todo.group : getDefaultTodoGroup(state.activeTodoGroup);
+  todoGroupInput.value = todo?.group || state.activeTodoGroup;
   todoTextInput.value = todo?.text || "";
   todoScheduleInput.value = todo ? todoSchedule(todo, todayString()) : "optional";
   todoDueDateInput.value = todo?.dueDate || "";
@@ -5580,7 +5372,6 @@ function showTrip(tripId, options = {}) {
   state.activeDayIndex = Math.max(0, Math.min(options.dayIndex ?? 0, trip.days.length - 1));
   state.activeTripSection = options.section || "itinerary";
   state.activeBookingGroup = options.bookingGroup || state.activeBookingGroup;
-  state.activeBookingDate = options.activeBookingDate || "";
   state.activeTodoGroup = options.todoGroup || state.activeTodoGroup;
   state.activeExpenseDate = options.expenseDate || null;
   landingView.hidden = true;
@@ -6632,11 +6423,7 @@ cloudAuthForm.addEventListener("submit", async (event) => {
     state.cloudUser = data.user;
     cloudPasswordInput.value = "";
     renderCloudStatus();
-    try {
-      await requestInitialCloudSync(data.user.id);
-    } catch {
-      // 同步問題由閘門顯示安全訊息與重試按鈕，不把服務端細節顯示在 alert。
-    }
+    await loadCloudLibrary();
   } catch (error) {
     alert(`登入失敗：${error.message}`);
   }
@@ -6660,11 +6447,7 @@ cloudSignUpButton.addEventListener("click", async () => {
     cloudPasswordInput.value = "";
     renderCloudStatus();
     if (data.session) {
-      try {
-        await requestInitialCloudSync(data.user.id);
-      } catch {
-        // 同步問題由閘門處理；帳號已建立，使用者可安全地重試同步。
-      }
+      await saveCloudLibrary();
       alert("註冊完成，已開始雲端同步。");
     } else {
       alert("註冊完成。請先到信箱確認 Email，再回來登入。");
@@ -6677,8 +6460,6 @@ cloudSignUpButton.addEventListener("click", async () => {
 cloudSignOutButton.addEventListener("click", async () => {
   if (isReadonly) return;
 
-  syncCoordinator.invalidate();
-  state.cloudSyncing = false;
   try {
     const client = await getSupabaseClient();
     await client.auth.signOut();
@@ -6687,11 +6468,6 @@ cloudSignOutButton.addEventListener("click", async () => {
     state.cloudError = "";
     renderCloudStatus();
   }
-});
-
-syncGateRetryButton?.addEventListener("click", () => {
-  const userId = state.cloudUser?.id;
-  if (userId) requestInitialCloudSync(userId, { retry: true }).catch(() => {});
 });
 
 cloudSyncButton.addEventListener("click", async () => {
@@ -7095,15 +6871,6 @@ bookingSubTabs.addEventListener("click", (event) => {
   const button = event.target.closest("[data-booking-group]");
   if (!button) return;
   state.activeBookingGroup = button.dataset.bookingGroup;
-  state.activeBookingDate = "";
-  renderBookings();
-  rememberViewState(captureViewState());
-});
-
-bookingDateTabs.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-booking-date]");
-  if (!button) return;
-  state.activeBookingDate = button.dataset.bookingDate;
   renderBookings();
   rememberViewState(captureViewState());
 });
@@ -7429,7 +7196,7 @@ todoForm.addEventListener("submit", async (event) => {
     note: todoNoteInput.value.trim(),
     attachments: todoGroupInput.value === "購物清單" ? [...keptAttachments, ...newAttachments] : [],
     done: existingTodo?.done || false,
-    visibility: resolveTodoVisibility(existingTodo)
+    visibility: existingTodo?.visibility || "private"
   };
   const todo = normalizeTodo(todoData);
 
@@ -7438,7 +7205,7 @@ todoForm.addEventListener("submit", async (event) => {
 
   try {
     await uploadOwnerAttachmentsBeforeLocalSave(trip, "todo", todo.id, todo.attachments);
-    saveTodoAndSync(trip, todo);
+    saveLibrary();
     deleteRemovedAttachmentsFromCloud(removedAttachments);
   } catch (error) {
     if (previousTodo) Object.assign(existingTodo, previousTodo);
@@ -7458,7 +7225,7 @@ todoGroups.addEventListener("change", (event) => {
   const todo = currentTrip().todos.find((item) => item.id === checkbox.dataset.toggleTodo);
   if (!todo) return;
   todo.done = checkbox.checked;
-  saveTodoAndSync(currentTrip(), todo);
+  saveLibrary();
   renderTodos();
 });
 
@@ -7849,20 +7616,13 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=157").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js").then((registration) => registration.update());
 }
 
 populateTimeOptions();
 saveLibrary();
+render();
 renderReadonlyMode();
-if (isReadonly) {
-  render();
-  restoreInitialViewState();
-} else {
-  setSyncGate({ phase: "loading" });
-  initCloudSync().finally(() => {
-    render();
-    restoreInitialViewState();
-  });
-}
+restoreInitialViewState();
+initCloudSync();
 startTravelModeTimer();
