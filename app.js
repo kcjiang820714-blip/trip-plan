@@ -7987,7 +7987,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=157").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=159").then((registration) => registration.update());
 }
 
 populateTimeOptions();
