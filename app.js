@@ -307,7 +307,14 @@ const timeInput = document.querySelector("#timeInput");
 const timeHourInput = document.querySelector("#timeHourInput");
 const timeMinuteInput = document.querySelector("#timeMinuteInput");
 const placeInput = document.querySelector("#placeInput");
+const placeInputLabel = document.querySelector("#placeInputLabel");
 const typeInput = document.querySelector("#typeInput");
+const flexibleExplorationFields = document.querySelector("#flexibleExplorationFields");
+const flexibleEndTimeInput = document.querySelector("#flexibleEndTimeInput");
+const flexibleEndHourInput = document.querySelector("#flexibleEndHourInput");
+const flexibleEndMinuteInput = document.querySelector("#flexibleEndMinuteInput");
+const flexibleStopList = document.querySelector("#flexibleStopList");
+const addFlexibleStopButton = document.querySelector("#addFlexibleStopButton");
 const attractionFields = document.querySelector("#attractionFields");
 const attractionIntroInput = document.querySelector("#attractionIntroInput");
 const itemContentInput = document.querySelector("#itemContentInput");
@@ -914,6 +921,25 @@ function normalizeDay(day, index, tripStartDate = "") {
   };
 }
 
+function normalizeFlexibleStops(stops) {
+  if (!Array.isArray(stops)) return [];
+  return stops
+    .map((stop) => {
+      const name = typeof stop?.name === "string" ? stop.name.trim() : "";
+      if (!name) return null;
+      return {
+        id: stop.id || createId(),
+        name,
+        intro: typeof stop.intro === "string" ? stop.intro.trim() : ""
+      };
+    })
+    .filter(Boolean);
+}
+
+function formatFlexibleExploreSummary(stops) {
+  return `${Array.isArray(stops) ? stops.length : 0} 個景點可彈性安排`;
+}
+
 function normalizeItem(item) {
   return {
     id: item.id || createId(),
@@ -921,6 +947,7 @@ function normalizeItem(item) {
     bookingSourceSummary: item.bookingSourceSummary || "",
     title: item.title || "",
     time: item.time || "",
+    endTime: item.endTime || "",
     place: item.place || "",
     type: item.type || "",
     content: item.content || "",
@@ -936,7 +963,8 @@ function normalizeItem(item) {
     arrivalTerminal: item.arrivalTerminal || "",
     attachments: Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment).filter(Boolean) : [],
     transportMode: item.transportMode || "",
-    transportSegments: Array.isArray(item.transportSegments) ? item.transportSegments.map(normalizeTransportSegment) : []
+    transportSegments: Array.isArray(item.transportSegments) ? item.transportSegments.map(normalizeTransportSegment) : [],
+    flexibleStops: normalizeFlexibleStops(item.flexibleStops)
   };
 }
 
@@ -2681,6 +2709,28 @@ function renderTravelDayPanel(focus) {
   `;
 }
 
+function formatFlexibleExploreTimeRange(item) {
+  if (item?.type !== "彈性探索") return item?.time || "";
+  return item.time && item.endTime ? `${item.time}–${item.endTime}` : item.time || item.endTime || "";
+}
+
+function renderFlexibleExplorationDetails(item) {
+  if (item?.type !== "彈性探索") return "";
+  const stops = Array.isArray(item.flexibleStops) ? item.flexibleStops : [];
+  return `
+    <section class="flexible-stop-list" aria-label="彈性探索景點">
+      ${stops
+        .map((stop) => `
+          <article class="flexible-stop">
+            <h4>${escapeHtml(stop.name || "未命名景點")}</h4>
+            ${stop.intro ? `<p>${escapeHtml(stop.intro)}</p>` : ""}
+          </article>
+        `)
+        .join("")}
+    </section>
+  `;
+}
+
 function renderItineraryTimeline(day, focusItem) {
   const trip = currentTrip();
   const items = day.items
@@ -2698,6 +2748,7 @@ function renderItineraryTimeline(day, focusItem) {
   timeline.innerHTML = items
     .map(({ item, index }) => {
       const isExpanded = state.expandedItemId === item.id;
+      const isFlexibleExploration = item.type === "彈性探索";
       const detailsId = `itemDetails${item.id}`;
       const referenceVisual = getItineraryItemVisual(item);
       const sourceBooking = item.sourceBookingId
@@ -2713,12 +2764,13 @@ function renderItineraryTimeline(day, focusItem) {
             aria-expanded="${isExpanded}"
             aria-controls="${escapeHtml(detailsId)}"
           >
-            <span class="time">${escapeHtml(item.time)}</span>
+            <span class="time">${escapeHtml(formatFlexibleExploreTimeRange(item))}</span>
             <span class="itinerary-type-marker is-${escapeHtml(referenceVisual.tone)}" aria-hidden="true">${renderItineraryTypeIcon(referenceVisual.icon)}</span>
             <span class="item-summary-content">
               <span class="item-title ${Array.from(getItemTitle(item) || "").length > 18 ? "is-long-item-title" : ""}">${escapeHtml(getItemTitle(item))}</span>
-              ${item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
-              <span class="meta">⌖ ${escapeHtml(item.note || item.type || "行程")}</span>
+              ${isFlexibleExploration ? `<span class="flexible-exploration-summary">${escapeHtml(formatFlexibleExploreSummary(item.flexibleStops))}</span>` : ""}
+              ${!isFlexibleExploration && item.content ? `<span class="item-content-preview">${escapeHtml(item.content)}</span>` : ""}
+              ${!isFlexibleExploration ? `<span class="meta">⌖ ${escapeHtml(item.note || item.type || "行程")}</span>` : ""}
             </span>
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
@@ -2726,6 +2778,7 @@ function renderItineraryTimeline(day, focusItem) {
             ${renderFlightInfo(item)}
             ${renderTransportInfo(item)}
             ${renderAttractionIntro(item)}
+            ${renderFlexibleExplorationDetails(item)}
             ${renderAttachmentGallery(item.attachments, "item", item.id)}
             ${item.bookingSourceSummary ? `<p class="booking-source-summary">${escapeHtml(item.bookingSourceSummary)}</p>` : ""}
             ${renderBookingSourceAttachments(item, sourceBooking)}
@@ -5921,6 +5974,7 @@ function openItemDialog(index = null) {
   const item = index === null
     ? {
         time: "",
+        endTime: "",
         place: "",
         type: "景點",
         content: "",
@@ -5935,7 +5989,8 @@ function openItemDialog(index = null) {
         arrivalAirport: "",
         arrivalTerminal: "",
         transportMode: "火車",
-        transportSegments: [createBlankTransportSegment("火車")]
+        transportSegments: [createBlankTransportSegment("火車")],
+        flexibleStops: []
       }
     : currentDay().items[index];
 
@@ -5943,6 +5998,8 @@ function openItemDialog(index = null) {
   deleteItemButton.hidden = index === null;
   timeInput.value = item.time;
   setTimeSelects(item.time);
+  flexibleEndTimeInput.value = item.endTime || "";
+  setTimeSelectPair(flexibleEndHourInput, flexibleEndMinuteInput, item.endTime || "");
   placeInput.value = item.place;
   typeInput.value = [...typeInput.options].some((option) => option.value === item.type) ? item.type : "其他";
   itemContentInput.value = item.content || "";
@@ -5968,9 +6025,11 @@ function openItemDialog(index = null) {
     transportSegmentList[0].departureTime = item.time;
   }
   renderTransportSegments(transportSegmentList);
+  renderFlexibleStopEditors(item.flexibleStops?.length ? item.flexibleStops : [{ id: createId(), name: "", intro: "" }]);
   syncFlightFields();
   syncTransportFields();
   syncAttractionFields();
+  syncFlexibleExplorationFields();
   openModal(itemDialog);
 }
 
@@ -6899,6 +6958,7 @@ typeInput.addEventListener("change", () => {
   syncFlightFields();
   syncTransportFields();
   syncAttractionFields();
+  syncFlexibleExplorationFields();
 });
 timeHourInput.addEventListener("change", syncTimeInput);
 timeMinuteInput.addEventListener("change", syncTimeInput);
@@ -6940,6 +7000,16 @@ transportSegments.addEventListener("click", (event) => {
   const removeIndex = Number(removeButton.dataset.removeTransportSegment);
   const segments = collectTransportSegments().filter((_, index) => index !== removeIndex);
   renderTransportSegments(segments.length ? segments : [createBlankTransportSegment(transportModeInput.value)]);
+});
+flexibleEndHourInput.addEventListener("change", () => syncHiddenTimeInput(flexibleEndTimeInput, flexibleEndHourInput, flexibleEndMinuteInput));
+flexibleEndMinuteInput.addEventListener("change", () => syncHiddenTimeInput(flexibleEndTimeInput, flexibleEndHourInput, flexibleEndMinuteInput));
+addFlexibleStopButton.addEventListener("click", () => {
+  renderFlexibleStopEditors([...collectFlexibleStops(), { id: createId(), name: "", intro: "" }]);
+});
+flexibleStopList.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-remove-flexible-stop]");
+  if (!removeButton) return;
+  removeButton.closest("[data-flexible-stop-id]")?.remove();
 });
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
@@ -7219,17 +7289,27 @@ itemForm.addEventListener("submit", async (event) => {
   if (!canManageTrip()) return;
   syncHiddenTimeInput(departureTimeInput, departureHourInput, departureMinuteInput);
   syncHiddenTimeInput(arrivalTimeInput, arrivalHourInput, arrivalMinuteInput);
+  syncHiddenTimeInput(flexibleEndTimeInput, flexibleEndHourInput, flexibleEndMinuteInput);
+
+  const flexibleStops = typeInput.value === "彈性探索" ? collectFlexibleStops() : [];
+  if (typeInput.value === "彈性探索" && flexibleStops.length === 0) {
+    alert("請至少新增一個景點後再儲存。");
+    return;
+  }
 
   let attachments = [];
-  try {
-    attachments = await readItemPhotos();
-  } catch (error) {
-    alert(error.message);
-    return;
+  if (typeInput.value !== "彈性探索") {
+    try {
+      attachments = await readItemPhotos();
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
   }
 
   const item = {
     time: `${timeHourInput.value}:${timeMinuteInput.value}`,
+    endTime: typeInput.value === "彈性探索" ? flexibleEndTimeInput.value.trim() : "",
     place: placeInput.value.trim(),
     type: typeInput.value.trim(),
     content: itemContentInput.value.trim(),
@@ -7245,6 +7325,7 @@ itemForm.addEventListener("submit", async (event) => {
     arrivalTerminal: typeInput.value === "飛機" ? arrivalTerminalInput.value.trim() : "",
     transportMode: typeInput.value === "交通" ? transportModeInput.value : "",
     transportSegments: typeInput.value === "交通" ? collectTransportSegments() : [],
+    flexibleStops,
     attachments
   };
 
@@ -7255,7 +7336,9 @@ itemForm.addEventListener("submit", async (event) => {
 
   const editingIndex = state.editingItemIndex;
   const existingItem = editingIndex === null ? null : currentDay().items[editingIndex];
-  const keptItemAttachments = existingItem ? getKeptAttachments(itemExistingAttachments, existingItem.attachments || []) : [];
+  const keptItemAttachments = existingItem && item.type !== "彈性探索"
+    ? getKeptAttachments(itemExistingAttachments, existingItem.attachments || [])
+    : [];
   const removedItemAttachments = existingItem ? getRemovedAttachments(existingItem.attachments || [], keptItemAttachments) : [];
 
   if (editingIndex === null) {
@@ -7707,6 +7790,60 @@ function syncAttractionFields() {
   const isAttraction = typeInput.value === "景點";
   attractionFields.hidden = !isAttraction;
   attractionIntroInput.disabled = !isAttraction;
+}
+
+function renderFlexibleStopEditors(stops = []) {
+  flexibleStopList.innerHTML = (Array.isArray(stops) ? stops : [])
+    .map((stop) => `
+      <section class="flexible-stop-editor" data-flexible-stop-id="${escapeHtml(stop.id || createId())}">
+        <label>
+          景點名稱
+          <input data-flexible-stop-field="name" value="${escapeHtml(stop.name || "")}" placeholder="清水寺" />
+        </label>
+        <label>
+          景點介紹
+          <textarea data-flexible-stop-field="intro" rows="3" placeholder="值得看的特色、散步路線或備註">${escapeHtml(stop.intro || "")}</textarea>
+        </label>
+        <button class="text-button danger-text" type="button" data-remove-flexible-stop>移除景點</button>
+      </section>
+    `)
+    .join("");
+}
+
+function collectFlexibleStops() {
+  return Array.from(flexibleStopList.querySelectorAll("[data-flexible-stop-id]"))
+    .map((editor) => ({
+      id: editor.dataset.flexibleStopId || createId(),
+      name: editor.querySelector('[data-flexible-stop-field="name"]')?.value.trim() || "",
+      intro: editor.querySelector('[data-flexible-stop-field="intro"]')?.value.trim() || ""
+    }))
+    .filter((stop) => stop.name);
+}
+
+function syncFlexibleExplorationFields() {
+  const isFlexible = typeInput.value === "彈性探索";
+  flexibleExplorationFields.hidden = !isFlexible;
+  flexibleEndTimeInput.required = false;
+  flexibleEndTimeInput.disabled = !isFlexible;
+  flexibleEndHourInput.required = isFlexible;
+  flexibleEndHourInput.disabled = !isFlexible;
+  flexibleEndMinuteInput.required = isFlexible;
+  flexibleEndMinuteInput.disabled = !isFlexible;
+  timeInput.closest("label").hidden = false;
+  timeHourInput.required = typeInput.value !== "交通";
+  timeMinuteInput.required = typeInput.value !== "交通";
+  placeInput.readOnly = false;
+  placeInput.required = typeInput.value !== "交通";
+  placeInputLabel.textContent = isFlexible ? "區段名稱" : "地點";
+  placeInputLabel.append(placeInput);
+  if (isFlexible) {
+    flightFields.hidden = true;
+    transportFields.hidden = true;
+    attractionFields.hidden = true;
+  }
+  itemPhotoInput.closest("label").hidden = isFlexible;
+  itemPhotoInput.disabled = isFlexible;
+  itemExistingAttachments.hidden = isFlexible || !itemExistingAttachments.children.length;
 }
 
 function getTransportTitle(segments) {

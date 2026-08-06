@@ -59,7 +59,8 @@ test("normalizeItem 保留預訂來源欄位，且不影響既有手動欄位", 
   const normalizeItem = loadFunction("normalizeItem", {
     createId: () => "generated-item",
     normalizeAttachment: (attachment) => attachment,
-    normalizeTransportSegment: (segment) => segment
+    normalizeTransportSegment: (segment) => segment,
+    normalizeFlexibleStops: (stops) => Array.isArray(stops) ? stops : []
   });
 
   const item = normalizeItem({

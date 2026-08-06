@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=157" />
+    <link rel="stylesheet" href="./styles.css?v=158" />
   </head>
   <body>
     <main class="app-shell" id="appShell">
@@ -412,7 +412,7 @@
           </span>
         </label>
 
-        <label>
+        <label id="placeInputLabel">
           地點
           <input id="placeInput" name="place" placeholder="清水寺" required />
         </label>
@@ -421,6 +421,7 @@
           交通 / 分類
           <select id="typeInput" name="type" required>
             <option value="景點">景點</option>
+            <option value="彈性探索">彈性探索</option>
             <option value="餐廳">餐廳</option>
             <option value="午餐">午餐</option>
             <option value="交通">交通</option>
@@ -431,6 +432,20 @@
             <option value="其他">其他</option>
           </select>
         </label>
+
+        <section class="flexible-exploration-fields" id="flexibleExplorationFields" hidden>
+          <label>
+            結束時間
+            <input id="flexibleEndTimeInput" name="endTime" type="hidden" />
+            <span class="time-selects">
+              <select id="flexibleEndHourInput" aria-label="結束小時"></select>
+              <select id="flexibleEndMinuteInput" aria-label="結束分鐘"></select>
+            </span>
+          </label>
+
+          <section class="flexible-stop-editor-list" id="flexibleStopList" aria-label="彈性探索景點"></section>
+          <button class="secondary-action add-segment-button" id="addFlexibleStopButton" type="button">新增景點</button>
+        </section>
 
         <section class="flight-fields" id="flightFields" hidden>
           <label>
@@ -960,6 +975,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=157" type="module"></script>
+    <script src="./app.js?v=158" type="module"></script>
   </body>
 </html>
