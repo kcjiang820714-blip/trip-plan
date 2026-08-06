@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { filterTodosByGroup, getTodoProgress, renderTodoProgressRing } from "../ui-presentation.js";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
@@ -22,10 +23,6 @@ function functionSource(name) {
 }
 
 test("待辦總進度包含全部分類，且不改寫輸入資料", () => {
-  const getTodoProgress = new Function(
-    `${functionSource("getTodoProgress")}
-return getTodoProgress;`,
-  )();
   const todos = [
     { id: "passport", group: "行前準備", done: true },
     { id: "charger", group: "行李打包", done: false },
@@ -51,11 +48,12 @@ return getTodoProgress;`,
 
 test("待辦依目前分類分成出發前、本日與可選，並維持原順序", () => {
   const buildTodoSections = new Function(
+    "filterTodosByGroup",
     `${functionSource("todoPrimaryDate")}
 ${functionSource("todoSchedule")}
 ${functionSource("buildTodoSections")}
 return buildTodoSections;`,
-  )();
+  )(filterTodosByGroup);
   const todos = [
     { id: "future", group: "行李打包", dueDate: "2026-07-25", done: false },
     { id: "today-reminder", group: "行李打包", date: "2026-07-23", done: false },
@@ -72,10 +70,10 @@ return buildTodoSections;`,
   assert.deepEqual(todos, snapshot);
 });
 
-test("新增待辦可選擇出發前、本日或可選，並將選擇保存到待辦資料", () => {
+test("新增待辦可選擇出發前、旅行中或可選，並將選擇保存到待辦資料", () => {
   assert.match(html, /<select id="todoScheduleInput"[^>]*>/);
   assert.match(html, /<option value="departure">出發前<\/option>/);
-  assert.match(html, /<option value="today">本日<\/option>/);
+  assert.match(html, /<option value="today">旅行中<\/option>/);
   assert.match(html, /<option value="optional"(?: selected)?>可選<\/option>/);
 
   const todoSubmit = app.match(/todoForm\.addEventListener\("submit", async \(event\) => \{[\s\S]*?\n\}\);/)?.[0] ?? "";
@@ -125,7 +123,7 @@ test("待辦 panel 同時提供手機摘要、桌機主欄與右側工具", () =
 test("待辦渲染保留分類、勾選與編輯權限入口，並產生三個分組", () => {
   const renderTodos = functionSource("renderTodos");
 
-  assert.match(renderTodos, /getTodoProgress\(trip\.todos\)/);
+  assert.match(renderTodos, /getTodoProgress\(trip\.todos,\s*state\.activeTodoGroup\)/);
   assert.match(renderTodos, /buildTodoSections\(trip\.todos,\s*state\.activeTodoGroup/);
   assert.match(renderTodos, /findUpcomingTodos\(trip\.todos/);
   assert.match(renderTodos, /todo-section-departure/);
@@ -136,11 +134,11 @@ test("待辦渲染保留分類、勾選與編輯權限入口，並產生三個�
   assert.match(renderTodos, /data-edit-todo=/);
 });
 
-test("手機待辦會顯示已選出發前與本日的項目，不以日期欄位決定可見性", () => {
+test("手機待辦會顯示已選出發前與旅行中的項目，不以日期欄位決定可見性", () => {
   const renderTodos = functionSource("renderTodos");
 
   assert.match(renderTodos, /const mobileScheduledTodos = \[\.\.\.sections\.departure, \.\.\.sections\.today\];/);
-  assert.match(renderTodos, /title: "出發前與本日", todos: mobileScheduledTodos/);
+  assert.match(renderTodos, /title: "出發前與旅行中", todos: mobileScheduledTodos/);
   assert.doesNotMatch(renderTodos, /mobileScheduledTodos = trip\.todos\.filter\(/);
 });
 
@@ -167,6 +165,7 @@ test("購物待辦同時有數量與金額時，渲染會保留數量和不可�
     "currentTrip",
     "state",
     "getTodoProgress",
+    "renderTodoProgressRing",
     "buildTodoSections",
     "findUpcomingTodos",
     "canUseCollaborativeTools",
@@ -193,6 +192,7 @@ return renderTodos;`,
     () => ({ todos: [todo] }),
     { activeTodoGroup: "購物清單" },
     () => ({ done: 0, total: 1, pending: 1, percent: 0 }),
+    renderTodoProgressRing,
     () => ({ departure: [todo], today: [], optional: [] }),
     () => [],
     () => true,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { bookingTypeMeta } from "../ui-presentation.js";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
@@ -23,9 +24,10 @@ function functionSource(name) {
 
 test("預訂呈現 helper 產生今日、交通路線與類型視覺，且不改寫輸入", () => {
   const getBookingReferencePresentation = new Function(
+    "bookingTypeMeta",
     `${functionSource("getBookingReferencePresentation")}
 return getBookingReferencePresentation;`,
-  )();
+  )(bookingTypeMeta);
   const booking = {
     type: "交通",
     name: "新幹線",
@@ -47,7 +49,7 @@ return getBookingReferencePresentation;`,
 
   assert.deepEqual(getBookingReferencePresentation(booking, "2026-06-02"), {
     group: "交通",
-    icon: "▰",
+    icon: "🚆",
     tone: "blue",
     date: "2026-06-02",
     dateLabel: "今天",
