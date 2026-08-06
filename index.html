@@ -11,10 +11,10 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=116" />
+    <link rel="stylesheet" href="./styles.css?v=157" />
   </head>
   <body>
-    <main class="app-shell">
+    <main class="app-shell" id="appShell">
       <section class="readonly-banner" id="readonlyBanner" hidden>
         <strong>唯讀分享模式</strong>
         <p>你可以查看行程與開啟地圖，不能新增、編輯或匯入資料。</p>
@@ -229,11 +229,12 @@
           </header>
           <nav class="sub-tabs" id="bookingSubTabs" aria-label="預訂分類">
             <button class="sub-tab is-active" type="button" data-booking-group="全部"><span aria-hidden="true">☰</span>全部</button>
-            <button class="sub-tab" type="button" data-booking-group="票券"><span aria-hidden="true">▣</span>票券</button>
-            <button class="sub-tab" type="button" data-booking-group="交通"><span aria-hidden="true">▰</span>交通</button>
-            <button class="sub-tab" type="button" data-booking-group="住宿"><span aria-hidden="true">▥</span>住宿</button>
-            <button class="sub-tab" type="button" data-booking-group="餐廳"><span aria-hidden="true">♜</span>餐廳</button>
+            <button class="sub-tab" type="button" data-booking-group="票券"><span aria-hidden="true">🎟️</span>票券</button>
+            <button class="sub-tab" type="button" data-booking-group="交通"><span aria-hidden="true">🚆</span>交通</button>
+            <button class="sub-tab" type="button" data-booking-group="住宿"><span aria-hidden="true">🛏️</span>住宿</button>
+            <button class="sub-tab" type="button" data-booking-group="餐廳"><span aria-hidden="true">🍽️</span>餐廳</button>
           </nav>
+          <nav class="booking-date-tabs" id="bookingDateTabs" aria-label="預訂日期" hidden></nav>
           <div class="booking-workspace">
             <main class="booking-main-column">
               <h2 class="sr-only" id="bookingSectionTitle">全部</h2>
@@ -286,6 +287,7 @@
             <h2>旅行清單</h2>
           </header>
           <nav class="sub-tabs todo-category-tabs" id="todoSubTabs" aria-label="待辦分類">
+            <button class="sub-tab" type="button" data-todo-group="全部">全部</button>
             <button class="sub-tab is-active" type="button" data-todo-group="行前準備">行前準備</button>
             <button class="sub-tab" type="button" data-todo-group="行李打包">行李打包</button>
             <button class="sub-tab" type="button" data-todo-group="購物清單">購物清單</button>
@@ -384,6 +386,15 @@
         </div>
       </section>
     </main>
+
+    <section class="sync-gate" id="syncGate" role="dialog" aria-modal="true" aria-labelledby="syncGateTitle" hidden>
+      <div class="sync-gate-card" id="syncGateCard" tabindex="-1">
+        <span class="sync-gate-spinner" aria-hidden="true"></span>
+        <p id="syncGateTitle" role="status" aria-live="polite">正在與 Supabase 同步旅行資料…</p>
+        <p id="syncGateMessage"></p>
+        <button class="primary-button" id="syncGateRetryButton" type="button" hidden>重新同步</button>
+      </div>
+    </section>
 
     <dialog class="editor" id="itemDialog">
       <form method="dialog" id="itemForm">
@@ -784,7 +795,7 @@
           顯示分組
           <select id="todoScheduleInput">
             <option value="departure">出發前</option>
-            <option value="today">本日</option>
+            <option value="today">旅行中</option>
             <option value="optional" selected>可選</option>
           </select>
         </label>
@@ -949,6 +960,6 @@
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
 
-    <script src="./app.js?v=118" type="module"></script>
+    <script src="./app.js?v=157" type="module"></script>
   </body>
 </html>
