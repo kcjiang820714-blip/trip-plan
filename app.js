@@ -6242,7 +6242,8 @@ function populateTimeOptions() {
     [bookingHourInput, bookingMinuteInput],
     [bookingCheckoutHourInput, bookingCheckoutMinuteInput],
     [bookingArrivalHourInput, bookingArrivalMinuteInput],
-    [todoHourInput, todoMinuteInput]
+    [todoHourInput, todoMinuteInput],
+    [flexibleEndHourInput, flexibleEndMinuteInput]
   ].forEach(([hourSelect, minuteSelect]) => populateTimeSelectPair(hourSelect, minuteSelect));
 }
 

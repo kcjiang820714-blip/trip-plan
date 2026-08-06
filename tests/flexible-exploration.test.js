@@ -189,3 +189,32 @@ test("彈性探索版本會由新版 PWA 預快取提供", () => {
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/app\\.js\\?v=${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/styles\\.css\\?v=${styleVersion}"`));
 });
+
+test("彈性探索結束時間會初始化完整的小時與分鐘選單", () => {
+  const inputNames = [
+    "timeHourInput", "timeMinuteInput",
+    "departureHourInput", "departureMinuteInput",
+    "arrivalHourInput", "arrivalMinuteInput",
+    "bookingHourInput", "bookingMinuteInput",
+    "bookingCheckoutHourInput", "bookingCheckoutMinuteInput",
+    "bookingArrivalHourInput", "bookingArrivalMinuteInput",
+    "todoHourInput", "todoMinuteInput",
+    "flexibleEndHourInput", "flexibleEndMinuteInput"
+  ];
+  const inputs = Object.fromEntries(inputNames.map((name) => [name, { name }]));
+  const calls = [];
+  const populateTimeOptions = new Function(
+    "populateTimeSelectPair",
+    ...inputNames,
+    `${functionSource("populateTimeOptions")}\nreturn populateTimeOptions;`
+  )(
+    (hourSelect, minuteSelect) => calls.push([hourSelect, minuteSelect]),
+    ...inputNames.map((name) => inputs[name])
+  );
+
+  populateTimeOptions();
+  assert.ok(
+    calls.some(([hourSelect, minuteSelect]) => hourSelect === inputs.flexibleEndHourInput && minuteSelect === inputs.flexibleEndMinuteInput),
+    "彈性探索的結束時間必須交給既有時分選單初始化"
+  );
+});
