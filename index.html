@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#136f63" />
+    <meta name="theme-color" id="themeColorMeta" content="#136f63" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="旅．拾光" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -11,6 +11,21 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <script>
+      (() => {
+        const key = "trip-notebook-theme-preference-v1";
+        let preference = null;
+        try {
+          const saved = localStorage.getItem(key);
+          preference = saved === "light" || saved === "dark" ? saved : null;
+        } catch {
+          preference = null;
+        }
+        const theme = preference || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <link rel="stylesheet" href="./styles.css?v=159" />
   </head>
   <body>
@@ -974,6 +989,11 @@
       </header>
       <section class="attachment-viewer-body" id="attachmentViewerBody"></section>
     </dialog>
+
+    <button class="theme-toggle" id="themeToggleButton" type="button" aria-pressed="false" aria-label="切換為深色模式" title="切換為深色模式">
+      <span id="themeToggleIcon" aria-hidden="true">☾</span>
+      <span class="sr-only" id="themeToggleText">切換為深色模式</span>
+    </button>
 
     <script src="./app.js?v=159" type="module"></script>
   </body>

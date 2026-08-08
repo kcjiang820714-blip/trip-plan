@@ -7,6 +7,9 @@ import { fetchWeatherForecast } from "./weather-provider.js?v=157";
 const STORAGE_KEY = "trip-notebook-v2";
 const LEGACY_STORAGE_KEY = "trip-notebook-v1";
 const VIEW_STATE_KEY = "trip-notebook-view-state-v1";
+const THEME_PREFERENCE_KEY = "trip-notebook-theme-preference-v1";
+const LIGHT_THEME_COLOR = "#f4f1ea";
+const DARK_THEME_COLOR = "#111a18";
 const TRAVEL_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_BOOKING_ATTACHMENT_SIZE = 4 * 1024 * 1024;
 const MAX_IMAGE_ATTACHMENT_SIZE = 950 * 1024;
@@ -215,6 +218,10 @@ const landingView = document.querySelector("#landingView");
 const homeView = document.querySelector("#homeView");
 const tripView = document.querySelector("#tripView");
 const appShell = document.querySelector("#appShell");
+const themeToggleButton = document.querySelector("#themeToggleButton");
+const themeToggleIcon = document.querySelector("#themeToggleIcon");
+const themeToggleText = document.querySelector("#themeToggleText");
+const themeColorMeta = document.querySelector("#themeColorMeta");
 const syncGate = document.querySelector("#syncGate");
 const syncGateCard = document.querySelector("#syncGateCard");
 const syncGateTitle = document.querySelector("#syncGateTitle");
@@ -451,6 +458,65 @@ let cloudSaveTimer = null;
 const pendingTodoSyncIds = new Set();
 let exchangeRateUpdatePromise = null;
 const exchangeRateUpdateStatuses = new Map();
+
+function readThemePreference() {
+  try {
+    const preference = localStorage.getItem(THEME_PREFERENCE_KEY);
+    return preference === "light" || preference === "dark" ? preference : null;
+  } catch {
+    return null;
+  }
+}
+
+function systemTheme() {
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function resolveTheme(preference) {
+  return preference === "light" || preference === "dark" ? preference : systemTheme();
+}
+
+function updateThemeToggle(theme) {
+  if (!themeToggleButton) return;
+
+  const nextThemeLabel = theme === "dark" ? "切換為淺色模式" : "切換為深色模式";
+  themeToggleButton.setAttribute("aria-pressed", String(theme === "dark"));
+  themeToggleButton.setAttribute("aria-label", nextThemeLabel);
+  themeToggleButton.setAttribute("title", nextThemeLabel);
+  if (themeToggleIcon) themeToggleIcon.textContent = theme === "dark" ? "☀" : "☾";
+  if (themeToggleText) themeToggleText.textContent = nextThemeLabel;
+}
+
+function applyTheme(theme) {
+  const resolvedTheme = resolveTheme(theme);
+  document.documentElement.dataset.theme = resolvedTheme;
+  document.documentElement.style.colorScheme = resolvedTheme;
+  themeColorMeta?.setAttribute("content", resolvedTheme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR);
+  updateThemeToggle(resolvedTheme);
+}
+
+function setThemePreference(preference) {
+  if (preference !== "light" && preference !== "dark") return;
+  try {
+    localStorage.setItem(THEME_PREFERENCE_KEY, preference);
+  } catch {
+    // 儲存空間不可用時仍讓這次開啟的畫面切換成功。
+  }
+  applyTheme(preference);
+}
+
+function toggleTheme() {
+  const currentTheme = resolveTheme(document.documentElement.dataset.theme || readThemePreference());
+  setThemePreference(currentTheme === "dark" ? "light" : "dark");
+}
+
+function initializeTheme() {
+  applyTheme(readThemePreference());
+  const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+  mediaQuery?.addEventListener("change", (event) => {
+    if (!readThemePreference()) applyTheme(event.matches ? "dark" : "light");
+  });
+}
 
 function setSyncGate(gateState = { phase: "idle" }) {
   if (isReadonly || !syncGate || !appShell) return;
@@ -7990,6 +8056,8 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js?v=159").then((registration) => registration.update());
 }
 
+themeToggleButton?.addEventListener("click", toggleTheme);
+initializeTheme();
 populateTimeOptions();
 saveLibrary();
 renderReadonlyMode();
