@@ -7586,6 +7586,92 @@ select {
   }
 }
 
+/* Dark mode: app UI tokens. Print rules above deliberately remain white. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111a18;
+  --paper: #162320;
+  --panel: #1b2a26;
+  --ink: #edf4ef;
+  --muted: #b3c0ba;
+  --brand: #4eb3a2;
+  --brand-dark: #a3ddd3;
+  --accent: #f0a464;
+  --gold: #e8c36a;
+  --sky: #213a46;
+  --indigo: #b5caed;
+  --rose: #422b2c;
+  --line: #344640;
+  --danger: #ffb4ab;
+  --shadow: 0 16px 38px rgba(0, 0, 0, 0.3);
+  --color-bg: #111a18;
+  --color-surface: #172420;
+  --color-ink: #edf4ef;
+  --color-muted: #b3c0ba;
+  --color-primary: #4eb3a2;
+  --color-primary-strong: #a3ddd3;
+  --color-accent: #f0a464;
+  --color-sky: #213a46;
+  --color-line: #344640;
+  --color-border: #344640;
+  --ref-paper: #111a18;
+  --ref-surface: #172420;
+  --ref-ink: #edf4ef;
+  --ref-muted: #b3c0ba;
+  --ref-blue: #90bfd1;
+  --ref-blue-soft: #213640;
+  --ref-green: #a8c7ad;
+  --ref-green-soft: #23352a;
+  --ref-coral: #ff9b83;
+  --ref-coral-soft: #442b27;
+  --ref-line: #344640;
+  --ref-card-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
+}
+
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(78, 179, 162, 0.1), transparent 33%),
+    linear-gradient(135deg, #111a18 0%, #162320 100%);
+  color: var(--ink);
+}
+
+.theme-toggle {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+html[data-theme="dark"] .sync-gate {
+  background: rgba(17, 26, 24, 0.96);
+}
+
+html[data-theme="dark"] .flexible-stop-editor,
+html[data-theme="dark"] .flexible-stop {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+/* Keep the app bar controls clear of the fixed 44px theme toggle. */
+.trip-appbar-actions {
+  margin-right: 56px;
+}
+
 @media (max-width: 679px) {
   #tripTitle {
     font-family: var(--ref-serif);

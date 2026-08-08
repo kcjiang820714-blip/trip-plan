@@ -4,6 +4,7 @@ import test from "node:test";
 
 const appSource = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const htmlSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const cssSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
 function functionSource(name) {
   const start = appSource.indexOf(`function ${name}(`);
@@ -180,4 +181,32 @@ test("主程式會綁定切換 click，prepaint 在 CSS 前且涵蓋系統深色
   );
   assert.equal(root.dataset.theme, "dark");
   assert.equal(root.style.colorScheme, "dark");
+});
+
+test("深色模式用完整 token、固定切換鈕與工具列安全空間呈現", () => {
+  const darkTheme = cssSource.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(darkTheme, /--bg:\s*#111a18;/i);
+  assert.match(darkTheme, /--color-surface:\s*#172420;/i);
+  assert.match(darkTheme, /--color-border:\s*#344640;/i);
+
+  const toggle = cssSource.match(/\.theme-toggle\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(toggle, /position:\s*fixed;/);
+  assert.match(toggle, /width:\s*44px;/);
+  assert.match(toggle, /height:\s*44px;/);
+  assert.match(toggle, /z-index:\s*80;/);
+
+  assert.match(cssSource, /\.trip-appbar-actions\s*\{\s*margin-right:\s*56px;/);
+});
+
+test("深色同步遮罩與彈性景點卡不回退淺色，且列印持續白底", () => {
+  const darkGate = cssSource.match(/html\[data-theme="dark"\]\s+\.sync-gate\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(darkGate, /background:\s*rgba\(17,\s*26,\s*24,\s*0\.96\);/);
+  assert.match(cssSource, /\.sync-gate\s*\{[\s\S]*?z-index:\s*1000;/);
+
+  const darkFlexibleStops = cssSource.match(/html\[data-theme="dark"\]\s+\.flexible-stop-editor,\s*\nhtml\[data-theme="dark"\]\s+\.flexible-stop\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(darkFlexibleStops, /border-color:\s*var\(--color-border\);/);
+  assert.match(darkFlexibleStops, /background:\s*var\(--color-surface\);/);
+
+  const printCss = cssSource.match(/@media print\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(printCss, /background:\s*white\s*!important;/);
 });
