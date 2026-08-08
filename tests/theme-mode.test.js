@@ -5,6 +5,7 @@ import test from "node:test";
 const appSource = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const htmlSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+const serviceWorkerSource = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
 
 function functionSource(name) {
   const start = appSource.indexOf(`function ${name}(`);
@@ -181,6 +182,18 @@ test("主程式會綁定切換 click，prepaint 在 CSS 前且涵蓋系統深色
   );
   assert.equal(root.dataset.theme, "dark");
   assert.equal(root.style.colorScheme, "dark");
+});
+
+test("深色模式 CSS 與 HTML 更新會提升 PWA 快取世代", () => {
+  const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
+  const appVersion = htmlSource.match(/<script src="\.\/app\.js\?v=(\d+)"/)?.[1];
+
+  assert.equal(styleVersion, appVersion, "HTML 的 CSS 與 app 資產必須使用同一快取世代");
+  assert.ok(Number(appVersion) > 159, "新增深色模式 CSS/HTML 後必須提高 PWA 快取版本");
+  assert.match(appSource, new RegExp(`register\\("\\./sw\\.js\\?v=${appVersion}"\\)`));
+  assert.match(serviceWorkerSource, new RegExp(`const CACHE_NAME = "trip-notebook-v${appVersion}"`));
+  assert.match(serviceWorkerSource, new RegExp(`"\\./styles\\.css\\?v=${styleVersion}"`));
+  assert.match(serviceWorkerSource, new RegExp(`"\\./app\\.js\\?v=${appVersion}"`));
 });
 
 test("深色模式用完整 token、固定切換鈕與工具列安全空間呈現", () => {
