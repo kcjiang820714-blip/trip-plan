@@ -6,7 +6,7 @@ const appSource = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const htmlSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const serviceWorkerSource = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
-const DARK_MODE_PWA_ASSET_VERSION = "167";
+const DARK_MODE_PWA_ASSET_VERSION = "168";
 
 function functionSource(name) {
   const start = appSource.indexOf(`function ${name}(`);

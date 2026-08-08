@@ -6542,35 +6542,6 @@ body {
   margin: 14px 0;
 }
 
-.flexible-stop-quick-list {
-  display: grid;
-  gap: 8px;
-  padding: 0 14px 14px;
-}
-
-.flexible-stop-quick-item {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-  border: 1px solid var(--color-border, #d9e3df);
-  border-radius: 12px;
-  padding: 8px;
-  background: var(--color-surface, #fff);
-}
-
-.flexible-stop-quick-item:not(:has(.flexible-stop-photo-button)) {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.flexible-stop-quick-item strong {
-  min-width: 0;
-  color: var(--color-ink);
-  overflow-wrap: anywhere;
-}
-
-.flexible-stop-photo-button,
 .flexible-stop-detail-photo {
   border: 0;
   padding: 0;
@@ -6578,14 +6549,6 @@ body {
   cursor: pointer;
 }
 
-.flexible-stop-photo-button,
-.flexible-stop-photo-button img {
-  width: 54px;
-  height: 54px;
-  border-radius: 9px;
-}
-
-.flexible-stop-photo-button img,
 .flexible-stop-detail-photo img {
   display: block;
   object-fit: cover;
@@ -6617,10 +6580,6 @@ body {
   width: fit-content;
   min-height: 38px;
   padding: 8px 13px;
-}
-
-.itinerary-focus-card > .flexible-stop-quick-list {
-  padding: 0 18px 16px;
 }
 
 .flexible-stop h4,
@@ -6656,20 +6615,6 @@ body {
     max-height: 220px;
   }
 
-  .flexible-stop-quick-list {
-    padding-right: 10px;
-    padding-left: 10px;
-  }
-
-  .flexible-stop-quick-item {
-    grid-template-columns: 48px minmax(0, 1fr) auto;
-  }
-
-  .flexible-stop-photo-button,
-  .flexible-stop-photo-button img {
-    width: 48px;
-    height: 48px;
-  }
 }
 
 /* Final alignment pass: one typography scale and non-truncated, content-first cards. */

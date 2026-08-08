@@ -320,6 +320,7 @@ const flexibleExplorationFields = document.querySelector("#flexibleExplorationFi
 const flexibleEndTimeInput = document.querySelector("#flexibleEndTimeInput");
 const flexibleEndHourInput = document.querySelector("#flexibleEndHourInput");
 const flexibleEndMinuteInput = document.querySelector("#flexibleEndMinuteInput");
+const itemEndTimeLabel = document.querySelector("#itemEndTimeLabel");
 const flexibleStopList = document.querySelector("#flexibleStopList");
 const addFlexibleStopButton = document.querySelector("#addFlexibleStopButton");
 const attractionFields = document.querySelector("#attractionFields");
@@ -2776,7 +2777,7 @@ function renderTravelDayPanel(focus) {
     <article class="itinerary-focus-card">
       <header class="itinerary-focus-header">
         <span>${escapeHtml(focus.label)}</span>
-        <time>${escapeHtml(item.time || "時間未定")}</time>
+        <time>${escapeHtml(formatItineraryTimeRange(item) || "時間未定")}</time>
       </header>
       <div class="itinerary-focus-main">
         <span class="itinerary-focus-marker" aria-hidden="true"></span>
@@ -2799,9 +2800,19 @@ function renderTravelDayPanel(focus) {
   `;
 }
 
+function supportsItineraryEndTime(type) {
+  return !["交通", "飛機"].includes(type);
+}
+
+function formatItineraryTimeRange(item) {
+  const startTime = String(item?.time || "").trim();
+  if (!supportsItineraryEndTime(item?.type)) return startTime;
+  const endTime = String(item?.endTime || "").trim();
+  return startTime && endTime ? `${startTime}–${endTime}` : startTime || endTime;
+}
+
 function formatFlexibleExploreTimeRange(item) {
-  if (item?.type !== "彈性探索") return item?.time || "";
-  return item.time && item.endTime ? `${item.time}–${item.endTime}` : item.time || item.endTime || "";
+  return formatItineraryTimeRange(item);
 }
 
 function getFlexibleStopMapQuery(stop) {
@@ -2809,34 +2820,7 @@ function getFlexibleStopMapQuery(stop) {
 }
 
 function renderFlexibleStopQuickList(item) {
-  if (item?.type !== "彈性探索") return "";
-  const stops = Array.isArray(item.flexibleStops) ? item.flexibleStops : [];
-  if (!stops.length) return "";
-
-  return `
-    <section class="flexible-stop-quick-list" aria-label="景點快速導航">
-      ${stops.map((stop) => {
-        const photoSource = getAttachmentSource(stop.photo);
-        return `
-          <article class="flexible-stop-quick-item">
-            ${photoSource ? `
-              <button
-                class="flexible-stop-photo-button"
-                type="button"
-                data-open-attachment="flexible-stop"
-                data-owner-id="${escapeHtml(stop.id || "")}"
-                data-attachment-id="${escapeHtml(stop.photo.id || "")}"
-                title="查看 ${escapeHtml(stop.name || "景點")} 照片"
-              >
-                <img src="${escapeHtml(photoSource)}" alt="${escapeHtml(stop.name || "景點")} 照片" loading="lazy" />
-              </button>
-            ` : ""}
-            <strong>${escapeHtml(stop.name || "未命名景點")}</strong>
-          </article>
-        `;
-      }).join("")}
-    </section>
-  `;
+  return "";
 }
 
 function renderFlexibleExplorationDetails(item) {
@@ -2908,7 +2892,7 @@ function renderItineraryTimeline(day, focusItem) {
             aria-expanded="${isExpanded}"
             aria-controls="${escapeHtml(detailsId)}"
           >
-            <span class="time">${escapeHtml(formatFlexibleExploreTimeRange(item))}</span>
+            <span class="time">${escapeHtml(formatItineraryTimeRange(item))}</span>
             <span class="itinerary-type-marker is-${escapeHtml(referenceVisual.tone)}" aria-hidden="true">${renderItineraryTypeIcon(referenceVisual.icon)}</span>
             <span class="item-summary-content">
               <span class="item-title ${Array.from(getItemTitle(item) || "").length > 18 ? "is-long-item-title" : ""}">${escapeHtml(getItemTitle(item))}</span>
@@ -4428,7 +4412,7 @@ function renderPdfTimelineItem(item) {
 
   return `
     <article class="pdf-timeline-item">
-      <time>${escapeHtml(item.time || item.departureTime || "彈性")}</time>
+      <time>${escapeHtml(formatItineraryTimeRange(item) || item.departureTime || "彈性")}</time>
       <div>
         <span>${escapeHtml(item.type || "行程")}</span>
         <h3>${escapeHtml(title)}</h3>
@@ -7492,7 +7476,7 @@ itemForm.addEventListener("submit", async (event) => {
 
   const item = {
     time: `${timeHourInput.value}:${timeMinuteInput.value}`,
-    endTime: typeInput.value === "彈性探索" ? flexibleEndTimeInput.value.trim() : "",
+    endTime: supportsItineraryEndTime(typeInput.value) ? flexibleEndTimeInput.value.trim() : "",
     place: placeInput.value.trim(),
     type: typeInput.value.trim(),
     content: itemContentInput.value.trim(),
@@ -8044,16 +8028,20 @@ function collectFlexibleStops() {
 
 function syncFlexibleExplorationFields() {
   const isFlexible = typeInput.value === "彈性探索";
+  const supportsEndTime = supportsItineraryEndTime(typeInput.value);
+  const isTransport = typeInput.value === "交通";
   flexibleExplorationFields.hidden = !isFlexible;
   flexibleEndTimeInput.required = false;
-  flexibleEndTimeInput.disabled = !isFlexible;
+  flexibleEndTimeInput.disabled = !supportsEndTime;
   flexibleEndHourInput.required = isFlexible;
-  flexibleEndHourInput.disabled = !isFlexible;
+  flexibleEndHourInput.disabled = !supportsEndTime;
   flexibleEndMinuteInput.required = isFlexible;
-  flexibleEndMinuteInput.disabled = !isFlexible;
-  timeInput.closest("label").hidden = false;
-  timeHourInput.required = typeInput.value !== "交通";
-  timeMinuteInput.required = typeInput.value !== "交通";
+  flexibleEndMinuteInput.disabled = !supportsEndTime;
+  itemEndTimeLabel.hidden = !supportsEndTime;
+  itemEndTimeLabel.firstChild.textContent = isFlexible ? "結束時間" : "結束時間（選填）";
+  timeInput.closest("label").hidden = isTransport;
+  timeHourInput.required = !isTransport;
+  timeMinuteInput.required = !isTransport;
   placeInput.readOnly = false;
   placeInput.required = typeInput.value !== "交通";
   placeInputLabel.textContent = isFlexible ? "區段名稱" : "地點";
@@ -8208,7 +8196,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=167").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=168").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);

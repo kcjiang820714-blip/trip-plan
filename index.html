@@ -26,7 +26,7 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=167" />
+    <link rel="stylesheet" href="./styles.css?v=168" />
   </head>
   <body>
     <main class="app-shell" id="appShell">
@@ -418,12 +418,21 @@
           <button class="icon-button" data-close-dialog="itemDialog" type="button" aria-label="關閉" title="關閉">×</button>
         </header>
 
-        <label>
-          時間
+        <label id="itemStartTimeLabel">
+          開始時間
           <input id="timeInput" name="time" type="hidden" />
           <span class="time-selects">
             <select id="timeHourInput" aria-label="小時" required></select>
             <select id="timeMinuteInput" aria-label="分鐘" required></select>
+          </span>
+        </label>
+
+        <label id="itemEndTimeLabel">
+          結束時間（選填）
+          <input id="flexibleEndTimeInput" name="endTime" type="hidden" />
+          <span class="time-selects">
+            <select id="flexibleEndHourInput" aria-label="結束小時"></select>
+            <select id="flexibleEndMinuteInput" aria-label="結束分鐘"></select>
           </span>
         </label>
 
@@ -449,15 +458,6 @@
         </label>
 
         <section class="flexible-exploration-fields" id="flexibleExplorationFields" hidden>
-          <label>
-            結束時間
-            <input id="flexibleEndTimeInput" name="endTime" type="hidden" />
-            <span class="time-selects">
-              <select id="flexibleEndHourInput" aria-label="結束小時"></select>
-              <select id="flexibleEndMinuteInput" aria-label="結束分鐘"></select>
-            </span>
-          </label>
-
           <section class="flexible-stop-editor-list" id="flexibleStopList" aria-label="彈性探索景點"></section>
           <button class="secondary-action add-segment-button" id="addFlexibleStopButton" type="button">新增景點</button>
         </section>
@@ -995,6 +995,6 @@
       <span class="sr-only" id="themeToggleText">切換為深色模式</span>
     </button>
 
-    <script src="./app.js?v=167" type="module"></script>
+    <script src="./app.js?v=168" type="module"></script>
   </body>
 </html>

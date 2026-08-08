@@ -89,7 +89,7 @@ test("彈性探索資料正規化會補齊欄位、保留有效景點並輸出�
 });
 
 function loadFlexibleFormHelpers(fields) {
-  const sources = ["renderFlexibleStopEditors", "collectFlexibleStops", "syncFlexibleExplorationFields"]
+  const sources = ["supportsItineraryEndTime", "renderFlexibleStopEditors", "collectFlexibleStops", "syncFlexibleExplorationFields"]
     .map(functionSource)
     .join("\n");
   return new Function(
@@ -136,6 +136,7 @@ test("彈性探索編輯器保留景點介紹，並在切換類型時只啟用�
     flexibleEndTimeInput: createControl(),
     flexibleEndHourInput: createControl(),
     flexibleEndMinuteInput: createControl(),
+    itemEndTimeLabel: { ...createControl(), firstChild: { textContent: "結束時間" } },
     timeInput: { closest: () => startTimeLabel },
     timeHourInput: createControl(),
     timeMinuteInput: createControl(),
@@ -168,15 +169,37 @@ test("彈性探索編輯器保留景點介紹，並在切換類型時只啟用�
   assert.equal(fields.timeMinuteInput.required, true, "彈性探索仍必須填寫區段開始分鐘");
   assert.equal(fields.flexibleEndHourInput.required, true);
   assert.equal(fields.flexibleEndMinuteInput.required, true);
+  assert.equal(fields.itemEndTimeLabel.hidden, false);
+  assert.equal(fields.itemEndTimeLabel.firstChild.textContent, "結束時間");
   assert.equal(fields.placeInputLabel.textContent, "區段名稱");
   assert.equal(fields.attractionFields.hidden, true, "彈性探索不應顯示一般景點介紹欄位");
   assert.equal(fields.flightFields.hidden, true, "彈性探索不應顯示飛機欄位");
   assert.equal(fields.transportFields.hidden, true, "彈性探索不應顯示交通欄位");
   assert.equal(photoLabel.hidden, true, "彈性探索不應顯示附件欄位");
+
+  fields.typeInput.value = "景點";
+  syncFlexibleExplorationFields();
+  assert.equal(fields.itemEndTimeLabel.hidden, false, "一般行程應顯示結束時間");
+  assert.equal(fields.flexibleEndHourInput.disabled, false);
+  assert.equal(fields.flexibleEndMinuteInput.disabled, false);
+  assert.equal(fields.flexibleEndHourInput.required, false, "一般行程的結束時間是選填");
+  assert.equal(fields.itemEndTimeLabel.firstChild.textContent, "結束時間（選填）");
+
+  fields.typeInput.value = "交通";
+  syncFlexibleExplorationFields();
+  assert.equal(fields.itemEndTimeLabel.hidden, true, "交通應維持自己的出發與抵達時間");
+  assert.equal(fields.flexibleEndHourInput.disabled, true);
+  assert.equal(fields.flexibleEndMinuteInput.disabled, true);
+  assert.equal(startTimeLabel.hidden, true, "交通不應被彈性探索欄位邏輯重新顯示通用開始時間");
+
+  fields.typeInput.value = "飛機";
+  syncFlexibleExplorationFields();
+  assert.equal(fields.itemEndTimeLabel.hidden, true, "飛機已有出發與抵達時間，不再顯示通用結束時間");
+  assert.equal(startTimeLabel.hidden, false, "飛機應保留原有時間欄位行為");
 });
 
 function loadFlexibleTimelineHelpers() {
-  const sources = ["formatFlexibleExploreTimeRange", "getFlexibleStopMapQuery", "renderFlexibleStopQuickList", "renderFlexibleExplorationDetails"]
+  const sources = ["supportsItineraryEndTime", "formatItineraryTimeRange", "formatFlexibleExploreTimeRange", "getFlexibleStopMapQuery", "renderFlexibleStopQuickList", "renderFlexibleExplorationDetails"]
     .map(functionSource)
     .join("\n");
   return new Function("escapeHtml", "googleMapsUrl", "getAttachmentSource", `${sources}\nreturn { formatFlexibleExploreTimeRange, getFlexibleStopMapQuery, renderFlexibleStopQuickList, renderFlexibleExplorationDetails };`)(
@@ -211,8 +234,7 @@ test("彈性探索每個景點的照片與導航都獨立，不得使用區段�
   assert.equal(getFlexibleStopMapQuery(item.flexibleStops[1]), "二年坂", "導航地點留白時應使用該景點名稱");
   const quickList = renderFlexibleStopQuickList(item);
   const details = renderFlexibleExplorationDetails(item);
-  assert.match(quickList, /data-open-attachment="flexible-stop"/);
-  assert.doesNotMatch(quickList, /data-flexible-stop-map/, "收合清單只用來快速查看景點，不應重複顯示導航按鈕");
+  assert.equal(quickList, "", "收合卡下方不應再顯示重複的景點圖片與名稱清單");
   assert.match(details, /清水寺/);
   assert.match(details, /看本堂舞台與音羽瀑布/);
   assert.match(details, /二年坂/);
@@ -229,9 +251,9 @@ test("彈性探索版本會由新版 PWA 預快取提供", () => {
   const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
   const cacheVersion = serviceWorkerSource.match(/const CACHE_NAME = "trip-notebook-v(\d+)"/)?.[1];
 
-  assert.equal(cacheVersion, "167", "移除重複導航按鈕後必須建立 v167 PWA 快取");
-  assert.equal(appVersion, "167");
-  assert.equal(styleVersion, "167");
+  assert.equal(cacheVersion, "168", "行程結束時間與簡化景點卡必須建立 v168 PWA 快取");
+  assert.equal(appVersion, "168");
+  assert.equal(styleVersion, "168");
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/app\\.js\\?v=${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/styles\\.css\\?v=${styleVersion}"`));
 });
