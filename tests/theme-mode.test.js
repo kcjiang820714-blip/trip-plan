@@ -48,7 +48,13 @@ function createStorage(initialValue = null) {
 }
 
 function loadThemeHelpers({ prefersDark = false, storage = createStorage() } = {}) {
-  const mediaQuery = { matches: prefersDark, addEventListener() {} };
+  const mediaQuery = {
+    matches: prefersDark,
+    listeners: [],
+    addEventListener(type, listener) {
+      if (type === "change") this.listeners.push(listener);
+    }
+  };
   const document = { documentElement: new FakeElement() };
   const themeToggleButton = new FakeElement();
   const themeToggleIcon = new FakeElement();
@@ -80,7 +86,7 @@ function loadThemeHelpers({ prefersDark = false, storage = createStorage() } = {
     themeColorMeta
   );
 
-  return { ...helpers, document, storage, themeToggleButton, themeToggleIcon, themeToggleText, themeColorMeta };
+  return { ...helpers, document, storage, mediaQuery, themeToggleButton, themeToggleIcon, themeToggleText, themeColorMeta };
 }
 
 function prepaintThemeScript() {
@@ -131,4 +137,47 @@ test("全域主題按鈕具備可讀取名稱與狀態", () => {
   assert.match(button, /aria-label="切換為深色模式"/);
   assert.match(button, /id="themeToggleIcon"/);
   assert.match(button, /id="themeToggleText"/);
+});
+
+test("儲存偏好失敗時仍切換畫面，且系統變更只影響沒有手動偏好的主題", () => {
+  const unavailableStorage = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error("storage unavailable");
+    }
+  };
+  const transientTheme = loadThemeHelpers({ storage: unavailableStorage });
+  assert.doesNotThrow(() => transientTheme.toggleTheme());
+  assert.equal(transientTheme.document.documentElement.dataset.theme, "dark");
+  assert.equal(transientTheme.themeToggleButton.getAttribute("aria-pressed"), "true");
+  assert.match(transientTheme.themeToggleButton.getAttribute("aria-label"), /淺色/);
+
+  const systemTheme = loadThemeHelpers();
+  systemTheme.initializeTheme();
+  assert.equal(systemTheme.mediaQuery.listeners.length, 1);
+  systemTheme.mediaQuery.listeners[0]({ matches: true });
+  assert.equal(systemTheme.document.documentElement.dataset.theme, "dark");
+
+  const manualLightTheme = loadThemeHelpers({ storage: createStorage("light") });
+  manualLightTheme.initializeTheme();
+  manualLightTheme.mediaQuery.listeners[0]({ matches: true });
+  assert.equal(manualLightTheme.document.documentElement.dataset.theme, "light");
+});
+
+test("主程式會綁定切換 click，prepaint 在 CSS 前且涵蓋系統深色", () => {
+  assert.match(appSource, /themeToggleButton\?\.addEventListener\("click", toggleTheme\);/);
+  assert.match(htmlSource, /<meta name="theme-color" id="themeColorMeta" content="#[0-9a-f]+" \/>/i);
+  assert.ok(
+    htmlSource.indexOf(prepaintThemeScript()) < htmlSource.indexOf('<link rel="stylesheet" href="./styles.css'),
+    "prepaint script 必須在 stylesheet link 之前執行"
+  );
+
+  const root = new FakeElement();
+  new Function("document", "localStorage", "window", prepaintThemeScript())(
+    { documentElement: root },
+    createStorage(),
+    { matchMedia: () => ({ matches: true }) }
+  );
+  assert.equal(root.dataset.theme, "dark");
+  assert.equal(root.style.colorScheme, "dark");
 });
