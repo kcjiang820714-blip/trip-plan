@@ -7,7 +7,15 @@
 1. 390px bookings / todos 非 active sub-tabs 仍是近白底，readonly banner 仍是淺色。
 2. todo active tab 與其他實際 white-on-accent 元件對比不足。
 
-本階段只修改 `styles.css` 與 `tests/theme-mode.test.js`；未修改 app / HTML / Service Worker 或 PWA 版本。
+後續專門 PWA 階段因 CSS 變更，將 v163 同步升為 v164；未修改其他模組 URL 或功能。
+
+## PWA v164 追補
+
+- `index.html` 的 CSS／app query string 同步為 `v=164`。
+- `app.js` 註冊 `./sw.js?v=164`。
+- `sw.js` 的 `CACHE_NAME` 與兩個預快取資產同步為 `v164`。
+- `DARK_MODE_PWA_ASSET_VERSION` 由 `163` 升為 `164`。
+- TDD RED：先升版本鎖定，`node --test tests/theme-mode.test.js` 19 項中僅版本測試失敗（實際 `163`、期望 `164`）；同步後轉為 19/19 通過。
 
 ## TDD
 
