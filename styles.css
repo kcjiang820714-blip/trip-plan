@@ -11448,3 +11448,44 @@ html[data-theme="dark"] #tripView[data-active-section="expenses"] .ledger-head {
     font-size: 1.02rem;
   }
 }
+
+/* Itinerary time horizontal alignment contract: every row shares one text centre. */
+#tripView[data-active-section="itinerary"] #itineraryPanel .timeline {
+  --itinerary-time-column-width: 72px;
+}
+
+#tripView[data-active-section="itinerary"] #itineraryPanel .itinerary-time-range {
+  box-sizing: border-box;
+  width: 100%;
+  justify-self: stretch;
+  text-align: center;
+}
+
+#tripView[data-active-section="itinerary"] #itineraryPanel .itinerary-time-range.is-stacked {
+  width: 100%;
+  justify-self: stretch;
+  justify-items: center;
+}
+
+#tripView[data-active-section="itinerary"] #itineraryPanel .itinerary-time-range.is-single .itinerary-time-start {
+  width: 100%;
+}
+
+@media (max-width: 679px) {
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:has(.itinerary-time-range) {
+    grid-template-columns: var(--itinerary-time-column-width) minmax(0, 1fr) 24px !important;
+    grid-template-areas: "time content arrow" !important;
+    align-items: center;
+    align-content: center;
+  }
+}
+
+@media (min-width: 1100px) {
+  #tripView[data-active-section="itinerary"] #itineraryPanel .timeline {
+    --itinerary-time-column-width: 82px;
+  }
+
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:has(.itinerary-time-range) {
+    grid-template-columns: var(--itinerary-time-column-width) 48px minmax(0, 1fr) 26px;
+  }
+}

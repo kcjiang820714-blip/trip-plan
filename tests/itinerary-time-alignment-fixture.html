@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../styles.css?v=172-align" />
+    <title>行程時間對齊測試</title>
+  </head>
+  <body>
+    <main id="tripView" data-active-section="itinerary">
+      <section id="itineraryPanel">
+        <div class="timeline">
+          <article class="item-card" data-type="景點">
+            <button class="item-summary no-itinerary-photo" type="button">
+              <span class="time itinerary-time-range is-stacked">
+                <span class="itinerary-time-start">17:00</span>
+                <span class="itinerary-time-connector"></span>
+                <span class="itinerary-time-end">19:30</span>
+                <span class="itinerary-time-duration">2 Hr 30 Min</span>
+              </span>
+              <span class="itinerary-type-marker is-green" aria-hidden="true">✦</span>
+              <span class="item-summary-content">
+                <span class="item-title">有起訖時間的行程</span>
+                <span class="meta">景點</span>
+              </span>
+              <span class="expand-indicator">›</span>
+            </button>
+          </article>
+          <article class="item-card" data-type="住宿">
+            <button class="item-summary no-itinerary-photo" type="button">
+              <span class="time itinerary-time-range is-single is-single-itinerary-time">
+                <span class="itinerary-time-start">14:30</span>
+              </span>
+              <span class="itinerary-type-marker is-blue" aria-hidden="true">✦</span>
+              <span class="item-summary-content">
+                <span class="item-title">沒有結束時間的行程</span>
+                <span class="meta">住宿</span>
+              </span>
+              <span class="expand-indicator">›</span>
+            </button>
+          </article>
+          <article class="item-card" data-type="交通">
+            <button class="item-summary no-itinerary-photo" type="button">
+              <span class="time itinerary-time-range is-single">
+                <span class="itinerary-time-start">16:00</span>
+              </span>
+              <span class="itinerary-type-marker is-blue" aria-hidden="true">✦</span>
+              <span class="item-summary-content">
+                <span class="item-title">交通行程</span>
+                <span class="meta">交通</span>
+              </span>
+              <span class="expand-indicator">›</span>
+            </button>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

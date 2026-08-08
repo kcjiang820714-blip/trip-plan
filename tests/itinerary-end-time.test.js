@@ -141,13 +141,13 @@ test("沒有結束時間的單一時間也會置中對齊行程卡", () => {
   );
 });
 
-test("單一時間置中版本由 PWA v171 一致提供", () => {
-  assert.match(htmlSource, /styles\.css\?v=171/);
-  assert.match(htmlSource, /app\.js\?v=171/);
-  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=171"\)/);
-  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v171"/);
-  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=171"/);
-  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=171"/);
+test("共用時間欄中心版本由 PWA v172 一致提供", () => {
+  assert.match(htmlSource, /styles\.css\?v=172/);
+  assert.match(htmlSource, /app\.js\?v=172/);
+  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=172"\)/);
+  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v172"/);
+  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=172"/);
+  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=172"/);
 });
 
 test("行程表單提供獨立開始與結束時間欄位", () => {
