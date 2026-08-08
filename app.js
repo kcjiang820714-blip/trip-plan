@@ -8053,7 +8053,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=161").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=162").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);
