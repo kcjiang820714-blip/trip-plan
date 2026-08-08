@@ -4,6 +4,7 @@ import test from "node:test";
 
 const appSource = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const htmlSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const cssSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const serviceWorkerSource = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
 
 function functionSource(name) {
@@ -246,14 +247,28 @@ test("彈性探索每個景點的照片與導航都獨立，不得使用區段�
   assert.doesNotMatch(details, /checkbox|type="time"|14:00|17:30/i, "景點明細不應有勾選或個別時間欄位");
 });
 
+test("彈性探索的景點照片要當作全寬橫幅，文字排在照片下方", () => {
+  const detailPhotoRule = cssSource.match(/\.flexible-stop-detail-photo,\s*\n\.flexible-stop-detail-photo img\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  const flexibleStopRule = cssSource.match(/\.flexible-stop\s*\{\s*grid-template-columns:\s*([^;]+);/)?.[1] || "";
+  const mobileRule = cssSource.match(/@media \(max-width: 679px\)\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+
+  assert.match(detailPhotoRule, /width:\s*100%;/, "照片按鈕與圖片必須填滿景點卡內容寬度");
+  assert.match(detailPhotoRule, /aspect-ratio:\s*16\s*\/\s*9;/, "照片應使用橫幅比例，避免被拉伸");
+  assert.match(detailPhotoRule, /object-fit:\s*cover;/, "橫幅照片應裁切填滿而非變形");
+  assert.match(flexibleStopRule, /^minmax\(0,\s*1fr\)$/, "有照片的景點也必須單欄排列");
+  assert.doesNotMatch(flexibleStopRule, /220px/, "景點卡不可保留舊的左右圖片欄位");
+  assert.doesNotMatch(mobileRule, /max-height:\s*220px/, "手機不應以舊的圖片高度規則覆寫橫幅比例");
+});
+
 test("彈性探索版本會由新版 PWA 預快取提供", () => {
   const appVersion = htmlSource.match(/<script src="\.\/app\.js\?v=(\d+)"/)?.[1];
   const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
   const cacheVersion = serviceWorkerSource.match(/const CACHE_NAME = "trip-notebook-v(\d+)"/)?.[1];
 
-  assert.equal(cacheVersion, "172", "共用時間欄中心必須建立 v172 PWA 快取");
-  assert.equal(appVersion, "172");
-  assert.equal(styleVersion, "172");
+  assert.equal(cacheVersion, "173", "景點橫幅版面必須建立 v173 PWA 快取");
+  assert.equal(appVersion, "173");
+  assert.equal(styleVersion, "173");
+  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=173"\)/, "新版 Service Worker 必須以 v173 重新註冊");
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/app\\.js\\?v=${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/styles\\.css\\?v=${styleVersion}"`));
 });

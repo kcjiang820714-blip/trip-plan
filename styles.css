@@ -6556,18 +6556,15 @@ body {
 
 .flexible-stop-detail-photo,
 .flexible-stop-detail-photo img {
-  width: min(100%, 220px);
-  aspect-ratio: 4 / 3;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   border-radius: 10px;
+  object-fit: cover;
 }
 
 .flexible-stop {
-  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
-  align-items: start;
-}
-
-.flexible-stop:not(:has(.flexible-stop-detail-photo)) {
   grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 }
 
 .flexible-stop-detail-content {
@@ -6603,16 +6600,6 @@ body {
   .flexible-stop-editor,
   .flexible-stop {
     padding: 12px;
-  }
-
-  .flexible-stop {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .flexible-stop-detail-photo,
-  .flexible-stop-detail-photo img {
-    width: 100%;
-    max-height: 220px;
   }
 
 }
