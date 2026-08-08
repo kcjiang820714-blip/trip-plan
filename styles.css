@@ -10362,7 +10362,7 @@ html[data-theme="dark"] .flexible-stop {
     margin: -4px -4px 12px;
     border: 0;
     background: rgba(248, 245, 238, 0.94);
-    padding: 4px;
+    padding: 4px 64px 4px 4px;
     box-shadow: none;
     backdrop-filter: blur(16px);
   }

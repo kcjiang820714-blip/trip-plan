@@ -247,3 +247,21 @@ test("手機 app bar 在內部保留固定主題鈕安全區，桌機才使用�
   assert.match(cssSource, /@media \(min-width: 680px\)\s*\{\s*\.trip-appbar-actions\s*\{\s*margin-right:\s*56px;/);
   assert.doesNotMatch(cssSource, /\/\* Keep the app bar controls[\s\S]*?\.trip-appbar-actions\s*\{\s*margin-right:\s*56px;/);
 });
+
+test("手機預訂頁 app bar 的最後覆寫仍保留 64px 右側主題鈕安全區", () => {
+  const selector = '#tripView[data-active-section="bookings"] .trip-appbar';
+  const start = cssSource.lastIndexOf(`${selector} {`);
+  assert.notEqual(start, -1, "缺少預訂頁 app bar 規則");
+  const bodyStart = cssSource.indexOf("{", start);
+  let depth = 0;
+  let end = bodyStart;
+  for (; end < cssSource.length; end += 1) {
+    if (cssSource[end] === "{") depth += 1;
+    if (cssSource[end] === "}") depth -= 1;
+    if (depth === 0) break;
+  }
+  const bookingAppBar = cssSource.slice(start, end + 1);
+
+  assert.match(bookingAppBar, /padding:\s*4px\s+64px\s+4px\s+4px;/);
+  assert.doesNotMatch(bookingAppBar, /padding:\s*4px;/);
+});
