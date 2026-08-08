@@ -9,7 +9,15 @@
 3. sync gate 開啟時封鎖全域主題鈕。
 4. 把主題測試升級為 DOM 關係、selector specificity / 規則位置、實際函式 harness 與對比契約。
 
-本階段未修改 `index.html` / `sw.js` 的 PWA v162，留給後續專門階段處理。
+後續專門 PWA 階段已因本 commit 的 `app.js`／`styles.css` 變更，將 v162 同步升為 v163；未改動其他模組 URL 或功能。
+
+## PWA v163 追補
+
+- `index.html` 的 CSS 與 app query string 均為 `v=163`。
+- `app.js` 註冊 `./sw.js?v=163`。
+- `sw.js` 的 `CACHE_NAME` 為 `trip-notebook-v163`，並預快取 `styles.css?v=163`、`app.js?v=163`。
+- `DARK_MODE_PWA_ASSET_VERSION` 由 `162` 升為 `163`。
+- TDD RED：先升版本鎖定，`node --test tests/theme-mode.test.js` 17 項中僅版本測試失敗（實際 `162`、期望 `163`）；同步後轉為 17/17 通過。
 
 ## TDD 記錄
 
