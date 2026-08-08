@@ -4,6 +4,8 @@ import test from "node:test";
 
 const appSource = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const htmlSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const styleSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+const serviceWorkerSource = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
 
 function functionSource(name) {
   const start = appSource.indexOf(`function ${name}(`);
@@ -36,10 +38,19 @@ function functionSource(name) {
 }
 
 function loadTimeHelpers() {
-  const source = ["supportsItineraryEndTime", "formatItineraryTimeRange"]
+  const source = [
+    "escapeHtml",
+    "supportsItineraryEndTime",
+    "formatItineraryTimeRange",
+    "getItineraryDurationMinutes",
+    "formatItineraryDuration",
+    "renderItineraryTimelineTime"
+  ]
     .map(functionSource)
     .join("\n");
-  return new Function(`${source}\nreturn { supportsItineraryEndTime, formatItineraryTimeRange };`)();
+  return new Function(
+    `${source}\nreturn { supportsItineraryEndTime, formatItineraryTimeRange, getItineraryDurationMinutes, formatItineraryDuration, renderItineraryTimelineTime };`
+  )();
 }
 
 test("一般行程可以儲存結束時間，交通與飛機維持專用時間欄位", () => {
@@ -60,6 +71,56 @@ test("時間軸只在有結束時間時顯示起訖範圍，舊資料維持原�
   assert.equal(formatItineraryTimeRange({ type: "餐廳", time: "18:00", endTime: "" }), "18:00", "空白結束時間不得多顯示符號");
   assert.equal(formatItineraryTimeRange({ type: "交通", time: "08:00", endTime: "09:00" }), "08:00", "交通不使用通用結束時間");
   assert.equal(formatItineraryTimeRange({ type: "飛機", time: "07:00", endTime: "12:00" }), "07:00", "飛機不使用通用結束時間");
+});
+
+test("一般行程與彈性探索會計算停留時長，並正確處理跨午夜", () => {
+  const { getItineraryDurationMinutes, formatItineraryDuration } = loadTimeHelpers();
+
+  assert.equal(getItineraryDurationMinutes({ type: "景點", time: "07:35", endTime: "08:30" }), 55);
+  assert.equal(formatItineraryDuration({ type: "彈性探索", time: "09:00", endTime: "10:30" }), "1 Hr 30 Min");
+  assert.equal(formatItineraryDuration({ type: "餐廳", time: "12:00", endTime: "13:00" }), "1 Hr");
+  assert.equal(formatItineraryDuration({ type: "購物", time: "14:00", endTime: "14:30" }), "30 Min");
+  assert.equal(formatItineraryDuration({ type: "散步", time: "23:30", endTime: "01:00" }), "1 Hr 30 Min");
+  assert.equal(formatItineraryDuration({ type: "景點", time: "08:30", endTime: "08:30" }), "0 Min");
+  assert.equal(formatItineraryDuration({ type: "景點", time: "", endTime: "10:00" }), "");
+  assert.equal(formatItineraryDuration({ type: "交通", time: "08:00", endTime: "09:00" }), "", "交通不可誤用通用停留時長");
+  assert.equal(formatItineraryDuration({ type: "飛機", time: "07:00", endTime: "12:00" }), "", "飛機不可誤用通用停留時長");
+});
+
+test("有起訖時間的一般行程使用垂直時段，舊行程與交通維持單一時間", () => {
+  const { renderItineraryTimelineTime } = loadTimeHelpers();
+  const stacked = renderItineraryTimelineTime({ type: "景點", time: "07:35", endTime: "08:30" });
+  const flexible = renderItineraryTimelineTime({ type: "彈性探索", time: "17:00", endTime: "19:30" });
+  const legacy = renderItineraryTimelineTime({ type: "餐廳", time: "12:00", endTime: "" });
+  const transport = renderItineraryTimelineTime({ type: "交通", time: "08:00", endTime: "09:00" });
+
+  assert.match(stacked, /class="time itinerary-time-range is-stacked"/);
+  assert.match(stacked, /class="itinerary-time-start">07:35<\/span>/);
+  assert.match(stacked, /class="itinerary-time-connector"/);
+  assert.match(stacked, /class="itinerary-time-end">08:30<\/span>/);
+  assert.match(stacked, /class="itinerary-time-duration">55 Min<\/span>/);
+  assert.match(flexible, /class="itinerary-time-duration">2 Hr 30 Min<\/span>/);
+  assert.match(legacy, /class="time itinerary-time-range is-single"[^>]*>[\s\S]*12:00/);
+  assert.doesNotMatch(legacy, /itinerary-time-connector|itinerary-time-duration/);
+  assert.match(transport, /class="time itinerary-time-range is-single"[^>]*>[\s\S]*08:00/);
+  assert.doesNotMatch(transport, /09:00|itinerary-time-connector|itinerary-time-duration/);
+});
+
+test("垂直時段在桌機與手機都保留狀態類別，時長不會造成水平溢出", () => {
+  assert.match(styleSource, /\.itinerary-time-range\.is-stacked\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(styleSource, /\.itinerary-time-connector\s*\{[\s\S]*?height:\s*\d+px/);
+  assert.match(styleSource, /\.itinerary-time-duration\s*\{[\s\S]*?white-space:\s*nowrap/);
+  assert.match(styleSource, /@media\s*\(max-width:\s*679px\)[\s\S]*?\.itinerary-time-range\.is-stacked/);
+  assert.match(styleSource, /@media\s*\(min-width:\s*1100px\)[\s\S]*?\.itinerary-time-range\.is-stacked/);
+});
+
+test("垂直時段版本由 PWA v169 一致提供", () => {
+  assert.match(htmlSource, /styles\.css\?v=169/);
+  assert.match(htmlSource, /app\.js\?v=169/);
+  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=169"\)/);
+  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v169"/);
+  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=169"/);
+  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=169"/);
 });
 
 test("行程表單提供獨立開始與結束時間欄位", () => {

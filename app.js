@@ -2811,6 +2811,56 @@ function formatItineraryTimeRange(item) {
   return startTime && endTime ? `${startTime}–${endTime}` : startTime || endTime;
 }
 
+function getItineraryDurationMinutes(item) {
+  if (!supportsItineraryEndTime(item?.type)) return null;
+  const startTime = String(item?.time || "").trim();
+  const endTime = String(item?.endTime || "").trim();
+  const timePattern = /^(\d{1,2}):(\d{2})$/;
+  const startParts = startTime.match(timePattern);
+  const endParts = endTime.match(timePattern);
+  if (!startParts || !endParts) return null;
+
+  const startHour = Number(startParts[1]);
+  const startMinute = Number(startParts[2]);
+  const endHour = Number(endParts[1]);
+  const endMinute = Number(endParts[2]);
+  if (startHour > 23 || endHour > 23 || startMinute > 59 || endMinute > 59) return null;
+
+  const startTotal = startHour * 60 + startMinute;
+  let endTotal = endHour * 60 + endMinute;
+  if (endTotal < startTotal) endTotal += 24 * 60;
+  return endTotal - startTotal;
+}
+
+function formatItineraryDuration(item) {
+  const totalMinutes = getItineraryDurationMinutes(item);
+  if (totalMinutes === null) return "";
+  if (totalMinutes === 0) return "0 Min";
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return [hours ? `${hours} Hr` : "", minutes ? `${minutes} Min` : ""].filter(Boolean).join(" ");
+}
+
+function renderItineraryTimelineTime(item) {
+  const startTime = String(item?.time || "").trim();
+  const endTime = supportsItineraryEndTime(item?.type) ? String(item?.endTime || "").trim() : "";
+  const duration = formatItineraryDuration(item);
+
+  if (!startTime || !endTime || !duration) {
+    return `<span class="time itinerary-time-range is-single"><span class="itinerary-time-start">${escapeHtml(formatItineraryTimeRange(item))}</span></span>`;
+  }
+
+  return `
+    <span class="time itinerary-time-range is-stacked" aria-label="${escapeHtml(`${startTime} 到 ${endTime}，${duration}`)}">
+      <span class="itinerary-time-start">${escapeHtml(startTime)}</span>
+      <span class="itinerary-time-connector" aria-hidden="true"></span>
+      <span class="itinerary-time-end">${escapeHtml(endTime)}</span>
+      <span class="itinerary-time-duration">${escapeHtml(duration)}</span>
+    </span>
+  `;
+}
+
 function formatFlexibleExploreTimeRange(item) {
   return formatItineraryTimeRange(item);
 }
@@ -2892,7 +2942,7 @@ function renderItineraryTimeline(day, focusItem) {
             aria-expanded="${isExpanded}"
             aria-controls="${escapeHtml(detailsId)}"
           >
-            <span class="time">${escapeHtml(formatItineraryTimeRange(item))}</span>
+            ${renderItineraryTimelineTime(item)}
             <span class="itinerary-type-marker is-${escapeHtml(referenceVisual.tone)}" aria-hidden="true">${renderItineraryTypeIcon(referenceVisual.icon)}</span>
             <span class="item-summary-content">
               <span class="item-title ${Array.from(getItemTitle(item) || "").length > 18 ? "is-long-item-title" : ""}">${escapeHtml(getItemTitle(item))}</span>
@@ -8196,7 +8246,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=168").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=169").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);

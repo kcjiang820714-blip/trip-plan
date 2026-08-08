@@ -251,9 +251,9 @@ test("彈性探索版本會由新版 PWA 預快取提供", () => {
   const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
   const cacheVersion = serviceWorkerSource.match(/const CACHE_NAME = "trip-notebook-v(\d+)"/)?.[1];
 
-  assert.equal(cacheVersion, "168", "行程結束時間與簡化景點卡必須建立 v168 PWA 快取");
-  assert.equal(appVersion, "168");
-  assert.equal(styleVersion, "168");
+  assert.equal(cacheVersion, "169", "垂直時段與停留時長必須建立 v169 PWA 快取");
+  assert.equal(appVersion, "169");
+  assert.equal(styleVersion, "169");
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/app\\.js\\?v=${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/styles\\.css\\?v=${styleVersion}"`));
 });
