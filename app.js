@@ -2817,7 +2817,6 @@ function renderFlexibleStopQuickList(item) {
     <section class="flexible-stop-quick-list" aria-label="景點快速導航">
       ${stops.map((stop) => {
         const photoSource = getAttachmentSource(stop.photo);
-        const mapQuery = getFlexibleStopMapQuery(stop);
         return `
           <article class="flexible-stop-quick-item">
             ${photoSource ? `
@@ -2833,7 +2832,6 @@ function renderFlexibleStopQuickList(item) {
               </button>
             ` : ""}
             <strong>${escapeHtml(stop.name || "未命名景點")}</strong>
-            ${mapQuery ? `<a class="secondary-action flexible-stop-map-link" href="${googleMapsUrl(mapQuery)}" target="_blank" rel="noopener">導航</a>` : ""}
           </article>
         `;
       }).join("")}
@@ -2867,7 +2865,7 @@ function renderFlexibleExplorationDetails(item) {
               <div class="flexible-stop-detail-content">
                 <h4>${escapeHtml(stop.name || "未命名景點")}</h4>
                 ${stop.intro ? `<p>${escapeHtml(stop.intro)}</p>` : ""}
-                ${mapQuery ? `<a class="secondary-action flexible-stop-map-link" href="${googleMapsUrl(mapQuery)}" target="_blank" rel="noopener">導航</a>` : ""}
+                ${mapQuery ? `<a class="secondary-action flexible-stop-map-link" data-flexible-stop-map href="${googleMapsUrl(mapQuery)}" target="_blank" rel="noopener">導航</a>` : ""}
               </div>
             </article>
           `;

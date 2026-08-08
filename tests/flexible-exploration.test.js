@@ -212,12 +212,13 @@ test("彈性探索每個景點的照片與導航都獨立，不得使用區段�
   const quickList = renderFlexibleStopQuickList(item);
   const details = renderFlexibleExplorationDetails(item);
   assert.match(quickList, /data-open-attachment="flexible-stop"/);
-  assert.match(quickList, /%E4%BA%AC%E9%83%BD%E5%BA%9C%E4%BA%AC%E9%83%BD%E5%B8%82%E6%9D%B1%E5%B1%B1%E5%8D%80%E6%B8%85%E6%B0%B41%E4%B8%81%E7%9B%AE294/);
+  assert.doesNotMatch(quickList, /data-flexible-stop-map/, "收合清單只用來快速查看景點，不應重複顯示導航按鈕");
   assert.match(details, /清水寺/);
   assert.match(details, /看本堂舞台與音羽瀑布/);
   assert.match(details, /二年坂/);
   assert.match(details, /逛老街小店/);
   assert.match(details, /data-open-attachment="flexible-stop"/);
+  assert.match(details, /data-flexible-stop-map/, "展開後的景點介紹卡必須保留各自的導航按鈕");
   assert.match(details, />導航<\/a>/);
   assert.doesNotMatch(`${quickList}${details}`, /query=%E6%9D%B1%E5%B1%B1%E5%8D%8A%E6%97%A5%E6%95%A3%E6%AD%A5/, "任何景點導航都不能使用區段標題");
   assert.doesNotMatch(details, /checkbox|type="time"|14:00|17:30/i, "景點明細不應有勾選或個別時間欄位");
