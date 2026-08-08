@@ -10,9 +10,10 @@
 
 ## TDD 證據
 
-1. 在 `tests/theme-mode.test.js` 新增「深色模式 CSS 與 HTML 更新會提升 PWA 快取世代」回歸測試。
+1. 在 `tests/theme-mode.test.js` 新增「深色模式 CSS 與 HTML 更新會提升 PWA 快取世代」回歸測試，並以集中定義的 `DARK_MODE_PWA_ASSET_VERSION = "160"` 鎖定本次資產世代。後續若再修改此深色模式資產，須連同此契約與所有 PWA 版本位置升版。
 2. RED：執行 `node --test tests/theme-mode.test.js tests/booking-date-tabs.test.mjs`，新增測試因版本仍為 `159` 失敗；其餘 24 項通過。
 3. GREEN：以最小修改同步上述五個 PWA 版本位置至 `160`。
+4. 審查修正 RED：暫時將精確期望設為 `159`，`node --test tests/theme-mode.test.js` 如預期以 `'160' !== '159'` 失敗；再恢復集中定義的 `160`，不修改產品碼。
 
 ## 驗證結果
 

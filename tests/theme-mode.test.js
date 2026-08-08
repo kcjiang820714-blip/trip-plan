@@ -6,6 +6,7 @@ const appSource = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const htmlSource = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const serviceWorkerSource = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+const DARK_MODE_PWA_ASSET_VERSION = "160";
 
 function functionSource(name) {
   const start = appSource.indexOf(`function ${name}(`);
@@ -189,7 +190,7 @@ test("深色模式 CSS 與 HTML 更新會提升 PWA 快取世代", () => {
   const appVersion = htmlSource.match(/<script src="\.\/app\.js\?v=(\d+)"/)?.[1];
 
   assert.equal(styleVersion, appVersion, "HTML 的 CSS 與 app 資產必須使用同一快取世代");
-  assert.ok(Number(appVersion) > 159, "新增深色模式 CSS/HTML 後必須提高 PWA 快取版本");
+  assert.equal(appVersion, DARK_MODE_PWA_ASSET_VERSION, "深色模式 CSS/HTML 更新必須使用本次指定的 PWA 快取世代");
   assert.match(appSource, new RegExp(`register\\("\\./sw\\.js\\?v=${appVersion}"\\)`));
   assert.match(serviceWorkerSource, new RegExp(`const CACHE_NAME = "trip-notebook-v${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\./styles\\.css\\?v=${styleVersion}"`));
