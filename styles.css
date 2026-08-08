@@ -11149,3 +11149,20 @@ html[data-theme="dark"] .flexible-stop {
     grid-area: arrow;
   }
 }
+
+/* Keep late desktop card rules from reintroducing light surfaces in dark mode. */
+html[data-theme="dark"] .trip-visual,
+html[data-theme="dark"] .itinerary-main-column,
+html[data-theme="dark"] .itinerary-side-card,
+html[data-theme="dark"] .expense-summary-card,
+html[data-theme="dark"] .expense-table-card,
+html[data-theme="dark"] .weather-card,
+html[data-theme="dark"] .utility-card,
+html[data-theme="dark"] .todo-group,
+html[data-theme="dark"] .travel-day-metrics span,
+html[data-theme="dark"] .travel-day-card,
+html[data-theme="dark"] .booking-card,
+html[data-theme="dark"] .booking-focus-card {
+  background: var(--ref-surface);
+  border-color: var(--ref-line);
+}

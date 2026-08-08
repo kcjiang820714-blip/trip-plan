@@ -225,6 +225,35 @@ test("深色同步遮罩與彈性景點卡不回退淺色，且列印持續白�
   assert.match(printCss, /background:\s*white\s*!important;/);
 });
 
+test("深色模式的桌機卡片覆寫以深色 surface 與 line token 取代淺色卡片底", () => {
+  const selectors = [
+    ".trip-visual",
+    ".itinerary-main-column",
+    ".itinerary-side-card",
+    ".expense-summary-card",
+    ".expense-table-card",
+    ".weather-card",
+    ".utility-card",
+    ".todo-group",
+    ".travel-day-metrics span",
+    ".travel-day-card",
+    ".booking-card",
+    ".booking-focus-card"
+  ];
+  const selectorPattern = selectors
+    .map((selector) => `html\\[data-theme="dark"\\]\\s+${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`)
+    .join("\\s*,\\s*");
+  const darkCardOverrideMatch = cssSource.match(new RegExp(`${selectorPattern}\\s*\\{([\\s\\S]*?)\\n\\}`, "m"));
+  const darkCardOverride = darkCardOverrideMatch?.[1] || "";
+
+  assert.match(darkCardOverride, /background:\s*var\(--ref-surface\);/);
+  assert.match(darkCardOverride, /border-color:\s*var\(--ref-line\);/);
+  assert.ok(
+    darkCardOverrideMatch.index > cssSource.lastIndexOf(".expense-table-card {"),
+    "深色卡片覆寫必須放在後段淺色桌機卡片規則之後"
+  );
+});
+
 function relativeLuminance(hex) {
   const channels = hex.match(/[a-f\d]{2}/gi).map((channel) => Number.parseInt(channel, 16) / 255);
   const linear = channels.map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
