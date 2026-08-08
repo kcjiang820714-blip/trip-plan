@@ -7624,6 +7624,7 @@ html[data-theme="dark"] {
   --ref-green-soft: #23352a;
   --ref-coral: #ff9b83;
   --ref-coral-soft: #442b27;
+  --ref-accent-ink: #111a18;
   --ref-line: #344640;
   --ref-card-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
 }
@@ -11156,17 +11157,92 @@ html[data-theme="dark"] #tripView[data-active-section] .itinerary-main-column,
 html[data-theme="dark"] #tripView[data-active-section] .itinerary-side-card,
 html[data-theme="dark"] #tripView[data-active-section] .expense-summary-card,
 html[data-theme="dark"] #tripView[data-active-section] .expense-table-card,
+html[data-theme="dark"] #tripView[data-active-section] .expense-mobile-summary-card,
+html[data-theme="dark"] #tripView[data-active-section] .expense-settlement-card,
+html[data-theme="dark"] #tripView[data-active-section] .expense-category-card,
+html[data-theme="dark"] #tripView[data-active-section] .expense-settings-details,
+html[data-theme="dark"] #tripView[data-active-section] .expense-members,
+html[data-theme="dark"] #tripView[data-active-section] .exchange-panel,
+html[data-theme="dark"] #tripView[data-active-section] .expense-stats-card,
+html[data-theme="dark"] #tripView[data-active-section] .ledger-card,
 html[data-theme="dark"] #tripView[data-active-section] .weather-card,
 html[data-theme="dark"] #tripView[data-active-section] .utility-card,
 html[data-theme="dark"] #tripView[data-active-section] .todo-group,
+html[data-theme="dark"] #tripView[data-active-section] .todo-list-section,
+html[data-theme="dark"] #tripView[data-active-section] .todo-side-card,
+html[data-theme="dark"] #tripView[data-active-section] .todo-progress-card,
 html[data-theme="dark"] #tripView[data-active-section] .travel-day-metrics span,
 html[data-theme="dark"] #tripView[data-active-section] .travel-day-card,
 html[data-theme="dark"] #tripView[data-active-section] .booking-card,
 html[data-theme="dark"] #tripView[data-active-section] .booking-focus-card,
+html[data-theme="dark"] #tripView[data-active-section] .booking-side-card,
 html[data-theme="dark"] #tripView[data-active-section] .trip-sticky-nav,
 html[data-theme="dark"] #tripView[data-active-section] .empty-state,
-html[data-theme="dark"] #tripView[data-active-section] .desktop-sidebar,
-html[data-theme="dark"] #tripView[data-active-section] .install-panel {
+html[data-theme="dark"] #tripView[data-active-section] .desktop-sidebar {
   background: var(--ref-surface);
   border-color: var(--ref-line);
+}
+
+/* Dark mode: final surface contracts after all late responsive light rules. */
+html[data-theme="dark"] .landing-hero,
+html[data-theme="dark"] .landing-ticket,
+html[data-theme="dark"] .landing-stats div,
+html[data-theme="dark"] .cloud-panel,
+html[data-theme="dark"] .trip-card,
+html[data-theme="dark"] .trip-share-panel,
+html[data-theme="dark"] .trip-member-row,
+html[data-theme="dark"] .editor,
+html[data-theme="dark"] .editor form,
+html[data-theme="dark"] .existing-attachments,
+html[data-theme="dark"] .trip-day-title-editor,
+html[data-theme="dark"] .trip-weather-editor,
+html[data-theme="dark"] .trip-segment-editor,
+html[data-theme="dark"] .trip-segment-row,
+html[data-theme="dark"] .trip-weather-day,
+html[data-theme="dark"] .trip-weather-results button,
+html[data-theme="dark"] .checkbox-row,
+html[data-theme="dark"] .transport-segment-editor,
+html[data-theme="dark"] .transport-segment-card,
+html[data-theme="dark"] .personal-ticket-editor,
+html[data-theme="dark"] .personal-ticket-card,
+html[data-theme="dark"] .todo-row {
+  background: var(--ref-surface);
+  border-color: var(--ref-line);
+}
+
+html[data-theme="dark"] .cloud-form input,
+html[data-theme="dark"] .trip-invite-form input,
+html[data-theme="dark"] .trip-invite-form select,
+html[data-theme="dark"] .trip-member-name-field input,
+html[data-theme="dark"] .editor input,
+html[data-theme="dark"] .editor textarea,
+html[data-theme="dark"] .editor select {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] #tripView[data-active-section] .trip-appbar,
+html[data-theme="dark"] #tripView[data-active-section] .trip-section-tabs {
+  background: var(--ref-surface);
+  border-color: var(--ref-line);
+}
+
+html[data-theme="dark"] #appShell > #installPanel.install-panel {
+  background: var(--ref-surface);
+  border-color: var(--ref-line);
+}
+
+/* Bright reference accents need dark text; the same tokens remain bright as icons. */
+html[data-theme="dark"] .primary-button,
+html[data-theme="dark"] .timeline-add-button,
+html[data-theme="dark"] .expense-add-button,
+html[data-theme="dark"] #addBookingButton,
+html[data-theme="dark"] #bookingsPanel .sub-tab.is-active,
+html[data-theme="dark"] .booking-ticket-primary,
+html[data-theme="dark"] .todo-add-button,
+html[data-theme="dark"] .todo-quick-add-button,
+html[data-theme="dark"] #tripView[data-active-section="itinerary"] .day-tab.is-active,
+html[data-theme="dark"] .booking-date-tab.is-active {
+  color: var(--ref-accent-ink);
 }

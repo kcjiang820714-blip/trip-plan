@@ -11,7 +11,9 @@ const DARK_MODE_PWA_ASSET_VERSION = "162";
 function functionSource(name) {
   const start = appSource.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `找不到 ${name}，主題行為尚未實作`);
-  const bodyStart = appSource.indexOf("{", start);
+  const signatureEnd = appSource.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `${name} 函式簽名不完整`);
+  const bodyStart = signatureEnd + 2;
   let depth = 0;
 
   for (let index = bodyStart; index < appSource.length; index += 1) {
@@ -29,6 +31,13 @@ class FakeElement {
     this.dataset = {};
     this.style = {};
     this.textContent = "";
+    this.hidden = false;
+    this.disabled = false;
+    this.inert = false;
+    this.focusCount = 0;
+    this.classList = {
+      toggle: () => {}
+    };
   }
 
   setAttribute(name, value) {
@@ -37,6 +46,23 @@ class FakeElement {
 
   getAttribute(name) {
     return this.attributes.get(name) ?? null;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+
+  toggleAttribute(name, force) {
+    if (force) this.setAttribute(name, "");
+    else this.removeAttribute(name);
+  }
+
+  focus() {
+    this.focusCount += 1;
   }
 }
 
@@ -90,6 +116,106 @@ function loadThemeHelpers({ prefersDark = false, storage = createStorage() } = {
   );
 
   return { ...helpers, document, storage, mediaQuery, themeToggleButton, themeToggleIcon, themeToggleText, themeColorMeta };
+}
+
+function loadSyncGateHarness() {
+  const syncGate = new FakeElement();
+  const appShell = new FakeElement();
+  const themeToggleButton = new FakeElement();
+  const syncGateCard = new FakeElement();
+  const syncGateTitle = new FakeElement();
+  const syncGateMessage = new FakeElement();
+  const syncGateRetryButton = new FakeElement();
+  const source = `${functionSource("setSyncGate")}\nreturn { setSyncGate };`;
+  const helpers = new Function(
+    "isReadonly",
+    "syncGate",
+    "appShell",
+    "themeToggleButton",
+    "syncGateCard",
+    "syncGateTitle",
+    "syncGateMessage",
+    "syncGateRetryButton",
+    "queueMicrotask",
+    source
+  )(
+    false,
+    syncGate,
+    appShell,
+    themeToggleButton,
+    syncGateCard,
+    syncGateTitle,
+    syncGateMessage,
+    syncGateRetryButton,
+    (callback) => callback()
+  );
+
+  return {
+    ...helpers,
+    syncGate,
+    appShell,
+    themeToggleButton,
+    syncGateCard,
+    syncGateRetryButton
+  };
+}
+
+function elementRangeById(id) {
+  const openingPattern = new RegExp(`<([a-z][\\w-]*)\\b[^>]*\\bid=["']${id}["'][^>]*>`, "i");
+  const opening = openingPattern.exec(htmlSource);
+  assert.ok(opening, `找不到 #${id}`);
+  const tagName = opening[1];
+  const tagPattern = new RegExp(`<\\/?${tagName}\\b[^>]*>`, "gi");
+  tagPattern.lastIndex = opening.index;
+  let depth = 0;
+  let tag;
+
+  while ((tag = tagPattern.exec(htmlSource))) {
+    if (tag[0].startsWith("</")) depth -= 1;
+    else if (!tag[0].endsWith("/>")) depth += 1;
+    if (depth === 0) return { start: opening.index, end: tagPattern.lastIndex };
+  }
+
+  throw new Error(`#${id} HTML 元素沒有正確關閉`);
+}
+
+function cssRuleForSelector(selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const selectorMatches = [...cssSource.matchAll(new RegExp(`${escapedSelector}\\s*(?:,|\\{)`, "g"))];
+  const selectorIndex = selectorMatches.at(-1)?.index ?? -1;
+  assert.notEqual(selectorIndex, -1, `找不到 CSS selector：${selector}`);
+  const bodyStart = cssSource.indexOf("{", selectorIndex);
+  assert.notEqual(bodyStart, -1, `${selector} 缺少規則內容`);
+  let depth = 0;
+
+  for (let index = bodyStart; index < cssSource.length; index += 1) {
+    if (cssSource[index] === "{") depth += 1;
+    if (cssSource[index] === "}") depth -= 1;
+    if (depth === 0) {
+      return {
+        index: selectorIndex,
+        body: cssSource.slice(bodyStart + 1, index)
+      };
+    }
+  }
+
+  throw new Error(`${selector} CSS 規則沒有正確關閉`);
+}
+
+function selectorSpecificity(selector) {
+  const ids = (selector.match(/#[\\w-]+/g) || []).length;
+  const classesAndAttributes = (selector.match(/\\.[\\w-]+|\\[[^\\]]+\\]|:(?!:)[\\w-]+/g) || []).length;
+  const elements = (selector
+    .replace(/#[\\w-]+|\\.[\\w-]+|\\[[^\\]]+\\]|::?[\\w-]+/g, " ")
+    .match(/(?:^|[>+~\\s])([a-z][\\w-]*)/gi) || []).length;
+  return [ids, classesAndAttributes, elements];
+}
+
+function compareSpecificity(left, right) {
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
 }
 
 function prepaintThemeScript() {
@@ -225,37 +351,140 @@ test("深色同步遮罩與彈性景點卡不回退淺色，且列印持續白�
   assert.match(printCss, /background:\s*white\s*!important;/);
 });
 
-test("深色模式的桌機卡片覆寫以深色 surface 與 line token 取代淺色卡片底", () => {
-  const selectors = [
+test("sync gate 開啟時主題鈕不可聚焦且從輔助閱讀隱藏，關閉後完整恢復", () => {
+  const harness = loadSyncGateHarness();
+
+  harness.setSyncGate({ phase: "loading" });
+  assert.equal(harness.syncGate.hidden, false);
+  assert.equal(harness.appShell.inert, true);
+  assert.equal(harness.themeToggleButton.disabled, true);
+  assert.equal(harness.themeToggleButton.inert, true);
+  assert.equal(harness.themeToggleButton.getAttribute("aria-hidden"), "true");
+  assert.equal(harness.syncGateCard.focusCount, 1);
+
+  harness.setSyncGate({ phase: "idle" });
+  assert.equal(harness.syncGate.hidden, true);
+  assert.equal(harness.appShell.inert, false);
+  assert.equal(harness.themeToggleButton.disabled, false);
+  assert.equal(harness.themeToggleButton.inert, false);
+  assert.equal(harness.themeToggleButton.hasAttribute("aria-hidden"), false);
+});
+
+test("深色模式的主要卡片、app bar 與底部導覽會在後段 cascade 實際勝出", () => {
+  const tripSurfaceSelectors = [
     ".trip-visual",
     ".itinerary-main-column",
     ".itinerary-side-card",
     ".expense-summary-card",
     ".expense-table-card",
+    ".expense-mobile-summary-card",
+    ".expense-settlement-card",
+    ".expense-category-card",
+    ".expense-settings-details",
+    ".expense-members",
+    ".exchange-panel",
+    ".expense-stats-card",
+    ".ledger-card",
     ".weather-card",
     ".utility-card",
     ".todo-group",
+    ".todo-list-section",
+    ".todo-side-card",
+    ".todo-progress-card",
     ".travel-day-metrics span",
     ".travel-day-card",
     ".booking-card",
     ".booking-focus-card",
+    ".booking-side-card",
     ".trip-sticky-nav",
     ".empty-state",
-    ".desktop-sidebar",
-    ".install-panel"
+    ".desktop-sidebar"
   ];
-  const selectorPattern = selectors
-    .map((selector) => `html\\[data-theme="dark"\\]\\s+#tripView\\[data-active-section\\]\\s+${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`)
-    .join("\\s*,\\s*");
-  const darkCardOverrideMatch = cssSource.match(new RegExp(`${selectorPattern}\\s*\\{([\\s\\S]*?)\\n\\}`, "m"));
-  const darkCardOverride = darkCardOverrideMatch?.[1] || "";
 
-  assert.match(darkCardOverride, /background:\s*var\(--ref-surface\);/);
-  assert.match(darkCardOverride, /border-color:\s*var\(--ref-line\);/);
+  for (const suffix of tripSurfaceSelectors) {
+    const selector = `html[data-theme="dark"] #tripView[data-active-section] ${suffix}`;
+    const rule = cssRuleForSelector(selector);
+    assert.match(rule.body, /background:\s*var\(--ref-surface\);/, `${suffix} 必須使用深色 surface`);
+    assert.match(rule.body, /border-color:\s*var\(--ref-line\);/, `${suffix} 必須使用深色邊線`);
+    assert.ok(rule.index > cssSource.lastIndexOf(`  ${suffix} {`), `${suffix} 覆寫必須放在桌機淺色規則後`);
+  }
+
+  const appBarSelector = 'html[data-theme="dark"] #tripView[data-active-section] .trip-appbar';
+  const appBar = cssRuleForSelector(appBarSelector);
+  assert.match(appBar.body, /background:\s*var\(--ref-surface\);/);
   assert.ok(
-    darkCardOverrideMatch.index > cssSource.lastIndexOf(".expense-table-card {"),
-    "高權重深色卡片覆寫必須放在後段淺色桌機卡片規則之後"
+    compareSpecificity(selectorSpecificity(appBarSelector), selectorSpecificity('#tripView[data-active-section="bookings"] .trip-appbar')) > 0,
+    "深色 app bar selector 權重必須高於後段預訂頁淺色規則"
   );
+  assert.ok(appBar.index > cssSource.lastIndexOf('#tripView[data-active-section="bookings"] .trip-appbar {'));
+
+  const bottomNavSelector = 'html[data-theme="dark"] #tripView[data-active-section] .trip-section-tabs';
+  const bottomNav = cssRuleForSelector(bottomNavSelector);
+  assert.match(bottomNav.body, /background:\s*var\(--ref-surface\);/);
+  assert.ok(compareSpecificity(selectorSpecificity(bottomNavSelector), selectorSpecificity(".trip-section-tabs")) > 0);
+});
+
+test("深色 landing、home 與 editor 主要 surface 及輸入控制不會保留淺色底", () => {
+  const surfaceSelectors = [
+    ".landing-hero",
+    ".landing-ticket",
+    ".landing-stats div",
+    ".cloud-panel",
+    ".trip-card",
+    ".trip-share-panel",
+    ".trip-member-row",
+    ".editor",
+    ".editor form",
+    ".existing-attachments",
+    ".trip-day-title-editor",
+    ".trip-weather-editor",
+    ".trip-segment-editor",
+    ".trip-segment-row",
+    ".trip-weather-day",
+    ".trip-weather-results button",
+    ".checkbox-row",
+    ".transport-segment-editor",
+    ".transport-segment-card",
+    ".personal-ticket-editor",
+    ".personal-ticket-card",
+    ".todo-row"
+  ];
+  for (const suffix of surfaceSelectors) {
+    const rule = cssRuleForSelector(`html[data-theme="dark"] ${suffix}`);
+    assert.match(rule.body, /background:\s*var\(--ref-surface\);/, `${suffix} 必須使用深色 surface`);
+    assert.doesNotMatch(rule.body, /rgba\(255|background:\s*(?:white|#fff)/i);
+  }
+
+  for (const suffix of [
+    ".cloud-form input",
+    ".trip-invite-form input",
+    ".trip-invite-form select",
+    ".trip-member-name-field input",
+    ".editor input",
+    ".editor textarea",
+    ".editor select"
+  ]) {
+    const rule = cssRuleForSelector(`html[data-theme="dark"] ${suffix}`);
+    assert.match(rule.body, /background:\s*var\(--panel\);/, `${suffix} 必須使用深色輸入底`);
+    assert.match(rule.body, /color:\s*var\(--ink\);/);
+    assert.match(rule.body, /border-color:\s*var\(--line\);/);
+  }
+});
+
+test("install panel 是 tripView 的兄弟節點，深色 selector 依真實 DOM 關係命中", () => {
+  const appShell = elementRangeById("appShell");
+  const tripView = elementRangeById("tripView");
+  const installPanel = elementRangeById("installPanel");
+  assert.ok(appShell.start < tripView.start && tripView.end < installPanel.start && installPanel.end < appShell.end);
+  assert.match(htmlSource.slice(tripView.end, appShell.end), /^\s*<section\s+class="install-panel"\s+id="installPanel">/);
+
+  const selector = 'html[data-theme="dark"] #appShell > #installPanel.install-panel';
+  const rule = cssRuleForSelector(selector);
+  assert.match(rule.body, /background:\s*var\(--ref-surface\);/);
+  assert.match(rule.body, /border-color:\s*var\(--ref-line\);/);
+  assert.ok(compareSpecificity(selectorSpecificity(selector), selectorSpecificity(".install-panel")) > 0);
+  assert.ok(rule.index > cssSource.lastIndexOf("\n.install-panel {"), "install panel 深色規則必須在淺色規則後");
+  assert.doesNotMatch(cssSource, /#tripView\[data-active-section\][^{,]*\.install-panel/);
 });
 
 function relativeLuminance(hex) {
@@ -278,6 +507,40 @@ test("深色主題的白字按鈕與標籤背景 token 至少有 4.5:1 對比", 
       contrastRatio("#ffffff", value) >= 4.5,
       `白字搭配 --${token}（${value}）必須至少有 4.5:1 對比`,
     );
+  }
+});
+
+test("深色主題實際 coral 與 blue accent 元件改用深色字，每組至少 4.5:1", () => {
+  const darkTheme = cssSource.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  const tokenValue = (token) => darkTheme.match(new RegExp(`--${token}:\\s*(#[a-f\\d]{6});`, "i"))?.[1];
+  const accentInk = tokenValue("ref-accent-ink");
+  const coral = tokenValue("ref-coral");
+  const blue = tokenValue("ref-blue");
+  assert.ok(accentInk && coral && blue, "深色 accent 前景與背景 token 不完整");
+  assert.ok(contrastRatio(accentInk, coral) >= 4.5, `coral 組對比不足：${accentInk} on ${coral}`);
+  assert.ok(contrastRatio(accentInk, blue) >= 4.5, `blue 組對比不足：${accentInk} on ${blue}`);
+
+  const coralSelectors = [
+    ".primary-button",
+    ".timeline-add-button",
+    ".expense-add-button",
+    "#addBookingButton",
+    "#bookingsPanel .sub-tab.is-active",
+    ".booking-ticket-primary",
+    ".todo-add-button",
+    ".todo-quick-add-button"
+  ];
+  const blueSelectors = [
+    '#tripView[data-active-section="itinerary"] .day-tab.is-active',
+    ".booking-date-tab.is-active"
+  ];
+  for (const suffix of [...coralSelectors, ...blueSelectors]) {
+    const rule = cssRuleForSelector(`html[data-theme="dark"] ${suffix}`);
+    assert.match(rule.body, /color:\s*var\(--ref-accent-ink\);/, `${suffix} 必須使用高對比 accent 文字`);
+  }
+
+  for (const gradientStop of ["#ff7359", "#fa6046", "#688ca1", "#6b91a7", "#e95b43"]) {
+    assert.ok(contrastRatio(accentInk, gradientStop) >= 4.5, `${gradientStop} 與 accent 文字必須至少 4.5:1`);
   }
 });
 

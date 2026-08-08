@@ -528,6 +528,12 @@ function setSyncGate(gateState = { phase: "idle" }) {
   syncGate.classList.toggle("is-error", isError);
   appShell.inert = isVisible;
   appShell.toggleAttribute("aria-hidden", isVisible);
+  if (themeToggleButton) {
+    themeToggleButton.disabled = isVisible;
+    themeToggleButton.inert = isVisible;
+    if (isVisible) themeToggleButton.setAttribute("aria-hidden", "true");
+    else themeToggleButton.removeAttribute("aria-hidden");
+  }
 
   if (isLoading) {
     syncGateTitle.textContent = "正在與 Supabase 同步旅行資料…";
