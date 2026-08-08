@@ -11242,7 +11242,39 @@ html[data-theme="dark"] #bookingsPanel .sub-tab.is-active,
 html[data-theme="dark"] .booking-ticket-primary,
 html[data-theme="dark"] .todo-add-button,
 html[data-theme="dark"] .todo-quick-add-button,
+html[data-theme="dark"] .trip-section-add,
+html[data-theme="dark"] .trip-section-add > span,
 html[data-theme="dark"] #tripView[data-active-section="itinerary"] .day-tab.is-active,
-html[data-theme="dark"] .booking-date-tab.is-active {
+html[data-theme="dark"] .booking-date-tab.is-active,
+html[data-theme="dark"] .todo-category-tabs .sub-tab.is-active,
+html[data-theme="dark"] .todo-list-check input:checked + span::after,
+html[data-theme="dark"] .booking-checklist > div.is-done > span,
+html[data-theme="dark"] .expense-avatar {
   color: var(--ref-accent-ink);
+}
+
+html[data-theme="dark"] #bookingsPanel .sub-tab:not(.is-active),
+html[data-theme="dark"] .todo-category-tabs .sub-tab:not(.is-active) {
+  border-color: var(--ref-line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .todo-category-tabs .sub-tab.is-active {
+  background: var(--ref-blue);
+  color: var(--ref-accent-ink);
+}
+
+html[data-theme="dark"] .readonly-banner {
+  border-color: var(--ref-line);
+  background: var(--ref-surface);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .expense-avatar:not(.expense-avatar-2):not(.expense-avatar-3):not(.expense-avatar-4) {
+  background: linear-gradient(145deg, #f6d8c5, #ba735e);
+}
+
+html[data-theme="dark"] .expense-avatar-3 {
+  background: linear-gradient(145deg, #dce8ef, #6e94aa);
 }

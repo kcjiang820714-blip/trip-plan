@@ -179,27 +179,31 @@ function elementRangeById(id) {
   throw new Error(`#${id} HTML 元素沒有正確關閉`);
 }
 
-function cssRuleForSelector(selector) {
+function cssRulesForSelector(selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const selectorMatches = [...cssSource.matchAll(new RegExp(`${escapedSelector}\\s*(?:,|\\{)`, "g"))];
-  const selectorIndex = selectorMatches.at(-1)?.index ?? -1;
-  assert.notEqual(selectorIndex, -1, `找不到 CSS selector：${selector}`);
-  const bodyStart = cssSource.indexOf("{", selectorIndex);
-  assert.notEqual(bodyStart, -1, `${selector} 缺少規則內容`);
-  let depth = 0;
-
-  for (let index = bodyStart; index < cssSource.length; index += 1) {
-    if (cssSource[index] === "{") depth += 1;
-    if (cssSource[index] === "}") depth -= 1;
-    if (depth === 0) {
-      return {
-        index: selectorIndex,
-        body: cssSource.slice(bodyStart + 1, index)
-      };
+  return selectorMatches.map((match) => {
+    const selectorIndex = match.index;
+    const bodyStart = cssSource.indexOf("{", selectorIndex);
+    let depth = 0;
+    for (let index = bodyStart; index < cssSource.length; index += 1) {
+      if (cssSource[index] === "{") depth += 1;
+      if (cssSource[index] === "}") depth -= 1;
+      if (depth === 0) {
+        return {
+          index: selectorIndex,
+          body: cssSource.slice(bodyStart + 1, index)
+        };
+      }
     }
-  }
+    throw new Error(`${selector} CSS 規則沒有正確關閉`);
+  });
+}
 
-  throw new Error(`${selector} CSS 規則沒有正確關閉`);
+function cssRuleForSelector(selector) {
+  const rules = cssRulesForSelector(selector);
+  assert.notEqual(rules.length, 0, `找不到 CSS selector：${selector}`);
+  return rules.at(-1);
 }
 
 function selectorSpecificity(selector) {
@@ -487,6 +491,33 @@ test("install panel 是 tripView 的兄弟節點，深色 selector 依真實 DOM
   assert.doesNotMatch(cssSource, /#tripView\[data-active-section\][^{,]*\.install-panel/);
 });
 
+test("深色 bookings/todos 非 active tabs 與 readonly banner 不會保留淺色底", () => {
+  const tabSelectors = [
+    'html[data-theme="dark"] #bookingsPanel .sub-tab:not(.is-active)',
+    'html[data-theme="dark"] .todo-category-tabs .sub-tab:not(.is-active)'
+  ];
+  for (const selector of tabSelectors) {
+    const rule = cssRuleForSelector(selector);
+    assert.match(rule.body, /background:\s*var\(--panel\);/);
+    assert.match(rule.body, /border-color:\s*var\(--ref-line\);/);
+    assert.match(rule.body, /color:\s*var\(--ink\);/);
+  }
+  assert.ok(
+    cssRuleForSelector(tabSelectors[0]).index > cssSource.lastIndexOf("\n#bookingsPanel .sub-tab {"),
+    "bookings 深色覆寫必須在後段淺色 tab 規則之後"
+  );
+  assert.ok(
+    cssRuleForSelector(tabSelectors[1]).index > cssSource.lastIndexOf("\n.todo-category-tabs .sub-tab {"),
+    "todos 深色覆寫必須在後段淺色 tab 規則之後"
+  );
+
+  const readonlyBanner = cssRuleForSelector('html[data-theme="dark"] .readonly-banner');
+  assert.match(readonlyBanner.body, /background:\s*var\(--ref-surface\);/);
+  assert.match(readonlyBanner.body, /border-color:\s*var\(--ref-line\);/);
+  assert.match(readonlyBanner.body, /color:\s*var\(--ink\);/);
+  assert.ok(readonlyBanner.index > cssSource.lastIndexOf("\n.readonly-banner {"));
+});
+
 function relativeLuminance(hex) {
   const channels = hex.match(/[a-f\d]{2}/gi).map((channel) => Number.parseInt(channel, 16) / 255);
   const linear = channels.map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
@@ -516,9 +547,11 @@ test("深色主題實際 coral 與 blue accent 元件改用深色字，每組至
   const accentInk = tokenValue("ref-accent-ink");
   const coral = tokenValue("ref-coral");
   const blue = tokenValue("ref-blue");
-  assert.ok(accentInk && coral && blue, "深色 accent 前景與背景 token 不完整");
+  const green = tokenValue("ref-green");
+  assert.ok(accentInk && coral && blue && green, "深色 accent 前景與背景 token 不完整");
   assert.ok(contrastRatio(accentInk, coral) >= 4.5, `coral 組對比不足：${accentInk} on ${coral}`);
   assert.ok(contrastRatio(accentInk, blue) >= 4.5, `blue 組對比不足：${accentInk} on ${blue}`);
+  assert.ok(contrastRatio(accentInk, green) >= 4.5, `green 組對比不足：${accentInk} on ${green}`);
 
   const coralSelectors = [
     ".primary-button",
@@ -528,19 +561,63 @@ test("深色主題實際 coral 與 blue accent 元件改用深色字，每組至
     "#bookingsPanel .sub-tab.is-active",
     ".booking-ticket-primary",
     ".todo-add-button",
-    ".todo-quick-add-button"
+    ".todo-quick-add-button",
+    ".trip-section-add",
+    ".trip-section-add > span"
   ];
   const blueSelectors = [
     '#tripView[data-active-section="itinerary"] .day-tab.is-active',
-    ".booking-date-tab.is-active"
+    ".booking-date-tab.is-active",
+    ".todo-category-tabs .sub-tab.is-active"
   ];
-  for (const suffix of [...coralSelectors, ...blueSelectors]) {
+  const greenSelectors = [
+    ".todo-list-check input:checked + span::after",
+    ".booking-checklist > div.is-done > span"
+  ];
+  for (const suffix of [...coralSelectors, ...blueSelectors, ...greenSelectors, ".expense-avatar"]) {
     const rule = cssRuleForSelector(`html[data-theme="dark"] ${suffix}`);
     assert.match(rule.body, /color:\s*var\(--ref-accent-ink\);/, `${suffix} 必須使用高對比 accent 文字`);
   }
+  assert.match(
+    cssRuleForSelector('html[data-theme="dark"] .todo-category-tabs .sub-tab.is-active').body,
+    /background:\s*var\(--ref-blue\);/,
+    "todo active tab 在手機與桌機都必須使用與深色字契約一致的背景"
+  );
 
-  for (const gradientStop of ["#ff7359", "#fa6046", "#688ca1", "#6b91a7", "#e95b43"]) {
+  for (const gradientStop of ["#ff7359", "#fa6046", "#688ca1", "#6b91a7", "#6e94aa", "#e95b43"]) {
     assert.ok(contrastRatio(accentInk, gradientStop) >= 4.5, `${gradientStop} 與 accent 文字必須至少 4.5:1`);
+  }
+
+  const avatarStops = ["#f6d8c5", "#ba735e", "#d9e7dc", "#779784", "#dce8ef", "#6e94aa", "#f6e3b7", "#c39136"];
+  for (const gradientStop of avatarStops) {
+    assert.ok(contrastRatio(accentInk, gradientStop) >= 4.5, `${gradientStop} 與頭像文字必須至少 4.5:1`);
+  }
+  const avatar = cssRuleForSelector('html[data-theme="dark"] .expense-avatar:not(.expense-avatar-2):not(.expense-avatar-3):not(.expense-avatar-4)');
+  const avatarThree = cssRuleForSelector('html[data-theme="dark"] .expense-avatar-3');
+  assert.match(avatar.body, /linear-gradient\(145deg,\s*#f6d8c5,\s*#ba735e\)/i);
+  assert.match(avatarThree.body, /linear-gradient\(145deg,\s*#dce8ef,\s*#6e94aa\)/i);
+});
+
+test("深色主題保留白字的深色 accent 實際元件也都至少 4.5:1", () => {
+  const darkTheme = cssSource.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  const tokenValue = (token) => darkTheme.match(new RegExp(`--${token}:\\s*(#[a-f\\d]{6});`, "i"))?.[1];
+  const brand = tokenValue("brand");
+  const brandDark = tokenValue("brand-dark");
+  assert.ok(contrastRatio("#ffffff", brand) >= 4.5);
+  assert.ok(contrastRatio("#ffffff", brandDark) >= 4.5);
+
+  for (const selector of [".expense-stats-tab.is-active", ".member-category-tab.is-active", ".expense-date-tab.is-active"]) {
+    const rule = cssRuleForSelector(selector);
+    assert.match(rule.body, /background:\s*var\(--brand\);/);
+    assert.match(rule.body, /color:\s*#fff;/);
+  }
+  for (const selector of [".travel-day-header > span", ".travel-stop-card.is-current .travel-stop-time"]) {
+    const matchingRule = cssRulesForSelector(selector).find((rule) => /background:\s*var\(--brand-dark\);/.test(rule.body));
+    assert.ok(matchingRule, `${selector} 必須使用 --brand-dark 背景`);
+    assert.match(matchingRule.body, /color:\s*#fff;/);
+  }
+  for (const stop of ["#0a423c", "#0f6b5f"]) {
+    assert.ok(contrastRatio("#ffffff", stop) >= 4.5, `itinerary focus ${stop} 與白字必須至少 4.5:1`);
   }
 });
 
