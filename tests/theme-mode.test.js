@@ -238,10 +238,14 @@ test("深色模式的桌機卡片覆寫以深色 surface 與 line token 取代�
     ".travel-day-metrics span",
     ".travel-day-card",
     ".booking-card",
-    ".booking-focus-card"
+    ".booking-focus-card",
+    ".trip-sticky-nav",
+    ".empty-state",
+    ".desktop-sidebar",
+    ".install-panel"
   ];
   const selectorPattern = selectors
-    .map((selector) => `html\\[data-theme="dark"\\]\\s+${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`)
+    .map((selector) => `html\\[data-theme="dark"\\]\\s+#tripView\\[data-active-section\\]\\s+${selector.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`)
     .join("\\s*,\\s*");
   const darkCardOverrideMatch = cssSource.match(new RegExp(`${selectorPattern}\\s*\\{([\\s\\S]*?)\\n\\}`, "m"));
   const darkCardOverride = darkCardOverrideMatch?.[1] || "";
@@ -250,7 +254,7 @@ test("深色模式的桌機卡片覆寫以深色 surface 與 line token 取代�
   assert.match(darkCardOverride, /border-color:\s*var\(--ref-line\);/);
   assert.ok(
     darkCardOverrideMatch.index > cssSource.lastIndexOf(".expense-table-card {"),
-    "深色卡片覆寫必須放在後段淺色桌機卡片規則之後"
+    "高權重深色卡片覆寫必須放在後段淺色桌機卡片規則之後"
   );
 });
 

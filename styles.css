@@ -11151,18 +11151,22 @@ html[data-theme="dark"] .flexible-stop {
 }
 
 /* Keep late desktop card rules from reintroducing light surfaces in dark mode. */
-html[data-theme="dark"] .trip-visual,
-html[data-theme="dark"] .itinerary-main-column,
-html[data-theme="dark"] .itinerary-side-card,
-html[data-theme="dark"] .expense-summary-card,
-html[data-theme="dark"] .expense-table-card,
-html[data-theme="dark"] .weather-card,
-html[data-theme="dark"] .utility-card,
-html[data-theme="dark"] .todo-group,
-html[data-theme="dark"] .travel-day-metrics span,
-html[data-theme="dark"] .travel-day-card,
-html[data-theme="dark"] .booking-card,
-html[data-theme="dark"] .booking-focus-card {
+html[data-theme="dark"] #tripView[data-active-section] .trip-visual,
+html[data-theme="dark"] #tripView[data-active-section] .itinerary-main-column,
+html[data-theme="dark"] #tripView[data-active-section] .itinerary-side-card,
+html[data-theme="dark"] #tripView[data-active-section] .expense-summary-card,
+html[data-theme="dark"] #tripView[data-active-section] .expense-table-card,
+html[data-theme="dark"] #tripView[data-active-section] .weather-card,
+html[data-theme="dark"] #tripView[data-active-section] .utility-card,
+html[data-theme="dark"] #tripView[data-active-section] .todo-group,
+html[data-theme="dark"] #tripView[data-active-section] .travel-day-metrics span,
+html[data-theme="dark"] #tripView[data-active-section] .travel-day-card,
+html[data-theme="dark"] #tripView[data-active-section] .booking-card,
+html[data-theme="dark"] #tripView[data-active-section] .booking-focus-card,
+html[data-theme="dark"] #tripView[data-active-section] .trip-sticky-nav,
+html[data-theme="dark"] #tripView[data-active-section] .empty-state,
+html[data-theme="dark"] #tripView[data-active-section] .desktop-sidebar,
+html[data-theme="dark"] #tripView[data-active-section] .install-panel {
   background: var(--ref-surface);
   border-color: var(--ref-line);
 }
