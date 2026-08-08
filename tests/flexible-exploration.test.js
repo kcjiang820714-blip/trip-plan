@@ -265,10 +265,10 @@ test("彈性探索版本會由新版 PWA 預快取提供", () => {
   const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
   const cacheVersion = serviceWorkerSource.match(/const CACHE_NAME = "trip-notebook-v(\d+)"/)?.[1];
 
-  assert.equal(cacheVersion, "173", "景點橫幅版面必須建立 v173 PWA 快取");
-  assert.equal(appVersion, "173");
-  assert.equal(styleVersion, "173");
-  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=173"\)/, "新版 Service Worker 必須以 v173 重新註冊");
+  assert.equal(cacheVersion, "174", "景點橫幅版面必須建立 v174 PWA 快取");
+  assert.equal(appVersion, "174");
+  assert.equal(styleVersion, "174");
+  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=174"\)/, "新版 Service Worker 必須以 v174 重新註冊");
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/app\\.js\\?v=${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/styles\\.css\\?v=${styleVersion}"`));
 });

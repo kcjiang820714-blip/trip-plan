@@ -4046,6 +4046,7 @@ function renderAttachmentGallery(attachments, ownerType, ownerId, excludedAttach
   const visibleAttachments = attachments.filter((attachment) => attachment.id !== excludedAttachmentId);
   const images = visibleAttachments.filter((attachment) => attachment.type.startsWith("image/"));
   const files = visibleAttachments.filter((attachment) => !attachment.type.startsWith("image/"));
+  const isSingleItineraryImage = ownerType === "item" && images.length === 1;
 
   if (images.length === 0 && files.length === 0) return "";
 
@@ -4053,12 +4054,12 @@ function renderAttachmentGallery(attachments, ownerType, ownerId, excludedAttach
     <div class="attachment-gallery" aria-label="附件">
       ${
         images.length
-          ? `<div class="photo-grid">
+          ? `${isSingleItineraryImage ? "" : `<div class="photo-grid">`}
               ${images
                 .map(
                   (attachment) => `
                     <button
-                      class="photo-thumb"
+                      class="photo-thumb${isSingleItineraryImage ? " itinerary-detail-single-image" : ""}"
                       type="button"
                       data-open-attachment="${escapeHtml(ownerType)}"
                       data-owner-id="${escapeHtml(ownerId)}"
@@ -4070,7 +4071,7 @@ function renderAttachmentGallery(attachments, ownerType, ownerId, excludedAttach
                   `
                 )
                 .join("")}
-            </div>`
+            ${isSingleItineraryImage ? "" : "</div>"}`
           : ""
       }
       ${
@@ -8247,7 +8248,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=173").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=174").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);
