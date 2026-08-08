@@ -5,8 +5,15 @@
 ## 範圍
 
 - 依 `release-review.md` 修正 expenses advanced 展開區的淺色內層。
-- 只修改 `styles.css`、`tests/theme-mode.test.js` 與本報告。
-- 未修改 `app.js`、`index.html`、`sw.js`，本階段不調整 PWA 版本。
+- CSS 修正後的專門 PWA 階段只同步 v164 → v165，未修改其他模組 URL 或功能。
+
+## PWA v165 追補
+
+- `index.html` 的 CSS／app query string 同步為 `v=165`。
+- `app.js` 註冊 `./sw.js?v=165`。
+- `sw.js` 的 `CACHE_NAME` 與兩個預快取資產同步為 `v165`。
+- `DARK_MODE_PWA_ASSET_VERSION` 由 `164` 升為 `165`。
+- TDD RED：先升版本鎖定，20 項主題測試中僅版本測試失敗（實際 `164`、期望 `165`）；同步後轉為 20/20 通過。
 
 ## RED
 
@@ -49,4 +56,4 @@ node --test --test-name-pattern='bookings/todos|accent' tests/theme-mode.test.js
 - `node --check app.js`：通過。
 - `node --test tests/*.test.js tests/*.test.mjs`：`213 pass / 0 fail`（原 212 筆加上本次 1 筆契約測試）。
 - `git diff --check`：通過。
-- `git diff -- app.js index.html sw.js`：無差異，PWA 與程式邏輯未變更。
+- PWA diff 範圍：僅 v164 → v165 同步，未變更其他程式邏輯或模組 URL。
