@@ -62,15 +62,28 @@ test("彈性探索資料正規化會補齊欄位、保留有效景點並輸出�
   const item = normalizeItem({
     id: "explore-1",
     flexibleStops: [
-      { id: "temple", name: "  清水寺  ", intro: "  可看本堂舞台  ", ignored: "不能保留" },
+      {
+        id: "temple",
+        name: "  清水寺  ",
+        intro: "  可看本堂舞台  ",
+        location: "  日本京都府京都市東山區清水1丁目294  ",
+        photo: { id: "photo-1", dataUrl: "data:image/jpeg;base64,abc" },
+        ignored: "不能保留"
+      },
       { id: "blank", name: "   ", intro: "不應出現" },
       { name: "二年坂", intro: null }
     ]
   });
 
   assert.deepEqual(item.flexibleStops, [
-    { id: "temple", name: "清水寺", intro: "可看本堂舞台" },
-    { id: "generated-item", name: "二年坂", intro: "" }
+    {
+      id: "temple",
+      name: "清水寺",
+      intro: "可看本堂舞台",
+      location: "日本京都府京都市東山區清水1丁目294",
+      photo: { id: "photo-1", dataUrl: "data:image/jpeg;base64,abc" }
+    },
+    { id: "generated-item", name: "二年坂", intro: "", location: "", photo: null }
   ]);
   assert.equal(formatFlexibleExploreSummary(item.flexibleStops), "2 個景點可彈性安排");
 });
@@ -99,14 +112,17 @@ test("彈性探索編輯器保留景點介紹，並在切換類型時只啟用�
         dataset: { flexibleStopId: "temple" },
         querySelector: (selector) => ({
           '[data-flexible-stop-field="name"]': { value: " 清水寺 " },
-          '[data-flexible-stop-field="intro"]': { value: " 可看本堂舞台 " }
-        })[selector]
+          '[data-flexible-stop-field="intro"]': { value: " 可看本堂舞台 " },
+          '[data-flexible-stop-field="location"]': { value: " 京都府清水寺 " }
+        })[selector],
+        flexibleStopPhoto: { id: "photo-1", dataUrl: "data:image/jpeg;base64,abc" }
       },
       {
         dataset: { flexibleStopId: "blank" },
         querySelector: (selector) => ({
           '[data-flexible-stop-field="name"]': { value: "   " },
-          '[data-flexible-stop-field="intro"]': { value: "不應儲存" }
+          '[data-flexible-stop-field="intro"]': { value: "不應儲存" },
+          '[data-flexible-stop-field="location"]': { value: "不應儲存" }
         })[selector]
       }
     ]
@@ -114,6 +130,7 @@ test("彈性探索編輯器保留景點介紹，並在切換類型時只啟用�
   const fields = {
     flexibleStopList,
     escapeHtml: (value) => String(value),
+    getAttachmentSource: (attachment) => attachment?.dataUrl || attachment?.publicUrl || "",
     typeInput: { value: "彈性探索" },
     flexibleExplorationFields: createControl(),
     flexibleEndTimeInput: createControl(),
@@ -135,7 +152,15 @@ test("彈性探索編輯器保留景點介紹，並在切換類型時只啟用�
   renderFlexibleStopEditors([{ id: "temple", name: "清水寺", intro: "可看本堂舞台" }]);
   assert.match(flexibleStopList.innerHTML, /清水寺/, "編輯器應呈現景點名稱");
   assert.match(flexibleStopList.innerHTML, /可看本堂舞台/, "編輯器應呈現景點介紹");
-  assert.deepEqual(collectFlexibleStops(), [{ id: "temple", name: "清水寺", intro: "可看本堂舞台" }], "儲存時應濾除空白景點，保留介紹");
+  assert.match(flexibleStopList.innerHTML, /導航地點/, "每個景點應能設定獨立導航地點");
+  assert.match(flexibleStopList.innerHTML, /type="file"[^>]*accept="image\/\*"/, "每個景點應能獨立上傳照片");
+  assert.deepEqual(collectFlexibleStops(), [{
+    id: "temple",
+    name: "清水寺",
+    intro: "可看本堂舞台",
+    location: "京都府清水寺",
+    photo: { id: "photo-1", dataUrl: "data:image/jpeg;base64,abc" }
+  }], "儲存時應濾除空白景點，保留介紹、導航地點與該景點照片");
 
   syncFlexibleExplorationFields();
   assert.equal(fields.flexibleExplorationFields.hidden, false);
@@ -151,32 +176,50 @@ test("彈性探索編輯器保留景點介紹，並在切換類型時只啟用�
 });
 
 function loadFlexibleTimelineHelpers() {
-  const sources = ["formatFlexibleExploreTimeRange", "renderFlexibleExplorationDetails"]
+  const sources = ["formatFlexibleExploreTimeRange", "getFlexibleStopMapQuery", "renderFlexibleStopQuickList", "renderFlexibleExplorationDetails"]
     .map(functionSource)
     .join("\n");
-  return new Function("escapeHtml", `${sources}\nreturn { formatFlexibleExploreTimeRange, renderFlexibleExplorationDetails };`)(
-    (value) => String(value)
+  return new Function("escapeHtml", "googleMapsUrl", "getAttachmentSource", `${sources}\nreturn { formatFlexibleExploreTimeRange, getFlexibleStopMapQuery, renderFlexibleStopQuickList, renderFlexibleExplorationDetails };`)(
+    (value) => String(value),
+    (value) => `https://maps.test/?query=${encodeURIComponent(value)}`,
+    (attachment) => attachment?.dataUrl || attachment?.publicUrl || ""
   );
 }
 
-test("彈性探索時間卡收合顯示時間範圍與摘要，展開後才顯示景點介紹", () => {
-  const { formatFlexibleExploreTimeRange, renderFlexibleExplorationDetails } = loadFlexibleTimelineHelpers();
+test("彈性探索每個景點的照片與導航都獨立，不得使用區段標題", () => {
+  const { formatFlexibleExploreTimeRange, getFlexibleStopMapQuery, renderFlexibleStopQuickList, renderFlexibleExplorationDetails } = loadFlexibleTimelineHelpers();
   const item = {
     type: "彈性探索",
+    title: "東山半日散步",
+    place: "東山半日散步",
     time: "14:00",
     endTime: "17:30",
     flexibleStops: [
-      { id: "temple", name: "清水寺", intro: "看本堂舞台與音羽瀑布" },
-      { id: "slope", name: "二年坂", intro: "逛老街小店" }
+      {
+        id: "temple",
+        name: "清水寺",
+        intro: "看本堂舞台與音羽瀑布",
+        location: "京都府京都市東山區清水1丁目294",
+        photo: { id: "photo-1", name: "清水寺.jpg", type: "image/jpeg", dataUrl: "data:image/jpeg;base64,abc" }
+      },
+      { id: "slope", name: "二年坂", intro: "逛老街小店", location: "", photo: null }
     ]
   };
 
   assert.equal(formatFlexibleExploreTimeRange(item), "14:00–17:30", "收合卡只應顯示區段起訖時間");
+  assert.equal(getFlexibleStopMapQuery(item.flexibleStops[0]), "京都府京都市東山區清水1丁目294");
+  assert.equal(getFlexibleStopMapQuery(item.flexibleStops[1]), "二年坂", "導航地點留白時應使用該景點名稱");
+  const quickList = renderFlexibleStopQuickList(item);
   const details = renderFlexibleExplorationDetails(item);
+  assert.match(quickList, /data-open-attachment="flexible-stop"/);
+  assert.match(quickList, /%E4%BA%AC%E9%83%BD%E5%BA%9C%E4%BA%AC%E9%83%BD%E5%B8%82%E6%9D%B1%E5%B1%B1%E5%8D%80%E6%B8%85%E6%B0%B41%E4%B8%81%E7%9B%AE294/);
   assert.match(details, /清水寺/);
   assert.match(details, /看本堂舞台與音羽瀑布/);
   assert.match(details, /二年坂/);
   assert.match(details, /逛老街小店/);
+  assert.match(details, /data-open-attachment="flexible-stop"/);
+  assert.match(details, />導航<\/a>/);
+  assert.doesNotMatch(`${quickList}${details}`, /query=%E6%9D%B1%E5%B1%B1%E5%8D%8A%E6%97%A5%E6%95%A3%E6%AD%A5/, "任何景點導航都不能使用區段標題");
   assert.doesNotMatch(details, /checkbox|type="time"|14:00|17:30/i, "景點明細不應有勾選或個別時間欄位");
 });
 
@@ -185,7 +228,9 @@ test("彈性探索版本會由新版 PWA 預快取提供", () => {
   const styleVersion = htmlSource.match(/<link rel="stylesheet" href="\.\/styles\.css\?v=(\d+)"/)?.[1];
   const cacheVersion = serviceWorkerSource.match(/const CACHE_NAME = "trip-notebook-v(\d+)"/)?.[1];
 
-  assert.ok(Number(cacheVersion) > 141, "加入新行程類型後必須建立新的 PWA 快取版本");
+  assert.equal(cacheVersion, "166", "景點照片與導航上線時必須建立 v166 PWA 快取");
+  assert.equal(appVersion, "166");
+  assert.equal(styleVersion, "166");
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/app\\.js\\?v=${appVersion}"`));
   assert.match(serviceWorkerSource, new RegExp(`"\\.\/styles\\.css\\?v=${styleVersion}"`));
 });

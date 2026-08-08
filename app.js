@@ -1002,7 +1002,17 @@ function normalizeFlexibleStops(stops) {
       return {
         id: stop.id || createId(),
         name,
-        intro: typeof stop.intro === "string" ? stop.intro.trim() : ""
+        intro: typeof stop.intro === "string" ? stop.intro.trim() : "",
+        location: typeof stop.location === "string" ? stop.location.trim() : "",
+        photo: normalizeAttachment(
+          typeof stop.photo === "string"
+            ? {
+                name: "景點照片",
+                type: String(stop.photo).startsWith("data:image/") ? String(stop.photo).slice(5, String(stop.photo).indexOf(";")) : "image/jpeg",
+                ...(String(stop.photo).startsWith("data:") ? { dataUrl: stop.photo } : { publicUrl: stop.photo })
+              }
+            : stop.photo
+        ) || null
       };
     })
     .filter(Boolean);
@@ -1489,7 +1499,11 @@ function stripAttachmentsForCloudTrip(trip) {
       ...day,
       items: (day.items || []).map((item) => ({
         ...item,
-        attachments: (item.attachments || []).map(toCloudAttachment).filter(Boolean)
+        attachments: (item.attachments || []).map(toCloudAttachment).filter(Boolean),
+        flexibleStops: (item.flexibleStops || []).map((stop) => ({
+          ...stop,
+          photo: toCloudAttachment(stop.photo)
+        }))
       }))
     })),
     bookings: (trip.bookings || []).map((booking) => ({
@@ -1842,6 +1856,9 @@ async function uploadTripAttachments(client, trip, options) {
     for (const item of day.items || []) {
       for (const attachment of item.attachments || []) {
         if (!await uploadAttachmentToCloud(client, trip, "item", item.id || "item", attachment, options)) return false;
+      }
+      for (const stop of item.flexibleStops || []) {
+        if (stop.photo && !await uploadAttachmentToCloud(client, trip, "flexible-stop", stop.id || item.id || "stop", stop.photo, options)) return false;
       }
     }
   }
@@ -2773,8 +2790,9 @@ function renderTravelDayPanel(focus) {
           }
         </div>
       </div>
+      ${renderFlexibleStopQuickList(item)}
       <div class="itinerary-focus-actions">
-        <a class="primary-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">開啟導航</a>
+        ${item.type === "彈性探索" ? "" : `<a class="primary-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">開啟導航</a>`}
         <button class="secondary-action" type="button" data-focus-next-item="${escapeHtml(item.id || "")}">查看詳情</button>
       </div>
     </article>
@@ -2786,18 +2804,74 @@ function formatFlexibleExploreTimeRange(item) {
   return item.time && item.endTime ? `${item.time}–${item.endTime}` : item.time || item.endTime || "";
 }
 
+function getFlexibleStopMapQuery(stop) {
+  return String(stop?.location || stop?.name || "").trim();
+}
+
+function renderFlexibleStopQuickList(item) {
+  if (item?.type !== "彈性探索") return "";
+  const stops = Array.isArray(item.flexibleStops) ? item.flexibleStops : [];
+  if (!stops.length) return "";
+
+  return `
+    <section class="flexible-stop-quick-list" aria-label="景點快速導航">
+      ${stops.map((stop) => {
+        const photoSource = getAttachmentSource(stop.photo);
+        const mapQuery = getFlexibleStopMapQuery(stop);
+        return `
+          <article class="flexible-stop-quick-item">
+            ${photoSource ? `
+              <button
+                class="flexible-stop-photo-button"
+                type="button"
+                data-open-attachment="flexible-stop"
+                data-owner-id="${escapeHtml(stop.id || "")}"
+                data-attachment-id="${escapeHtml(stop.photo.id || "")}"
+                title="查看 ${escapeHtml(stop.name || "景點")} 照片"
+              >
+                <img src="${escapeHtml(photoSource)}" alt="${escapeHtml(stop.name || "景點")} 照片" loading="lazy" />
+              </button>
+            ` : ""}
+            <strong>${escapeHtml(stop.name || "未命名景點")}</strong>
+            ${mapQuery ? `<a class="secondary-action flexible-stop-map-link" href="${googleMapsUrl(mapQuery)}" target="_blank" rel="noopener">導航</a>` : ""}
+          </article>
+        `;
+      }).join("")}
+    </section>
+  `;
+}
+
 function renderFlexibleExplorationDetails(item) {
   if (item?.type !== "彈性探索") return "";
   const stops = Array.isArray(item.flexibleStops) ? item.flexibleStops : [];
   return `
     <section class="flexible-stop-list" aria-label="彈性探索景點">
       ${stops
-        .map((stop) => `
-          <article class="flexible-stop">
-            <h4>${escapeHtml(stop.name || "未命名景點")}</h4>
-            ${stop.intro ? `<p>${escapeHtml(stop.intro)}</p>` : ""}
-          </article>
-        `)
+        .map((stop) => {
+          const photoSource = getAttachmentSource(stop.photo);
+          const mapQuery = getFlexibleStopMapQuery(stop);
+          return `
+            <article class="flexible-stop">
+              ${photoSource ? `
+                <button
+                  class="flexible-stop-detail-photo"
+                  type="button"
+                  data-open-attachment="flexible-stop"
+                  data-owner-id="${escapeHtml(stop.id || "")}"
+                  data-attachment-id="${escapeHtml(stop.photo.id || "")}"
+                  title="查看 ${escapeHtml(stop.name || "景點")} 照片"
+                >
+                  <img src="${escapeHtml(photoSource)}" alt="${escapeHtml(stop.name || "景點")} 照片" loading="lazy" />
+                </button>
+              ` : ""}
+              <div class="flexible-stop-detail-content">
+                <h4>${escapeHtml(stop.name || "未命名景點")}</h4>
+                ${stop.intro ? `<p>${escapeHtml(stop.intro)}</p>` : ""}
+                ${mapQuery ? `<a class="secondary-action flexible-stop-map-link" href="${googleMapsUrl(mapQuery)}" target="_blank" rel="noopener">導航</a>` : ""}
+              </div>
+            </article>
+          `;
+        })
         .join("")}
     </section>
   `;
@@ -2846,6 +2920,7 @@ function renderItineraryTimeline(day, focusItem) {
             </span>
             <span class="expand-indicator" aria-hidden="true">⌄</span>
           </button>
+          ${isFlexibleExploration ? renderFlexibleStopQuickList(item) : ""}
           <div class="item-details" id="${escapeHtml(detailsId)}" ${isExpanded ? "" : "hidden"}>
             ${renderFlightInfo(item)}
             ${renderTransportInfo(item)}
@@ -2857,7 +2932,7 @@ function renderItineraryTimeline(day, focusItem) {
             ${item.content ? `<p class="item-detail-content">${escapeHtml(item.content)}</p>` : ""}
             ${item.note ? `<p class="item-detail-note">${escapeHtml(item.note)}</p>` : ""}
             <div class="card-actions">
-              <a class="text-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">地圖</a>
+              ${isFlexibleExploration ? "" : `<a class="text-button" href="${googleMapsUrl(getMapQuery(item))}" target="_blank" rel="noopener">地圖</a>`}
               ${canManageTrip(trip) ? `<button class="text-button" type="button" data-edit="${index}">編輯</button>` : ""}
             </div>
           </div>
@@ -5906,6 +5981,14 @@ function findAttachment(ownerType, ownerId, attachmentId) {
     return item?.attachments.find((attachment) => attachment.id === attachmentId);
   }
 
+  if (ownerType === "flexible-stop") {
+    const stop = currentTrip()
+      .days.flatMap((day) => day.items)
+      .flatMap((item) => item.flexibleStops || [])
+      .find((entry) => entry.id === ownerId);
+    return stop?.photo?.id === attachmentId ? stop.photo : null;
+  }
+
   if (ownerType === "todo") {
     const todo = currentTrip().todos.find((item) => item.id === ownerId);
     return todo?.attachments.find((attachment) => attachment.id === attachmentId) || null;
@@ -7077,9 +7160,33 @@ transportSegments.addEventListener("click", (event) => {
 flexibleEndHourInput.addEventListener("change", () => syncHiddenTimeInput(flexibleEndTimeInput, flexibleEndHourInput, flexibleEndMinuteInput));
 flexibleEndMinuteInput.addEventListener("change", () => syncHiddenTimeInput(flexibleEndTimeInput, flexibleEndHourInput, flexibleEndMinuteInput));
 addFlexibleStopButton.addEventListener("click", () => {
-  renderFlexibleStopEditors([...collectFlexibleStops(), { id: createId(), name: "", intro: "" }]);
+  renderFlexibleStopEditors([...collectFlexibleStops(), { id: createId(), name: "", intro: "", location: "", photo: null }]);
+});
+flexibleStopList.addEventListener("change", async (event) => {
+  const input = event.target.closest("[data-flexible-stop-photo-input]");
+  if (!input?.files?.length) return;
+  const editor = input.closest("[data-flexible-stop-id]");
+  if (!editor) return;
+
+  try {
+    editor.flexibleStopPhoto = await compressImageAttachment(input.files[0]);
+    updateFlexibleStopPhotoEditor(editor);
+  } catch (error) {
+    window.alert(error.message || "照片無法讀取，請改用較小的圖片。");
+  } finally {
+    input.value = "";
+  }
 });
 flexibleStopList.addEventListener("click", (event) => {
+  const removePhotoButton = event.target.closest("[data-remove-flexible-stop-photo]");
+  if (removePhotoButton) {
+    const editor = removePhotoButton.closest("[data-flexible-stop-id]");
+    if (editor) {
+      editor.flexibleStopPhoto = null;
+      updateFlexibleStopPhotoEditor(editor);
+    }
+    return;
+  }
   const removeButton = event.target.closest("[data-remove-flexible-stop]");
   if (!removeButton) return;
   removeButton.closest("[data-flexible-stop-id]")?.remove();
@@ -7194,6 +7301,11 @@ desktopEditTripButton?.addEventListener("click", () => {
 });
 
 travelDayPanel?.addEventListener("click", (event) => {
+  const attachmentButton = event.target.closest("[data-open-attachment]");
+  if (attachmentButton) {
+    openAttachment(attachmentButton.dataset.openAttachment, attachmentButton.dataset.ownerId, attachmentButton.dataset.attachmentId);
+    return;
+  }
   const button = event.target.closest("[data-focus-next-item]");
   if (!button) return;
 
@@ -7413,6 +7525,9 @@ itemForm.addEventListener("submit", async (event) => {
     ? getKeptAttachments(itemExistingAttachments, existingItem.attachments || [])
     : [];
   const removedItemAttachments = existingItem ? getRemovedAttachments(existingItem.attachments || [], keptItemAttachments) : [];
+  const flexibleStopPhotos = item.flexibleStops.map((stop) => stop.photo).filter(Boolean);
+  const existingFlexibleStopPhotos = (existingItem?.flexibleStops || []).map((stop) => stop.photo).filter(Boolean);
+  const removedFlexibleStopPhotos = getRemovedAttachments(existingFlexibleStopPhotos, flexibleStopPhotos);
 
   if (editingIndex === null) {
     item.id = createId();
@@ -7428,9 +7543,10 @@ itemForm.addEventListener("submit", async (event) => {
   let itemLocalSaveStarted = false;
   try {
     await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "item", item.id, item.attachments);
+    await uploadOwnerAttachmentsBeforeLocalSave(currentTrip(), "flexible-stop", item.id, flexibleStopPhotos);
     itemLocalSaveStarted = true;
     saveLibrary();
-    deleteRemovedAttachmentsFromCloud(removedItemAttachments);
+    deleteRemovedAttachmentsFromCloud([...removedItemAttachments, ...removedFlexibleStopPhotos]);
   } catch (error) {
     if (editingIndex === null) currentDay().items = currentDay().items.filter((entry) => entry.id !== item.id);
     else {
@@ -7866,7 +7982,8 @@ function syncAttractionFields() {
 }
 
 function renderFlexibleStopEditors(stops = []) {
-  flexibleStopList.innerHTML = (Array.isArray(stops) ? stops : [])
+  const stopList = Array.isArray(stops) ? stops : [];
+  flexibleStopList.innerHTML = stopList
     .map((stop) => `
       <section class="flexible-stop-editor" data-flexible-stop-id="${escapeHtml(stop.id || createId())}">
         <label>
@@ -7877,10 +7994,42 @@ function renderFlexibleStopEditors(stops = []) {
           景點介紹
           <textarea data-flexible-stop-field="intro" rows="3" placeholder="值得看的特色、散步路線或備註">${escapeHtml(stop.intro || "")}</textarea>
         </label>
+        <label>
+          導航地點
+          <input data-flexible-stop-field="location" value="${escapeHtml(stop.location || "")}" placeholder="可填完整地址；留白時使用景點名稱" />
+        </label>
+        <label class="flexible-stop-photo-field">
+          景點照片
+          <input data-flexible-stop-photo-input type="file" accept="image/*" />
+        </label>
+        <div class="flexible-stop-photo-preview" data-flexible-stop-photo-preview ${getAttachmentSource(stop.photo) ? "" : "hidden"}>
+          ${getAttachmentSource(stop.photo) ? `
+            <img src="${escapeHtml(getAttachmentSource(stop.photo))}" alt="${escapeHtml(stop.name || "景點")} 照片預覽" />
+            <button class="text-button danger-text" type="button" data-remove-flexible-stop-photo>移除照片</button>
+          ` : ""}
+        </div>
         <button class="text-button danger-text" type="button" data-remove-flexible-stop>移除景點</button>
       </section>
     `)
     .join("");
+
+  flexibleStopList.querySelectorAll("[data-flexible-stop-id]").forEach((editor, index) => {
+    if (stopList[index]?.photo) editor.flexibleStopPhoto = stopList[index].photo;
+  });
+}
+
+function updateFlexibleStopPhotoEditor(editor) {
+  const preview = editor?.querySelector("[data-flexible-stop-photo-preview]");
+  if (!preview) return;
+  const photo = editor.flexibleStopPhoto || null;
+  const source = getAttachmentSource(photo);
+  preview.hidden = !source;
+  preview.innerHTML = source
+    ? `
+      <img src="${escapeHtml(source)}" alt="${escapeHtml(editor.querySelector('[data-flexible-stop-field="name"]')?.value || "景點")} 照片預覽" />
+      <button class="text-button danger-text" type="button" data-remove-flexible-stop-photo>移除照片</button>
+    `
+    : "";
 }
 
 function collectFlexibleStops() {
@@ -7888,7 +8037,9 @@ function collectFlexibleStops() {
     .map((editor) => ({
       id: editor.dataset.flexibleStopId || createId(),
       name: editor.querySelector('[data-flexible-stop-field="name"]')?.value.trim() || "",
-      intro: editor.querySelector('[data-flexible-stop-field="intro"]')?.value.trim() || ""
+      intro: editor.querySelector('[data-flexible-stop-field="intro"]')?.value.trim() || "",
+      location: editor.querySelector('[data-flexible-stop-field="location"]')?.value.trim() || "",
+      photo: editor.flexibleStopPhoto || null
     }))
     .filter((stop) => stop.name);
 }
@@ -8059,7 +8210,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=165").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=166").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);
