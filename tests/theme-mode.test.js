@@ -210,3 +210,40 @@ test("深色同步遮罩與彈性景點卡不回退淺色，且列印持續白�
   const printCss = cssSource.match(/@media print\s*\{([\s\S]*?)\n\}/)?.[1] || "";
   assert.match(printCss, /background:\s*white\s*!important;/);
 });
+
+function relativeLuminance(hex) {
+  const channels = hex.match(/[a-f\d]{2}/gi).map((channel) => Number.parseInt(channel, 16) / 255);
+  const linear = channels.map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+}
+
+function contrastRatio(foreground, background) {
+  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort((a, b) => b - a);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+test("深色主題的白字按鈕與標籤背景 token 至少有 4.5:1 對比", () => {
+  const darkTheme = cssSource.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  for (const token of ["brand", "brand-dark", "color-primary", "color-primary-strong"]) {
+    const value = darkTheme.match(new RegExp(`--${token}:\\s*(#[a-f\\d]{6});`, "i"))?.[1];
+    assert.ok(value, `缺少 --${token} 深色 token`);
+    assert.ok(
+      contrastRatio("#ffffff", value) >= 4.5,
+      `白字搭配 --${token}（${value}）必須至少有 4.5:1 對比`,
+    );
+  }
+});
+
+test("手機 app bar 在內部保留固定主題鈕安全區，桌機才使用右外距", () => {
+  const mobileAppBar = cssSource.match(/#tripView\[data-active-section\]\s+\.trip-appbar\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(mobileAppBar, /grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+44px;/);
+  assert.match(mobileAppBar, /padding-right:\s*64px;/);
+
+  const mobileActions = cssSource.match(/#tripView\[data-active-section\]\s+\.trip-appbar-actions\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(mobileActions, /width:\s*44px;/);
+  assert.match(mobileActions, /margin-right:\s*0;/);
+  assert.match(cssSource, /\*\s*\{\s*box-sizing:\s*border-box;/);
+
+  assert.match(cssSource, /@media \(min-width: 680px\)\s*\{\s*\.trip-appbar-actions\s*\{\s*margin-right:\s*56px;/);
+  assert.doesNotMatch(cssSource, /\/\* Keep the app bar controls[\s\S]*?\.trip-appbar-actions\s*\{\s*margin-right:\s*56px;/);
+});

@@ -7594,8 +7594,8 @@ html[data-theme="dark"] {
   --panel: #1b2a26;
   --ink: #edf4ef;
   --muted: #b3c0ba;
-  --brand: #4eb3a2;
-  --brand-dark: #a3ddd3;
+  --brand: #0f6b5f;
+  --brand-dark: #0a423c;
   --accent: #f0a464;
   --gold: #e8c36a;
   --sky: #213a46;
@@ -7608,8 +7608,8 @@ html[data-theme="dark"] {
   --color-surface: #172420;
   --color-ink: #edf4ef;
   --color-muted: #b3c0ba;
-  --color-primary: #4eb3a2;
-  --color-primary-strong: #a3ddd3;
+  --color-primary: #0f6b5f;
+  --color-primary-strong: #0a423c;
   --color-accent: #f0a464;
   --color-sky: #213a46;
   --color-line: #344640;
@@ -7667,9 +7667,25 @@ html[data-theme="dark"] .flexible-stop {
   background: var(--color-surface);
 }
 
-/* Keep the app bar controls clear of the fixed 44px theme toggle. */
-.trip-appbar-actions {
-  margin-right: 56px;
+/* On mobile, reserve the toggle area inside the app bar's border box. */
+@media (max-width: 679px) {
+  #tripView[data-active-section] .trip-appbar {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    padding-right: 64px;
+  }
+
+  #tripView[data-active-section] .trip-appbar-actions {
+    width: 44px;
+    min-width: 0;
+    margin-right: 0;
+  }
+}
+
+/* Wider layouts have room to reserve space outside the actions grid. */
+@media (min-width: 680px) {
+  .trip-appbar-actions {
+    margin-right: 56px;
+  }
 }
 
 @media (max-width: 679px) {
