@@ -518,6 +518,41 @@ test("深色 bookings/todos 非 active tabs 與 readonly banner 不會保留淺�
   assert.ok(readonlyBanner.index > cssSource.lastIndexOf("\n.readonly-banner {"));
 });
 
+test("深色記帳進階設定的 member、rate 與 ledger 內層不會回退淺色底", () => {
+  const scope = 'html[data-theme="dark"] #tripView[data-active-section="expenses"]';
+  const surfaceSelectors = [
+    ".member-edit-row",
+    ".exchange-rate-row",
+    ".member-ledger-card",
+    ".ledger-row"
+  ];
+  for (const suffix of surfaceSelectors) {
+    const selector = `${scope} ${suffix}`;
+    const rule = cssRuleForSelector(selector);
+    assert.match(rule.body, /background:\s*var\(--ref-surface\);/, `${suffix} 必須使用深色 surface`);
+    assert.match(rule.body, /border-color:\s*var\(--ref-line\);/, `${suffix} 必須使用深色邊線`);
+    assert.ok(rule.index > cssSource.lastIndexOf(`\n${suffix} {`), `${suffix} 深色規則必須放在淺色規則後方`);
+    assert.ok(compareSpecificity(selectorSpecificity(selector), selectorSpecificity(suffix)) > 0);
+  }
+
+  for (const suffix of [".member-edit-row input", ".exchange-rate-row input"]) {
+    const selector = `${scope} ${suffix}`;
+    const rule = cssRuleForSelector(selector);
+    assert.match(rule.body, /background:\s*var\(--panel\);/, `${suffix} 必須使用深色輸入底`);
+    assert.match(rule.body, /border-color:\s*var\(--line\);/);
+    assert.match(rule.body, /color:\s*var\(--ink\);/);
+    assert.ok(rule.index > cssSource.lastIndexOf(`\n${suffix} {`), `${suffix} 深色規則必須放在淺色規則後方`);
+    assert.ok(compareSpecificity(selectorSpecificity(selector), selectorSpecificity(suffix)) > 0);
+  }
+
+  const ledgerHeadSelector = `${scope} .ledger-head`;
+  const ledgerHead = cssRuleForSelector(ledgerHeadSelector);
+  assert.match(ledgerHead.body, /background:\s*var\(--panel\);/);
+  assert.match(ledgerHead.body, /color:\s*var\(--ink\);/);
+  assert.ok(ledgerHead.index > cssSource.lastIndexOf("\n.ledger-head {"));
+  assert.ok(compareSpecificity(selectorSpecificity(ledgerHeadSelector), selectorSpecificity(".ledger-head")) > 0);
+});
+
 function relativeLuminance(hex) {
   const channels = hex.match(/[a-f\d]{2}/gi).map((channel) => Number.parseInt(channel, 16) / 255);
   const linear = channels.map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));

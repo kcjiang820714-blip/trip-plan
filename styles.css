@@ -11278,3 +11278,25 @@ html[data-theme="dark"] .expense-avatar:not(.expense-avatar-2):not(.expense-avat
 html[data-theme="dark"] .expense-avatar-3 {
   background: linear-gradient(145deg, #dce8ef, #6e94aa);
 }
+
+/* Expense advanced details must stay dark after their late light component rules. */
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .member-edit-row,
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .exchange-rate-row,
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .member-ledger-card,
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .ledger-row {
+  background: var(--ref-surface);
+  border-color: var(--ref-line);
+}
+
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .member-edit-row input,
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .exchange-rate-row input {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] #tripView[data-active-section="expenses"] .ledger-head {
+  background: var(--panel);
+  border-color: var(--ref-line);
+  color: var(--ink);
+}
