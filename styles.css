@@ -11382,6 +11382,20 @@ html[data-theme="dark"] #tripView[data-active-section="expenses"] .ledger-head {
   line-height: 1;
 }
 
+/* Later compact timeline rules align generic times to the top; time ranges stay card-centred. */
+#tripView[data-active-section="itinerary"] #itineraryPanel .itinerary-time-range.is-stacked {
+  align-self: center;
+}
+
+@media (max-width: 679px) {
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:has(.itinerary-time-range.is-stacked) {
+    grid-template-columns: 72px minmax(0, 1fr) 24px !important;
+    grid-template-areas: "time content arrow" !important;
+    align-items: center;
+    align-content: center;
+  }
+}
+
 #itineraryPanel .itinerary-time-range.is-single {
   display: block;
   width: max-content;

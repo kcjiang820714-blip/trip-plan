@@ -8246,7 +8246,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=169").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=170").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);

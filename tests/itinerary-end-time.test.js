@@ -114,13 +114,26 @@ test("垂直時段在桌機與手機都保留狀態類別，時長不會造成�
   assert.match(styleSource, /@media\s*\(min-width:\s*1100px\)[\s\S]*?\.itinerary-time-range\.is-stacked/);
 });
 
-test("垂直時段版本由 PWA v169 一致提供", () => {
-  assert.match(htmlSource, /styles\.css\?v=169/);
-  assert.match(htmlSource, /app\.js\?v=169/);
-  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=169"\)/);
-  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v169"/);
-  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=169"/);
-  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=169"/);
+test("垂直起訖時間會置中對齊對應的行程卡", () => {
+  assert.match(
+    styleSource,
+    /#tripView\[data-active-section="itinerary"\]\s+#itineraryPanel\s+\.itinerary-time-range\.is-stacked\s*\{[\s\S]*?align-self:\s*center/,
+    "有起訖時間的左側時間欄必須對齊右側行程卡的垂直中央"
+  );
+  assert.match(
+    styleSource,
+    /@media\s*\(max-width:\s*679px\)[\s\S]*?\.item-summary:has\(\.itinerary-time-range\.is-stacked\)[\s\S]*?grid-template-columns:\s*72px\s+minmax\(0,\s*1fr\)\s+24px\s*!important[\s\S]*?grid-template-areas:\s*"time content arrow"/,
+    "手機版的垂直時段要在左欄，並與右側內容同列置中"
+  );
+});
+
+test("垂直時段置中版本由 PWA v170 一致提供", () => {
+  assert.match(htmlSource, /styles\.css\?v=170/);
+  assert.match(htmlSource, /app\.js\?v=170/);
+  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=170"\)/);
+  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v170"/);
+  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=170"/);
+  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=170"/);
 });
 
 test("行程表單提供獨立開始與結束時間欄位", () => {
