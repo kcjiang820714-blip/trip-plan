@@ -2848,7 +2848,8 @@ function renderItineraryTimelineTime(item) {
   const duration = formatItineraryDuration(item);
 
   if (!startTime || !endTime || !duration) {
-    return `<span class="time itinerary-time-range is-single"><span class="itinerary-time-start">${escapeHtml(formatItineraryTimeRange(item))}</span></span>`;
+    const singleItineraryTimeClass = supportsItineraryEndTime(item?.type) && startTime && !endTime ? " is-single-itinerary-time" : "";
+    return `<span class="time itinerary-time-range is-single${singleItineraryTimeClass}"><span class="itinerary-time-start">${escapeHtml(formatItineraryTimeRange(item))}</span></span>`;
   }
 
   return `
@@ -8246,7 +8247,7 @@ deleteTripButton.addEventListener("click", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js?v=170").then((registration) => registration.update());
+  navigator.serviceWorker.register("./sw.js?v=171").then((registration) => registration.update());
 }
 
 themeToggleButton?.addEventListener("click", toggleTheme);

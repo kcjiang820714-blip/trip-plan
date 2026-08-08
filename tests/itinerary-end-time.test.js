@@ -100,9 +100,10 @@ test("有起訖時間的一般行程使用垂直時段，舊行程與交通維�
   assert.match(stacked, /class="itinerary-time-end">08:30<\/span>/);
   assert.match(stacked, /class="itinerary-time-duration">55 Min<\/span>/);
   assert.match(flexible, /class="itinerary-time-duration">2 Hr 30 Min<\/span>/);
-  assert.match(legacy, /class="time itinerary-time-range is-single"[^>]*>[\s\S]*12:00/);
+  assert.match(legacy, /class="time itinerary-time-range is-single is-single-itinerary-time"[^>]*>[\s\S]*12:00/);
   assert.doesNotMatch(legacy, /itinerary-time-connector|itinerary-time-duration/);
   assert.match(transport, /class="time itinerary-time-range is-single"[^>]*>[\s\S]*08:00/);
+  assert.doesNotMatch(transport, /is-single-itinerary-time/, "交通不應套用一般行程的單一時間置中版型");
   assert.doesNotMatch(transport, /09:00|itinerary-time-connector|itinerary-time-duration/);
 });
 
@@ -127,13 +128,26 @@ test("垂直起訖時間會置中對齊對應的行程卡", () => {
   );
 });
 
-test("垂直時段置中版本由 PWA v170 一致提供", () => {
-  assert.match(htmlSource, /styles\.css\?v=170/);
-  assert.match(htmlSource, /app\.js\?v=170/);
-  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=170"\)/);
-  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v170"/);
-  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=170"/);
-  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=170"/);
+test("沒有結束時間的單一時間也會置中對齊行程卡", () => {
+  assert.match(
+    styleSource,
+    /#tripView\[data-active-section="itinerary"\]\s+#itineraryPanel\s+\.itinerary-time-range\.is-single-itinerary-time\s*\{[\s\S]*?align-self:\s*center[\s\S]*?padding-top:\s*0/,
+    "單一時間必須與有起訖時間的行程同樣置中，且不保留舊有頂部間距"
+  );
+  assert.match(
+    styleSource,
+    /@media\s*\(max-width:\s*679px\)[\s\S]*?\.item-summary:has\(\.itinerary-time-range\.is-single-itinerary-time\)[\s\S]*?grid-template-columns:\s*72px\s+minmax\(0,\s*1fr\)\s+24px\s*!important[\s\S]*?align-items:\s*center/,
+    "手機版的單一時間也要留在左欄，並與卡片垂直置中"
+  );
+});
+
+test("單一時間置中版本由 PWA v171 一致提供", () => {
+  assert.match(htmlSource, /styles\.css\?v=171/);
+  assert.match(htmlSource, /app\.js\?v=171/);
+  assert.match(appSource, /serviceWorker\.register\("\.\/sw\.js\?v=171"\)/);
+  assert.match(serviceWorkerSource, /const CACHE_NAME = "trip-notebook-v171"/);
+  assert.match(serviceWorkerSource, /"\.\/styles\.css\?v=171"/);
+  assert.match(serviceWorkerSource, /"\.\/app\.js\?v=171"/);
 });
 
 test("行程表單提供獨立開始與結束時間欄位", () => {

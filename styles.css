@@ -11388,7 +11388,8 @@ html[data-theme="dark"] #tripView[data-active-section="expenses"] .ledger-head {
 }
 
 @media (max-width: 679px) {
-  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:has(.itinerary-time-range.is-stacked) {
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:has(.itinerary-time-range.is-stacked),
+  #tripView[data-active-section="itinerary"] #itineraryPanel .item-summary:has(.itinerary-time-range.is-single-itinerary-time) {
     grid-template-columns: 72px minmax(0, 1fr) 24px !important;
     grid-template-areas: "time content arrow" !important;
     align-items: center;
@@ -11400,6 +11401,12 @@ html[data-theme="dark"] #tripView[data-active-section="expenses"] .ledger-head {
   display: block;
   width: max-content;
   max-width: 100%;
+}
+
+/* Old entries only have one time too: keep that label centred beside its card. */
+#tripView[data-active-section="itinerary"] #itineraryPanel .itinerary-time-range.is-single-itinerary-time {
+  align-self: center;
+  padding-top: 0;
 }
 
 #itineraryPanel .itinerary-time-start,
